@@ -41,7 +41,7 @@ const returnTipoOperario = (tipoId) => {
 
 const submitHandler = () => {
   // Validar formulario
-  if (!form.name || !form.email || !form.ud_operativa_fk || !form.type) {
+  if (!form.name || !form.ud_operativa_fk || !form.type) {
     console.error('Faltan campos requeridos')
     return false
   }
@@ -139,7 +139,7 @@ defineExpose({
             type="email"
             label="e-mail"
             placeholder="e-mail"
-            validation="required"
+            
             class="w-full"
           />
           <FormKit
@@ -147,7 +147,7 @@ defineExpose({
             type="number"
             label="phone"
             placeholder="phone"
-            validation="required"
+            
             class="w-full"
           />
         </div>
