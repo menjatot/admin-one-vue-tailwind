@@ -1,5 +1,5 @@
 import { ref, reactive, computed, watch } from 'vue'
-import { getAnaliticasPaginated } from '@/services/analiticas'
+import { getAnaliticasPaginated, getAnaliticasFiltered } from '@/services/analiticas'
 
 export function useServerPagination(initialOptions = {}) {
   const loading = ref(false)
@@ -52,14 +52,24 @@ export function useServerPagination(initialOptions = {}) {
     error.value = null
 
     try {
+      // Limpiar filtros vacíos antes de enviar
+      const cleanFilters = {}
+      Object.keys(filters).forEach(key => {
+        if (filters[key] !== null && filters[key] !== undefined && filters[key] !== '') {
+          cleanFilters[key] = filters[key]
+        }
+      })
+
       const options = {
         page: pagination.page,
         pageSize: pagination.pageSize,
         sortBy: sorting.sortBy,
         sortOrder: sorting.sortOrder,
-        filters: { ...filters },
+        filters: cleanFilters,
         searchText: searchText.value
       }
+
+      console.log('🚀 useServerPagination.loadData con opciones:', options)
 
       const result = await getAnaliticasPaginated(options)
 
@@ -114,8 +124,21 @@ export function useServerPagination(initialOptions = {}) {
 
   // Función para aplicar filtros
   const applyFilters = (newFilters) => {
+    console.log('⚙️ applyFilters llamado con:', newFilters)
+
+    // Limpiar filtros anteriores
+    Object.keys(filters).forEach(key => {
+      filters[key] = null
+    })
+
+    // Aplicar nuevos filtros
     Object.assign(filters, newFilters)
     pagination.page = 1 // Reset a primera página
+
+    console.log('⚙️ Filtros actualizados, llamando a loadData()')
+
+    // Forzar recarga de datos inmediatamente
+    loadData()
   }
 
   // Función para limpiar filtros
@@ -138,10 +161,39 @@ export function useServerPagination(initialOptions = {}) {
     loadData()
   }
 
-  // Watch para recargar datos cuando cambian los parámetros
+  // Función para cargar TODAS las analíticas que coinciden con los filtros actuales (sin paginación)
+  // Útil para exportaciones y reportes
+  const loadAllFilteredData = async () => {
+    try {
+      // Limpiar filtros vacíos antes de enviar
+      const cleanFilters = {}
+      Object.keys(filters).forEach(key => {
+        if (filters[key] !== null && filters[key] !== undefined && filters[key] !== '') {
+          cleanFilters[key] = filters[key]
+        }
+      })
+
+      const options = {
+        sortBy: sorting.sortBy,
+        sortOrder: sorting.sortOrder,
+        filters: cleanFilters,
+        searchText: searchText.value
+      }
+
+      const allData = await getAnaliticasFiltered(options)
+      return allData
+    } catch (err) {
+      console.error('Error loading all filtered data:', err)
+      throw err
+    }
+  }
+
+  // Watch para recargar datos cuando cambian página, pageSize o sorting
+  // Los filtros se manejan directamente en applyFilters() para evitar doble carga
   watch(
-    [() => pagination.page, () => pagination.pageSize, sorting, filters, searchText],
+    [() => pagination.page, () => pagination.pageSize, sorting],
     () => {
+      console.log('📡 Watcher disparado - cambio en paginación o sorting')
       loadData()
     },
     { deep: true }
@@ -156,10 +208,10 @@ export function useServerPagination(initialOptions = {}) {
     sorting,
     filters,
     searchText,
-    
+
     // Computed
     paginationInfo,
-    
+
     // Métodos
     loadData,
     goToPage,
@@ -170,6 +222,7 @@ export function useServerPagination(initialOptions = {}) {
     applyFilters,
     clearFilters,
     search,
-    refresh
+    refresh,
+    loadAllFilteredData
   }
 }
