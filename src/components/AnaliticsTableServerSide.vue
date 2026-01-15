@@ -67,20 +67,22 @@ const {
   applyFilters,
   clearFilters,
   search,
-  refresh
+  refresh,
+  loadAllFilteredData
 } = useServerPagination()
 
 defineProps({
   checkable: Boolean
 })
 
-defineExpose({ 
+defineExpose({
   resetForm: () => {
     resetForm()
     clearFilters()
-  }, 
-  checkedRows, 
-  filters: localFilters 
+  },
+  checkedRows,
+  filters: localFilters,
+  loadAllFilteredData
 })
 
 const showOnlyWrongValues = ref(false)
@@ -172,9 +174,17 @@ const getTipoAnalitica = (id) => {
   }
 }
 
+// Computed para filtrar analíticas según el checkbox
+const filteredAnalitics = computed(() => {
+  if (!showOnlyWrongValues.value) {
+    return analitics.value
+  }
+  return analitics.value.filter(analitica => isWrongValues(analitica))
+})
+
 const allRowsChecked = computed(() => {
-  return analitics.value.length > 0 &&
-    analitics.value.every((analitica) =>
+  return filteredAnalitics.value.length > 0 &&
+    filteredAnalitics.value.every((analitica) =>
       checkedRows.value.some((row) => row.id === analitica.id)
     )
 })
@@ -211,14 +221,14 @@ const isWrongValues = (analitica) => {
 
 const toggleAllRows = (isChecked) => {
   if (isChecked) {
-    analitics.value.forEach((analitica) => {
+    filteredAnalitics.value.forEach((analitica) => {
       if (!checkedRows.value.some((row) => row.id === analitica.id)) {
         checkedRows.value.push(analitica)
       }
     })
   } else {
     checkedRows.value = checkedRows.value.filter(
-      (row) => !analitics.value.some((analitica) => analitica.id === row.id)
+      (row) => !filteredAnalitics.value.some((analitica) => analitica.id === row.id)
     )
   }
 }
@@ -235,14 +245,19 @@ const addAnalitica = (analitica, isChecked) => {
 
 // Aplicar filtros locales a la paginación server-side
 const applyLocalFilters = () => {
-  const serverFilters = {
-    fecha_inicio: localFilters.fecha_inicio,
-    fecha_final: localFilters.fecha_final,
-    punto_muestreo_fk: localFilters.punto_muestreo_fk,
-    personal_fk: localFilters.operario,
-    type: localFilters.type,
-    zona_fk: localFilters.zona
-  }
+  // Crear objeto de filtros sin valores null, undefined o vacíos
+  const serverFilters = {}
+
+  if (localFilters.fecha_inicio) serverFilters.fecha_inicio = localFilters.fecha_inicio
+  if (localFilters.fecha_final) serverFilters.fecha_final = localFilters.fecha_final
+  if (localFilters.punto_muestreo_fk) serverFilters.punto_muestreo_fk = localFilters.punto_muestreo_fk
+  if (localFilters.operario) serverFilters.personal_fk = localFilters.operario
+  if (localFilters.type) serverFilters.type = localFilters.type
+  if (localFilters.zona) serverFilters.zona_fk = localFilters.zona
+  if (localFilters.infraestructura) serverFilters.infraestructura_fk = localFilters.infraestructura
+  if (localFilters.uo) serverFilters.uo_fk = localFilters.uo
+
+  console.log('🔍 Aplicando filtros locales (filtrados):', serverFilters)
   applyFilters(serverFilters)
 }
 
@@ -315,29 +330,39 @@ const handleSort = (column) => {
   toggleSort(column)
 }
 
-// Watch para aplicar filtros cuando cambien los filtros locales
-const debouncedApplyFilters = (() => {
-  let timeoutId
-  return () => {
-    clearTimeout(timeoutId)
-    timeoutId = setTimeout(applyLocalFilters, 300)
-  }
-})()
+// Flag para evitar aplicar filtros durante la inicialización
+const isInitializing = ref(true)
 
-// Observar cambios en filtros locales
+// Observar cambios en filtros locales y aplicarlos inmediatamente (sin debounce)
 const stopWatching = []
 Object.keys(localFilters).forEach(key => {
   const stopWatcher = watch(
     () => localFilters[key],
-    () => debouncedApplyFilters(),
+    (newValue, oldValue) => {
+      // No aplicar filtros durante la inicialización
+      if (isInitializing.value) {
+        console.log(`⏭️ Ignorando cambio de "${key}" durante inicialización`)
+        return
+      }
+
+      console.log(`🎯 Watcher disparado para filtro "${key}":`, { oldValue, newValue })
+      // Aplicar filtros inmediatamente para máxima reactividad
+      applyLocalFilters()
+    },
     { deep: true }
   )
   stopWatching.push(stopWatcher)
 })
 
 onMounted(() => {
+  console.log('🚀 Componente montado, inicializando...')
   resetForm()
   loadData()
+  // Habilitar watchers después de la carga inicial
+  nextTick(() => {
+    isInitializing.value = false
+    console.log('✅ Inicialización completa, watchers activos')
+  })
 })
 </script>
 
@@ -490,9 +515,9 @@ onMounted(() => {
       <thead>
         <tr>
           <th v-if="checkable" class="text-center">
-            <TableCheckboxCell 
-              :model-value="allRowsChecked" 
-              :disabled="loading || analitics.length === 0"
+            <TableCheckboxCell
+              :model-value="allRowsChecked"
+              :disabled="loading || filteredAnalitics.length === 0"
               @update:model-value="toggleAllRows"
             />
           </th>
@@ -531,7 +556,7 @@ onMounted(() => {
         </tr>
       </thead>
       <tbody>
-        <template v-for="analitica in analitics" :key="analitica.id">
+        <template v-for="analitica in filteredAnalitics" :key="analitica.id">
           <tr>
             <TableCheckboxCell
               v-if="checkable"
@@ -641,9 +666,9 @@ onMounted(() => {
         </template>
 
         <!-- Empty state -->
-        <tr v-if="!loading && analitics.length === 0">
+        <tr v-if="!loading && filteredAnalitics.length === 0">
           <td :colspan="checkable ? 6 : 5" class="text-center py-8 text-gray-500">
-            No se encontraron analíticas con los filtros aplicados
+            {{ showOnlyWrongValues ? 'No hay analíticas con valores incorrectos' : 'No se encontraron analíticas con los filtros aplicados' }}
           </td>
         </tr>
       </tbody>

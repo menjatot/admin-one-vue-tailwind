@@ -59,21 +59,37 @@ const downloadXML = () => {
 
 const selectedAnaliticasFromTable = computed(() => tablaAnaliticas.value?.checkedRows || []);
 
-// Para exportaciones, cargar analíticas si no están disponibles
+// Ref para almacenar todas las analíticas filtradas (para server-side)
+const allFilteredAnaliticas = ref([]);
+
+// Para exportaciones, retornar las analíticas según el modo
 const allAnaliticasForDateRange = computed(() => {
-  // Si usamos server-side, no necesitamos todas las analíticas para exportar
+  // Si usamos server-side, retornar las analíticas filtradas cargadas
   if (useServerSide.value) {
-    console.warn('⚠️ Exportación en modo server-side puede requerir carga adicional')
-    return selectedAnaliticasFromTable.value // Solo exportar seleccionadas
+    return allFilteredAnaliticas.value
   }
+  // En client-side, usar las analíticas del store
   return plantasStore.getAnaliticas
 });
 
-// Método para forzar carga de todas las analíticas cuando se necesite para exportación
+// Método para cargar todas las analíticas filtradas cuando se necesite para exportación (server-side)
 const loadAllAnalyticsForExport = async () => {
-  if (!plantasStore.isAnalyticasLoaded) { 
-    console.log('🔄 Cargando todas las analíticas para exportación...')
-    await plantasStore.loadAnaliticas()
+  if (useServerSide.value) {
+    console.log('🔄 Cargando todas las analíticas filtradas para exportación...')
+    try {
+      const allData = await tablaAnaliticas.value?.loadAllFilteredData()
+      allFilteredAnaliticas.value = allData || []
+      console.log(`✅ Cargadas ${allFilteredAnaliticas.value.length} analíticas filtradas`)
+    } catch (error) {
+      console.error('Error cargando analíticas filtradas:', error)
+      allFilteredAnaliticas.value = []
+    }
+  } else {
+    // En client-side, cargar del store si no están cargadas
+    if (!plantasStore.isAnalyticasLoaded) {
+      console.log('🔄 Cargando todas las analíticas para exportación...')
+      await plantasStore.loadAnaliticas()
+    }
   }
 };
 
@@ -112,6 +128,7 @@ const loadAllAnalyticsForExport = async () => {
             company-name="AQLARA Ciclo Integral del Agua"
             :enable-html-print="true"
             :selected-zona="selectedZona"
+            :on-before-export="loadAllAnalyticsForExport"
           />
 
           <BaseButton

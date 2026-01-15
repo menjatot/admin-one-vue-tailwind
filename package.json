@@ -4,7 +4,8 @@
   "scripts": {
     "dev": "doppler run --config dev -- vite",
     "build:staging": "doppler run --config staging -- vite build",
-    "build": "doppler run --config production -- vite build",
+    "build:prod": "doppler run --config prd -- vite build",
+    "build": "doppler run --config dev -- vite build",
     "preview": "doppler run --config production -- vite preview"
   },
   "dependencies": {

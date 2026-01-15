@@ -1,0 +1,1 @@
+import{a7 as s,o as r,y as n,f as o,h as l}from"./index-1053069b.js";const a=["src"],d={__name:"SettingsView",setup(u){const t=s();return(c,e)=>(r(),n("div",null,[e[0]||(e[0]=o("h1",null,"Panel de control",-1)),o("img",{src:l(t).userAvatar,class:"rounded-full h-8 w-8",alt:"Foto de perfil"},null,8,a)]))}};export{d as default};

@@ -1,8 +1,9 @@
 <script setup>
 import { defineProps, toRefs } from 'vue';
 import BaseButton from '@/components/BaseButton.vue';
-import { mdiPrinter } from '@mdi/js'; // Solo necesitamos el icono de imprimir
+import { mdiPrinter, mdiFileExcel } from '@mdi/js';
 import { usePlantasStore } from '@/stores/plantas';
+import * as XLSX from 'xlsx';
 
 const props = defineProps({
   selectedRows: {
@@ -31,6 +32,10 @@ const props = defineProps({
   },
   selectedZona: {
     type: [Number, null],
+    default: null
+  },
+  onBeforeExport: {
+    type: Function,
     default: null
   }
 });
@@ -93,7 +98,12 @@ const getAnaliticasParaExportar = () => {
 
 // ...existing code...
 
-const handlePrintHTML = () => {
+const handlePrintHTML = async () => {
+  // Llamar a la función de callback antes de exportar (si existe)
+  if (props.onBeforeExport) {
+    await props.onBeforeExport()
+  }
+
   const exportData = getAnaliticasParaExportar();
   if (!exportData) return;
   let { analiticas, minDate, maxDate } = exportData;
@@ -214,6 +224,136 @@ const handlePrintHTML = () => {
   printWindow.document.close();
 };
 
+const handleExportExcel = async () => {
+  // Llamar a la función de callback antes de exportar (si existe)
+  if (props.onBeforeExport) {
+    await props.onBeforeExport()
+  }
+
+  const exportData = getAnaliticasParaExportar();
+  if (!exportData) return;
+  let { analiticas, minDate, maxDate } = exportData;
+
+  // Ordenar las analíticas de la misma manera que en el PDF
+  analiticas = [...analiticas].sort((a, b) => {
+    if (a.punto_muestreo_fk !== b.punto_muestreo_fk) {
+      return a.punto_muestreo_fk - b.punto_muestreo_fk;
+    }
+    const fechaA = new Date(a.fecha);
+    const fechaB = new Date(b.fecha);
+    return fechaA - fechaB;
+  });
+
+  // Construir el título con la zona si está seleccionada
+  let tituloInforme = `Informe de Analíticas (${formatDateForDisplay(minDate)} - ${formatDateForDisplay(maxDate)})`;
+  if (selectedZona.value) {
+    const nombreZona = getZonaNombre(selectedZona.value);
+    if (nombreZona) {
+      tituloInforme = `Informe de Analíticas - ${nombreZona} (${formatDateForDisplay(minDate)} - ${formatDateForDisplay(maxDate)})`;
+    }
+  }
+
+  // Preparar los datos para Excel
+  const excelData = [];
+
+  // Fila de título
+  excelData.push([companyName.value]);
+  excelData.push([tituloInforme]);
+  excelData.push([]); // Fila vacía para separación
+
+  // Encabezados de la tabla
+  excelData.push([
+    'Fecha',
+    'Punto de Muestreo',
+    'Código SINAC',
+    'Cloro (mg/l)',
+    'pH',
+    'Turbidez (NTU)',
+    'Olor',
+    'Sabor',
+    'Color'
+  ]);
+
+  // Datos de las analíticas
+  analiticas.forEach(a => {
+    excelData.push([
+      formatDateForDisplay(a.fecha),
+      getPuntoMuestreoNombre(a.punto_muestreo_fk),
+      a.punto_muestreo_fk,
+      a.cloro !== null && a.cloro !== undefined ? a.cloro : '',
+      a.ph !== null && a.ph !== undefined ? a.ph : '',
+      a.turbidez !== null && a.turbidez !== undefined ? a.turbidez : '',
+      formatOrganoleptico(a.olor),
+      formatOrganoleptico(a.sabor),
+      formatOrganoleptico(a.color)
+    ]);
+  });
+
+  // Crear libro de trabajo y hoja
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(excelData);
+
+  // Configurar anchos de columna
+  ws['!cols'] = [
+    { wch: 12 },  // Fecha
+    { wch: 30 },  // Punto de Muestreo
+    { wch: 15 },  // Código SINAC
+    { wch: 15 },  // Cloro
+    { wch: 10 },  // pH
+    { wch: 15 },  // Turbidez
+    { wch: 15 },  // Olor
+    { wch: 15 },  // Sabor
+    { wch: 15 }   // Color
+  ];
+
+  // Aplicar estilos a las celdas de título y encabezado
+  const range = XLSX.utils.decode_range(ws['!ref']);
+
+  // Estilo para el título (primera fila)
+  if (ws['A1']) {
+    ws['A1'].s = {
+      font: { bold: true, sz: 14, color: { rgb: '00447C' } },
+      alignment: { horizontal: 'center' }
+    };
+  }
+
+  // Estilo para el subtítulo (segunda fila)
+  if (ws['A2']) {
+    ws['A2'].s = {
+      font: { bold: true, sz: 12 },
+      alignment: { horizontal: 'center' }
+    };
+  }
+
+  // Estilo para los encabezados (cuarta fila - índice 3)
+  for (let col = range.s.c; col <= range.e.c; col++) {
+    const cellAddress = XLSX.utils.encode_cell({ r: 3, c: col });
+    if (ws[cellAddress]) {
+      ws[cellAddress].s = {
+        font: { bold: true, color: { rgb: 'FFFFFF' } },
+        fill: { fgColor: { rgb: '00447C' } },
+        alignment: { horizontal: 'center' }
+      };
+    }
+  }
+
+  // Combinar celdas para el título (primera fila)
+  ws['!merges'] = [
+    { s: { r: 0, c: 0 }, e: { r: 0, c: 8 } }, // Título
+    { s: { r: 1, c: 0 }, e: { r: 1, c: 8 } }  // Subtítulo
+  ];
+
+  // Agregar la hoja al libro
+  XLSX.utils.book_append_sheet(wb, ws, 'Analíticas');
+
+  // Generar nombre de archivo
+  const nombreZona = selectedZona.value ? `_${getZonaNombre(selectedZona.value).replace(/\s+/g, '_')}` : '';
+  const fileName = `Informe_Analiticas_AQLARA${nombreZona}_${formatDateForDisplay(minDate).replace(/\//g, '-')}_${formatDateForDisplay(maxDate).replace(/\//g, '-')}.xlsx`;
+
+  // Descargar el archivo
+  XLSX.writeFile(wb, fileName);
+};
+
 // const handlePrintHTML = () => {
 //   const exportData = getAnaliticasParaExportar();
 //   if (!exportData) return;
@@ -303,16 +443,25 @@ const handlePrintHTML = () => {
 
 <template>
   <div class="flex flex-wrap gap-2">
-    <BaseButton 
-    v-if="props.enableHtmlPrint"
-    class="bg-gray-300 hover:bg-gray-400 text-gray-800 py-2 px-4 rounded"
-    
+    <BaseButton
+      v-if="props.enableHtmlPrint"
+      class="bg-gray-300 hover:bg-gray-400 text-gray-800 py-2 px-4 rounded"
       label="Imprimir"
       :icon="mdiPrinter"
       rounded-full
       small
       :disabled="selectedRows.length === 0"
       @click="handlePrintHTML"
+    />
+
+    <BaseButton
+      class="bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded"
+      label="Exportar Excel"
+      :icon="mdiFileExcel"
+      rounded-full
+      small
+      :disabled="selectedRows.length === 0"
+      @click="handleExportExcel"
     />
   </div>
 </template>

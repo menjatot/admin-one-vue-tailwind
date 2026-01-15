@@ -4,11 +4,43 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Development Commands
 
-- **Start development server**: `npm run dev` (Vite development server)
-- **Build for production**: `npm run build` (Vite build)
-- **Preview production build**: `npm run preview --port 4173`
+- **Start development server**: `npm run dev` (Vite development server with Doppler dev config)
+- **Build for staging**: `npm run build:staging` (Vite build with Doppler staging config)
+- **Build for production**: `npm run build` (Vite build with Doppler production config)
+- **Preview production build**: `npm run preview` (Preview build with Doppler production config)
 - **Lint code**: `npm run lint` (ESLint with auto-fix)
-- **Format code**: `npm run format` (Prettier)
+
+**Note**: All commands use Doppler for environment variable management. Ensure Doppler CLI is installed and configured.
+
+## Deployment to Production
+
+### Building for Production
+
+1. Run `npm run build` to create production build with Doppler production config
+2. The build outputs to `dist/` directory
+3. Upload the entire `dist/` folder contents to the server path `apps.aqlara.com/sinaq/`
+
+### Important: .htaccess Configuration
+
+- The `.htaccess` file is located in `public/.htaccess`
+- Vite automatically copies files from `public/` to `dist/` during build
+- **The `.htaccess` file is required** for Vue Router hash mode and CORS headers
+- After uploading to server, verify `.htaccess` is present in `/sinaq/.htaccess`
+- Recommended permissions: `.htaccess` = 644, directories = 755, files = 644
+
+### Apache Requirements
+
+The application requires the following Apache modules enabled:
+- `mod_rewrite` - For Vue Router URL handling
+- `mod_headers` - For CORS and security headers
+
+### Troubleshooting 403 Forbidden
+
+If you get 403 Forbidden after deployment:
+1. Verify `.htaccess` exists in the deployment directory
+2. Check file permissions (644 for files, 755 for directories)
+3. Ensure `mod_rewrite` and `mod_headers` are enabled in Apache
+4. Verify `index.html` exists in the root deployment directory
 
 ## Project Architecture
 
@@ -33,6 +65,20 @@ This is a Vue 3 admin dashboard application built with:
 - **jspdf + jspdf-autotable**: PDF generation
 - **xlsx**: Excel file handling
 - **date-fns**: Date manipulation
+
+### Environment Management
+
+This project uses **Doppler** for secure environment variable management:
+
+- **Environment variables** are injected automatically via Doppler CLI
+- **Configs**: `dev`, `staging`, `production` (mapped in package.json scripts)
+- **Required variables**:
+  - `VITE_SUPABASE_URL`: Supabase project URL
+  - `VITE_SUPABASE_ANON_KEY`: Supabase anonymous key
+  - `VITE_MICROSOFT_CLIENT_ID`: Azure AD application client ID
+  - `VITE_MICROSOFT_TENANT_ID`: Azure AD tenant ID
+  - `VITE_BASE_URL`: Base path for deployment (defaults to `/sinaq/`)
+  - `VITE_DEV_PORT`: Development server port (defaults to 3000)
 
 ### Application Structure
 
@@ -97,6 +143,15 @@ Services in `src/services/` handle data operations:
 ### Build Configuration
 
 - **Vite target**: ES2022 for top-level await support
-- **Base path**: `/sinaq/` for deployment
-- **Vue options**: Production hydration mismatch details disabled
-- **Asset handling**: Static assets served from `/sinaq/` base path
+- **Base path**: Dynamic via `VITE_BASE_URL` environment variable (defaults to `/sinaq/`)
+- **Vue options**: Production hydration mismatch details disabled (`__VUE_PROD_HYDRATION_MISMATCH_DETAILS__: false`)
+- **Dev server port**: Configurable via `VITE_DEV_PORT` (defaults to 3000)
+- **Asset handling**: Static assets served from configured base path
+
+### Important Development Notes
+
+- **Microsoft Authentication**: Uses popup-based login for desktop, redirect-based for mobile devices
+- **Graph API Integration**: Fetches user profile including photo from Microsoft Graph API
+- **Supabase Client**: Auto-refresh tokens enabled with persistent session support
+- **Service Layer Pattern**: Each domain entity has its own service file with CRUD operations
+- **Composables**: Reusable logic in `src/composables/` for auth, permissions, data loading, etc.

@@ -28,3 +28,8 @@ coverage
 *.sw?
 
 .codegpt
+
+.env
+.env.local
+.env.*.local
+doppler.yaml
