@@ -1,5 +1,5 @@
 <script setup>
-import { computed, reactive, ref, toValue, watch } from 'vue'
+import { computed, onMounted, reactive, ref, toValue, watch } from 'vue'
 import {
   mdiBallotOutline,
   mdiAccount,
@@ -8,7 +8,8 @@ import {
   mdiStopCircle,
   mdiSignal,
   mdiChartBellCurve,
-  mdiLogin
+  mdiLogin,
+  mdiCrosshairsGps
 } from '@mdi/js'
 import SectionMain from '@/components/SectionMain.vue'
 import CardBox from '@/components/CardBox.vue'
@@ -43,6 +44,9 @@ const plantasStore = usePlantasStore()
 const API_KEY_ICONS = import.meta.env.VITE_ICONS_API_KEY
 const zoom = ref(13)
 const posicionEditable = ref(false)
+const userLocation = ref(null)
+const isLoadingLocation = ref(false)
+const map = ref(null)
 
 const props = defineProps({
   uo: {
@@ -176,6 +180,53 @@ const markerIcon = (icon) =>
     popupAnchor: [0, -45] // point from which the popup should open relative to the iconAnchor
   })
 
+// Icono para la posición actual del usuario (círculo azul pulsante)
+const userLocationIcon = L.divIcon({
+  html: `
+    <div class="user-location-marker">
+      <div class="user-location-pulse"></div>
+      <div class="user-location-dot"></div>
+    </div>
+  `,
+  className: 'user-location-icon',
+  iconSize: [24, 24],
+  iconAnchor: [12, 12]
+})
+
+const getUserLocation = () => {
+  if (!navigator.geolocation) {
+    console.error('Geolocalización no soportada por este navegador')
+    return
+  }
+
+  isLoadingLocation.value = true
+
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      const coords = [position.coords.latitude, position.coords.longitude]
+      userLocation.value = coords
+      isLoadingLocation.value = false
+      console.log('Ubicación del usuario obtenida:', coords)
+    },
+    (error) => {
+      console.error('Error de geolocalización:', error.message)
+      isLoadingLocation.value = false
+    },
+    {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 0
+    }
+  )
+}
+
+onMounted(() => {
+  // Obtener ubicación del usuario al montar el componente
+  setTimeout(() => {
+    getUserLocation()
+  }, 500)
+})
+
 const getGoogleMapsUrl = (lat, lng) => {
   return `https://www.google.com/maps?q=${lat},${lng}`
 }
@@ -255,6 +306,20 @@ defineExpose({
               layer-type="base"
               name="OpenStreetMap"
             ></l-tile-layer>
+
+            <!-- Marcador de posición actual del usuario -->
+            <l-marker
+              v-if="userLocation"
+              :lat-lng="userLocation"
+              :icon="userLocationIcon"
+            >
+              <l-tooltip>
+                <div class="text-center">
+                  <p class="text-sm font-semibold">Tu ubicación actual</p>
+                </div>
+              </l-tooltip>
+            </l-marker>
+
             <l-marker
               :lat-lng="
                 form.posicion
@@ -361,40 +426,54 @@ defineExpose({
     </CardBox>
   </SectionMain>
 </template>
-<!-- <style scoped>
+<style scoped>
+/* Estilos para el marcador de ubicación del usuario */
+:deep(.user-location-icon) {
+  background: transparent !important;
+  border: none !important;
+}
 
-.marker-pin {
-  width: 30px;
-  height: 30px;
-  border-radius: 50% 50% 50% 0;
-  background: #c30b82;
+:deep(.user-location-marker) {
+  position: relative;
+  width: 24px;
+  height: 24px;
+}
+
+:deep(.user-location-dot) {
   position: absolute;
-  transform: rotate(-45deg);
-  left: 50%;
   top: 50%;
-  margin: -15px 0 0 -15px;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 14px;
+  height: 14px;
+  background-color: #4285f4;
+  border: 3px solid white;
+  border-radius: 50%;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  z-index: 2;
 }
 
-.marker-pin::after {
-    content: '';
-    width: 24px;
-    height: 24px;
-    margin: 3px 0 0 3px;
-    background: #fff;
-    position: absolute;
-    border-radius: 50%;
- }
-
-.custom-div-icon i {
-   position: absolute;
-   width: 22px;
-   font-size: 22px;
-   left: 0;
-   right: 0;
-   margin: 10px auto;
-   text-align: center;
+:deep(.user-location-pulse) {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 24px;
+  height: 24px;
+  background-color: rgba(66, 133, 244, 0.3);
+  border-radius: 50%;
+  animation: pulse 2s ease-out infinite;
+  z-index: 1;
 }
 
-
-
-</style> -->
+@keyframes pulse {
+  0% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(2.5);
+    opacity: 0;
+  }
+}
+</style>
