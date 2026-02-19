@@ -12,5 +12,5 @@
     Header set Access-Control-Allow-Origin "*"
     Header set Access-Control-Allow-Methods "GET,POST,OPTIONS,DELETE,PUT"
     Header set Access-Control-Allow-Headers "DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Authorization"
-    Header set Content-Security-Policy "default-src 'self' 'unsafe-inline' 'unsafe-eval' https://login.microsoftonline.com https://*.microsoft.com data: ws:;"
+    Header set Content-Security-Policy "default-src 'self' 'unsafe-inline' 'unsafe-eval' data:; connect-src 'self' https://*.supabase.co https://login.microsoftonline.com https://*.microsoft.com https://graph.microsoft.com https://api.factorialhr.com; img-src 'self' data: blob: https:; font-src 'self' data:;"
   </IfModule>
