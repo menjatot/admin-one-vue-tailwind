@@ -175,16 +175,26 @@ defineExpose({
           />
         </div>
 
-        <div class=" md-grid-cols-1 md:grid-cols-5 gap-4 mb-6">
-          <div class="w-full">
-            <FormKit
-              v-model="form.zonas"
-              :options="buscaZonasUO(form.ud_operativa_fk)"
-              type="checkbox"
-              name="zonas"
-              options-class="mb-4  flex jutify-between items-center space-x-2 p-10 rounded-md w-full"
-              option-class="w-full"
-            />
+        <div class="relative w-full border border-gray-200 dark:border-gray-600 rounded-lg p-4 mb-6">
+          <span
+            class="absolute -top-2.5 left-3 bg-white dark:bg-gray-900 px-2 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500"
+          >
+            Zonas de abastecimiento
+          </span>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 w-full">
+            <label
+              v-for="zona in buscaZonasUO(form.ud_operativa_fk)"
+              :key="zona.value"
+              class="flex items-center gap-2 py-1 cursor-pointer text-sm text-neutral-700 dark:text-neutral-300"
+            >
+              <input
+                v-model="form.zonas"
+                type="checkbox"
+                :value="zona.value"
+                class="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+              />
+              {{ zona.label }}
+            </label>
           </div>
         </div>
       </form>
@@ -198,3 +208,10 @@ defineExpose({
     </CardBox>
   </SectionMain>
 </template>
+
+<style scoped>
+:deep(.formkit-outer) {
+  max-width: none !important;
+  width: 100%;
+}
+</style>
