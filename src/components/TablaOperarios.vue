@@ -1,10 +1,11 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { usePlantasStore } from '@/stores/plantas'
 import {
   mdiAccountHardHat,
   mdiAccountSearch,
   mdiEye,
+  mdiMagnify,
   mdiPencil,
   mdiShieldAccount,
   mdiTrashCan,
@@ -34,10 +35,6 @@ const operarioSeleccionado = ref(null)
 
 const operarios = computed(() => plantaStore.getOperarios)
 
-// const items = computed(() => mainStore.clients)
-
-// const isModalActive = ref(false)
-
 const isModalDangerActive = ref(false)
 
 const perPage = ref(10)
@@ -46,15 +43,27 @@ const currentPage = ref(0)
 
 const checkedRows = ref([])
 
-// onMounted(() => {
-//   const operarios = searchOperarios();
-// })
+const searchQuery = ref('')
+
+watch(searchQuery, () => {
+  currentPage.value = 0
+})
+
+const filteredOperarios = computed(() => {
+  const q = searchQuery.value.trim().toLowerCase()
+  if (!q) return operarios.value
+  return operarios.value.filter(
+    (o) =>
+      o.name?.toLowerCase().includes(q) ||
+      o.email?.toLowerCase().includes(q)
+  )
+})
 
 const operariosPaginated = computed(() =>
-  operarios.value.slice(perPage.value * currentPage.value, perPage.value * (currentPage.value + 1))
+  filteredOperarios.value.slice(perPage.value * currentPage.value, perPage.value * (currentPage.value + 1))
 )
 
-const numPages = computed(() => Math.ceil(operarios.value.length / perPage.value))
+const numPages = computed(() => Math.ceil(filteredOperarios.value.length / perPage.value))
 
 const currentPageHuman = computed(() => currentPage.value + 1)
 
@@ -171,6 +180,23 @@ const nombreUO = (id) =>
     </p>
     <p>Esta operación no se puede deshacer.</p>
   </CardBoxModal>
+
+  <div class="p-3 lg:px-6 border-b border-gray-100 dark:border-slate-800">
+    <div class="relative">
+      <svg
+        class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-slate-400 pointer-events-none"
+        viewBox="0 0 24 24"
+      >
+        <path fill="currentColor" :d="mdiMagnify" />
+      </svg>
+      <input
+        v-model="searchQuery"
+        type="text"
+        placeholder="Buscar por nombre o email..."
+        class="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+      />
+    </div>
+  </div>
 
   <table>
     <thead>

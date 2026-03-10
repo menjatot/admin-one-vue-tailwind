@@ -98,8 +98,33 @@ const selectZona = computed(() => {
 })
 
 const toggleEditarPosicion = () => {
+  if (!posicionEditable.value && !form.posicion) {
+    form.posicion = { lat: 39.54982998070428, lon: -0.4656852311920545 }
+  }
   posicionEditable.value = !posicionEditable.value
 }
+
+const posLat = computed({
+  get: () => form.posicion?.lat ?? null,
+  set: (val) => {
+    const num = parseFloat(val)
+    if (!isNaN(num)) {
+      if (!form.posicion) form.posicion = { lat: num, lon: 0 }
+      else form.posicion.lat = num
+    }
+  }
+})
+
+const posLon = computed({
+  get: () => form.posicion?.lon ?? null,
+  set: (val) => {
+    const num = parseFloat(val)
+    if (!isNaN(num)) {
+      if (!form.posicion) form.posicion = { lat: 0, lon: num }
+      else form.posicion.lon = num
+    }
+  }
+})
 
 const zonasPorComunidadAutonoma = (ca) => {
   const comAut = plantasStore.getZonas
@@ -248,36 +273,36 @@ defineExpose({
     <CardBox is-form>
       <form class="w-full" @submit.prevent="submitHandler">
         <div class="grid grid-cols-1 lg:grid-cols-6 mb-6 gap-4 w-full">
-          <div class="col-span-1 w-full">
+          <div class="col-span-1 min-w-0">
             <FormKit
               v-model="form.id"
               type="text"
               label="Código"
               placeholder="Nº SINAC"
               validation="required"
-              class="col-span-1 w-full"
+              :classes="{ outer: 'w-full min-w-0' }"
               :disabled="form.esNuevo ? false : true"
             />
           </div>
-          <div class="col-span-5 w-full">
+          <div class="col-span-5 min-w-0">
             <FormKit
               v-model="form.name"
               type="text"
               label="Nombre"
               placeholder="Nombre"
               validation="required"
-              class="col-span-3 w-full"
+              :classes="{ outer: 'w-full min-w-0' }"
             />
           </div>
         </div>
-        <div class="flex flex-col w-full md:flex-row md:space-x-4 md:space-y-0 space-y-4 mb-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
           <FormKit
             v-model="form.infraestructura_fk"
             :options="selectInfraestructura"
             type="select"
             label="Infraestructura"
             placeholder="Infraestructura"
-            class="w-full"
+            :classes="{ outer: 'w-full min-w-0' }"
             option-class="w-full"
           />
           <FormKit
@@ -286,9 +311,36 @@ defineExpose({
             type="select"
             label="Zona"
             placeholder="Zona"
-            class="w-full"
+            :classes="{ outer: 'w-full min-w-0' }"
             option-class="w-full"
           />
+        </div>
+        <div class="relative w-full border border-gray-200 dark:border-gray-600 rounded-lg p-4 mb-6">
+          <span
+            class="absolute -top-2.5 left-3 bg-white dark:bg-gray-900 px-2 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500"
+          >
+            Coordenadas GPS
+          </span>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormKit
+              v-model="posLat"
+              type="number"
+              label="Latitud"
+              placeholder="Latitud"
+              :disabled="!posicionEditable"
+              :classes="{ outer: 'w-full min-w-0' }"
+              step="any"
+            />
+            <FormKit
+              v-model="posLon"
+              type="number"
+              label="Longitud"
+              placeholder="Longitud"
+              :disabled="!posicionEditable"
+              :classes="{ outer: 'w-full min-w-0' }"
+              step="any"
+            />
+          </div>
         </div>
         <div style="height: 300px; width: 100%">
           <l-map
@@ -427,6 +479,12 @@ defineExpose({
   </SectionMain>
 </template>
 <style scoped>
+/* Override FormKit genesis theme max-w-[20em] so fields fill their containers */
+:deep(.formkit-outer) {
+  max-width: none;
+}
+
+
 /* Estilos para el marcador de ubicación del usuario */
 :deep(.user-location-icon) {
   background: transparent !important;
