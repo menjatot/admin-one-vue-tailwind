@@ -66,7 +66,8 @@ const routes = [
   {
     meta: {
       title: 'Aqlara Home',
-      requiresAuth: true
+      requiresAuth: true,
+      blockedRoles: [10, '10']
     },
     path: '/',
     name: 'home',
@@ -116,7 +117,8 @@ const routes = [
   {
     meta: {
       title: 'Forms',
-      requiresAuth: true
+      requiresAuth: true,
+      blockedRoles: [10, '10']
     },
     path: '/forms',
     name: 'forms',
@@ -173,7 +175,9 @@ const routes = [
   },
   {
     meta: {
-      title: 'Sinaq'
+      title: 'Sinaq',
+      requiresAuth: true,
+      blockedRoles: [10, '10']
     },
     path: '/sinaq',
     name: 'sinaq',
@@ -252,6 +256,17 @@ router.beforeEach((to, from, next) => {
         next({name: 'Unauthorized'});
         return;
       }
+    }
+
+    // Verificar si el rol del usuario está bloqueado para esta ruta
+    const blockedRoles = to.meta.blockedRoles;
+    if (blockedRoles && blockedRoles.includes(loginStore.userRole)) {
+      console.warn('Rol bloqueado para esta ruta', {
+        userRole: loginStore.userRole,
+        blockedRoles: blockedRoles
+      });
+      next({name: 'Unauthorized'});
+      return;
     }
 
     // Renovar sesión en cada navegación autenticada

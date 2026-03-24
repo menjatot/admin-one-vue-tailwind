@@ -12,6 +12,19 @@ import BaseIcon from './BaseIcon.vue'
 const plantaStore = usePlantasStore()
 const loginStore = useLoginStore()
 
+const totalizador = ref('')
+
+const esDeposito = computed(() => {
+  const puntoId = form.punto_muestreo_fk || props.initialPosition
+  if (!puntoId) return false
+
+  const punto = plantaStore.getPuntosMuestreo.find((p) => p.id === puntoId)
+  if (!punto?.infraestructura_fk) return false
+
+  const infra = plantaStore.getInfraestructuras.find((i) => i.id === punto.infraestructura_fk)
+  return infra?.type === 2
+})
+
 // Control para mostrar/ocultar el histórico en móvil
 const showHistorico = ref(false)
 
@@ -53,6 +66,7 @@ const resetForm = () => {
   form.infraestructura = ''
   form.uo = ''
   form.type = ''
+  totalizador.value = ''
 }
 
 // Computed properties para valores organolépticos
@@ -111,6 +125,28 @@ const getErroresOrganolepticos = (analitica) => {
   return errores
 }
 
+// Calcular volumen consumido y m³/día comparando con la analítica anterior con totalizador
+const getVolumenData = (analitica) => {
+  if (analitica.totalizador == null) return null
+
+  const prevAnalitica = plantaStore.getAnaliticas
+    .filter(a =>
+      a.punto_muestreo_fk === analitica.punto_muestreo_fk &&
+      a.totalizador != null &&
+      a.id !== analitica.id &&
+      a.fecha <= analitica.fecha
+    )
+    .sort((a, b) => new Date(b.fecha) - new Date(a.fecha))[0]
+
+  if (!prevAnalitica) return null
+
+  const volumen = analitica.totalizador - prevAnalitica.totalizador
+  const dias = Math.round((new Date(analitica.fecha) - new Date(prevAnalitica.fecha)) / (1000 * 60 * 60 * 24))
+  const m3PerDia = dias > 0 ? Math.round((volumen / dias) * 100) / 100 : null
+
+  return { volumen, m3PerDia }
+}
+
 const submitHandler = async () => {
   try {
     const { data, error } = await supabase.from('analiticas').insert([
@@ -126,7 +162,8 @@ const submitHandler = async () => {
         personal_fk: form.operario,
         ph: form.ph ? Number(form.ph) : null,
         turbidez: form.turbidez ? Number(form.turbidez) : null,
-        zona_fk: form.zona
+        zona_fk: form.zona,
+        totalizador: esDeposito.value && totalizador.value !== '' ? Number(totalizador.value) : null
       }
     ])
 
@@ -211,6 +248,18 @@ watch(
     }
   },
   { immediate: true }
+)
+
+// Al cambiar de UO, resincronizar el operario con el usuario logueado
+// para evitar que quede un valor "huérfano" fuera de la lista de opciones
+watch(
+  () => form.uo,
+  () => {
+    form.operario = operarioLogueado.value?.id ?? null
+    form.zona = null
+    form.infraestructura = null
+    form.punto_muestreo_fk = null
+  }
 )
 </script>
 
@@ -307,6 +356,32 @@ watch(
                 </div>
               </div>
 
+              <!-- Totalizador / Volumen / m³/día -->
+              <div
+                v-if="analitica.totalizador != null"
+                class="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded p-2 mb-2"
+              >
+                <div class="flex items-baseline gap-2 flex-wrap">
+                  <span class="text-xs text-gray-500 dark:text-gray-400">Totalizador:</span>
+                  <span class="text-sm font-bold text-blue-600 dark:text-blue-400">
+                    {{ analitica.totalizador }} <span class="text-xs font-normal">m³</span>
+                  </span>
+                  <template v-if="getVolumenData(analitica)">
+                    <span class="text-gray-300 dark:text-gray-600">|</span>
+                    <span class="text-xs text-gray-500 dark:text-gray-400">Vol:</span>
+                    <span class="text-sm font-semibold text-blue-500 dark:text-blue-300">
+                      {{ getVolumenData(analitica).volumen }} m³
+                    </span>
+                    <template v-if="getVolumenData(analitica).m3PerDia != null">
+                      <span class="text-gray-300 dark:text-gray-600">|</span>
+                      <span class="text-sm font-semibold text-blue-500 dark:text-blue-300">
+                        {{ getVolumenData(analitica).m3PerDia }} m³/día
+                      </span>
+                    </template>
+                  </template>
+                </div>
+              </div>
+
               <!-- Errores organolépticos -->
               <div
                 v-if="tieneErrorOrganoleptico(analitica)"
@@ -342,7 +417,7 @@ watch(
             type="select"
             :options="operarioPorZona"
             placeholder="Operario"
-            disabled="loginStore.userLogged?true:false"
+            :disabled="!!operarioLogueado"
           />
           <FormKit v-model="form.fecha" type="date" placeholder="Fecha de la toma de la muestra" />
         </div>
@@ -472,6 +547,21 @@ watch(
                 number: 'Introduce un número',
                 min: 'El valor mínimo es 0',
                 max: 'El valor máximo es 999'
+              }"
+            />
+            <FormKit
+              v-if="esDeposito"
+              v-model.number="totalizador"
+              type="number"
+              placeholder="Totalizador"
+              label="Totalizador"
+              help="m³"
+              :step="1"
+              :min="0"
+              validation="number|min:0"
+              :validation-messages="{
+                number: 'Introduce un número',
+                min: 'El valor mínimo es 0'
               }"
             />
           </div>

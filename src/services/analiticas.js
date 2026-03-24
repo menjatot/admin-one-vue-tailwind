@@ -20,8 +20,8 @@ export const getAnaliticasPaginated = async (options = {}) => {
   // **PASO 1: Obtener IDs de puntos de muestreo según filtros de UO/infraestructura/zona**
   let puntosMuestreoIds = null
 
-  // Si hay filtro de UO, infraestructura o zona, hacer query previa
-  if (filters.uo_fk || filters.infraestructura_fk || filters.zona_fk) {
+  // Si hay filtro de UO, infraestructura, zona o zonas (array), hacer query previa
+  if (filters.uo_fk || filters.infraestructura_fk || filters.zona_fk || filters.zonas_fk) {
     console.log('🔍 Filtros de UO/Infraestructura/Zona detectados, obteniendo puntos de muestreo...')
 
     // Sub-paso 1a: Si hay filtro de UO, primero obtener las zonas de esa UO
@@ -68,6 +68,9 @@ export const getAnaliticasPaginated = async (options = {}) => {
     if (filters.zona_fk) {
       console.log('  ➜ Filtrando por zona_fk directo:', filters.zona_fk)
       pmQuery = pmQuery.eq('zona_fk', filters.zona_fk)
+    } else if (filters.zonas_fk && filters.zonas_fk.length > 0) {
+      console.log('  ➜ Filtrando por zonas_fk (array):', filters.zonas_fk)
+      pmQuery = pmQuery.in('zona_fk', filters.zonas_fk)
     } else if (zonaIds) {
       console.log('  ➜ Filtrando por zona_fk via UO:', zonaIds)
       pmQuery = pmQuery.in('zona_fk', zonaIds)
@@ -184,7 +187,7 @@ export const getAnaliticasFiltered = async (options = {}) => {
   // **PASO 1: Obtener IDs de puntos de muestreo según filtros de UO/infraestructura/zona**
   let puntosMuestreoIds = null
 
-  if (filters.uo_fk || filters.infraestructura_fk || filters.zona_fk) {
+  if (filters.uo_fk || filters.infraestructura_fk || filters.zona_fk || filters.zonas_fk) {
     console.log('🔍 Filtros de UO/Infraestructura/Zona detectados en getAnaliticasFiltered')
 
     // Sub-paso 1a: Si hay filtro de UO, primero obtener las zonas de esa UO
@@ -223,6 +226,9 @@ export const getAnaliticasFiltered = async (options = {}) => {
     if (filters.zona_fk) {
       console.log('  ➜ Filtrando por zona_fk directo:', filters.zona_fk)
       pmQuery = pmQuery.eq('zona_fk', filters.zona_fk)
+    } else if (filters.zonas_fk && filters.zonas_fk.length > 0) {
+      console.log('  ➜ Filtrando por zonas_fk (array):', filters.zonas_fk)
+      pmQuery = pmQuery.in('zona_fk', filters.zonas_fk)
     } else if (zonaIds) {
       console.log('  ➜ Filtrando por zona_fk via UO:', zonaIds)
       pmQuery = pmQuery.in('zona_fk', zonaIds)
