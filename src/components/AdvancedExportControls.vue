@@ -72,6 +72,30 @@ const formatOrganoleptico = (value) => {
 };
 // --- Fin de funciones auxiliares ---
 
+// --- Cálculo de volumen y m³/día ---
+const getPrevAnalitica = (analitica) => {
+  if (analitica.totalizador == null) return null
+  return allAnaliticasForDateRange.value
+    .filter(a =>
+      a.punto_muestreo_fk === analitica.punto_muestreo_fk &&
+      a.totalizador != null &&
+      a.id !== analitica.id &&
+      new Date(a.fecha) <= new Date(analitica.fecha)
+    )
+    .sort((a, b) => new Date(b.fecha) - new Date(a.fecha))[0] ?? null
+}
+const getVolumen = (analitica) => {
+  const prev = getPrevAnalitica(analitica)
+  return prev != null ? analitica.totalizador - prev.totalizador : null
+}
+const getM3PerDia = (analitica) => {
+  const prev = getPrevAnalitica(analitica)
+  if (prev == null) return null
+  const volumen = analitica.totalizador - prev.totalizador
+  const dias = Math.round((new Date(analitica.fecha) - new Date(prev.fecha)) / (1000 * 60 * 60 * 24))
+  return dias > 0 ? Math.round((volumen / dias) * 100) / 100 : null
+}
+
 const getAnaliticasParaExportar = () => {
   if (selectedRows.value.length === 0) {
     alert('Por favor, seleccione al menos una analítica para definir el rango de fechas.');
@@ -179,6 +203,9 @@ const handlePrintHTML = async () => {
               <th>Olor</th>
               <th>Sabor</th>
               <th>Color</th>
+              <th>Totalizador (m³)</th>
+              <th>Volumen (m³)</th>
+              <th>Consumo (m³/día)</th>
             </tr>
           </thead>
           <tbody>
@@ -206,6 +233,9 @@ const handlePrintHTML = async () => {
               <td>${formatOrganoleptico(a.olor)}</td>
               <td>${formatOrganoleptico(a.sabor)}</td>
               <td>${formatOrganoleptico(a.color)}</td>
+              <td>${a.totalizador != null ? a.totalizador : ''}</td>
+              <td>${getVolumen(a) != null ? getVolumen(a) : ''}</td>
+              <td>${getM3PerDia(a) != null ? getM3PerDia(a) : ''}</td>
             </tr>
     `;
   });
@@ -271,7 +301,10 @@ const handleExportExcel = async () => {
     'Turbidez (NTU)',
     'Olor',
     'Sabor',
-    'Color'
+    'Color',
+    'Totalizador (m³)',
+    'Volumen (m³)',
+    'Consumo (m³/día)'
   ]);
 
   // Datos de las analíticas
@@ -285,7 +318,10 @@ const handleExportExcel = async () => {
       a.turbidez !== null && a.turbidez !== undefined ? a.turbidez : '',
       formatOrganoleptico(a.olor),
       formatOrganoleptico(a.sabor),
-      formatOrganoleptico(a.color)
+      formatOrganoleptico(a.color),
+      a.totalizador != null ? a.totalizador : '',
+      getVolumen(a) != null ? getVolumen(a) : '',
+      getM3PerDia(a) != null ? getM3PerDia(a) : ''
     ]);
   });
 
@@ -303,7 +339,10 @@ const handleExportExcel = async () => {
     { wch: 15 },  // Turbidez
     { wch: 15 },  // Olor
     { wch: 15 },  // Sabor
-    { wch: 15 }   // Color
+    { wch: 15 },  // Color
+    { wch: 16 },  // Totalizador
+    { wch: 14 },  // Volumen
+    { wch: 16 }   // Consumo m³/día
   ];
 
   // Aplicar estilos a las celdas de título y encabezado
@@ -339,8 +378,8 @@ const handleExportExcel = async () => {
 
   // Combinar celdas para el título (primera fila)
   ws['!merges'] = [
-    { s: { r: 0, c: 0 }, e: { r: 0, c: 8 } }, // Título
-    { s: { r: 1, c: 0 }, e: { r: 1, c: 8 } }  // Subtítulo
+    { s: { r: 0, c: 0 }, e: { r: 0, c: 11 } }, // Título
+    { s: { r: 1, c: 0 }, e: { r: 1, c: 11 } }  // Subtítulo
   ];
 
   // Agregar la hoja al libro
@@ -455,8 +494,8 @@ const handleExportExcel = async () => {
     />
 
     <BaseButton
-      class="bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded"
       label="Exportar Excel"
+      color="success"
       :icon="mdiFileExcel"
       rounded-full
       small

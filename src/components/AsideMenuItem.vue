@@ -20,6 +20,10 @@ const props = defineProps({
 const emit = defineEmits(['menu-click'])
 
 const isVisible = computed(() => {
+  if (props.item.blockedFor !== undefined) {
+    const currentRole = loginStore.userRole
+    if (props.item.blockedFor.includes(currentRole) || props.item.blockedFor.includes(Number(currentRole))) return false
+  }
   if (props.item.maxRole !== undefined) {
     const currentRole = Number(loginStore.userLogged?.role ?? 9)
     // console.log('CurrentRole: ',currentRole)

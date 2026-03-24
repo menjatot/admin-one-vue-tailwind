@@ -17,6 +17,7 @@ export default [
       {
         label: 'Formulario Analítica',
         to: {name: "forms"},
+        blockedFor: [10, '10']
         // icon: mdiSquareEditOutline
       },
       {

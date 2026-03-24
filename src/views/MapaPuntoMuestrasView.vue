@@ -66,7 +66,7 @@ const crearAnalitica = (puntoId) => {
 
 const puntosMuestreo = computed(() => {
   // Si es rol 99, mostrar todos los puntos activos
-  if (loginStore.userRole === 99) {
+  if (Number(loginStore.userRole) === 99) {
     return plantasStore.getPuntosMuestreo.filter((punto) => punto.activo)
   }
   
@@ -205,7 +205,7 @@ onMounted(() => {
   </CardBoxModal>
 
   <LayoutAuthenticated>
-    <SectionMain>
+    <SectionMain class="pb-0">
       <SectionTitleLineWithButton :icon="mdiMap" title="Mapa Puntos Muestreo" main>
         <div class="flex gap-2">
           <!-- <BaseButton
@@ -231,25 +231,29 @@ onMounted(() => {
         <b>Responsive table.</b> Collapses on mobile
       </NotificationBar> -->
 
-      <CardBox class="mb-6" has-table>
-        <div class="flex flex-col items-center justify-center">
-          <div style="height: 600px; width: 95%">
+      <CardBox has-table class="overflow-hidden -mx-4 sm:-mx-6">
+        <div class="relative w-full" style="height: calc(100dvh - 13rem); min-height: 400px;">
+
+          <!-- Botón superpuesto sobre el mapa -->
+          <div class="absolute top-3 right-12 z-[1001]">
             <BaseButton
-  label="Centrar posición"
-  :icon="mdiCrosshairsGps"
-  color="info"
-  rounded
-  small
-  :disabled="isLoading"
-  class="w-full"
-  @click="centerOnUserLocation"
-/>
-            <l-map
-              ref="map"
-              v-model:zoom="zoom"
-              :center="center"
-              :use-global-leaflet="false"
-              >
+              label="Centrar posición"
+              :icon="mdiCrosshairsGps"
+              color="info"
+              rounded
+              small
+              :disabled="isLoading"
+              @click="centerOnUserLocation"
+            />
+          </div>
+
+          <l-map
+            ref="map"
+            v-model:zoom="zoom"
+            :center="center"
+            :use-global-leaflet="false"
+            style="height: 100%; width: 100%"
+            >
               <!-- :center="[39.54982998070428, -0.4656852311920545]" -->
               <l-tile-layer
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -332,7 +336,6 @@ onMounted(() => {
                 </l-marker>
               </div>
             </l-map>
-          </div>
         </div>
       </CardBox>
      

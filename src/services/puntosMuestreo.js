@@ -10,6 +10,7 @@ export const createPuntoMuestreo = async (data) => {
             zona_fk: data.zona_fk,
             posicion: data.posicion,
             activo: data.activo,
+            sn_contador: data.sn_contador ?? null,
         })
         .select()
     .single()
@@ -37,6 +38,7 @@ export const updatePuntoMuestreo = async (data) => {
             zona_fk: data.zona_fk,
             posicion: data.posicion,
             activo: data.activo,
+            sn_contador: data.sn_contador ?? null,
         })
         .eq('id', data.id)
         .select()

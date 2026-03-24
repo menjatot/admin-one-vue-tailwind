@@ -76,6 +76,32 @@ const toggleExpand = (id) => {
   }
 }
 
+const getPrevAnalitica = (analitica) => {
+  if (analitica.totalizador == null) return null
+  return plantaStore.getAnaliticas
+    .filter(
+      (a) =>
+        a.punto_muestreo_fk === analitica.punto_muestreo_fk &&
+        a.totalizador != null &&
+        a.id !== analitica.id &&
+        new Date(a.fecha) <= new Date(analitica.fecha)
+    )
+    .sort((a, b) => new Date(b.fecha) - new Date(a.fecha))[0] ?? null
+}
+
+const getVolumen = (analitica) => {
+  const prev = getPrevAnalitica(analitica)
+  return prev != null ? analitica.totalizador - prev.totalizador : null
+}
+
+const getM3PerDia = (analitica) => {
+  const prev = getPrevAnalitica(analitica)
+  if (prev == null) return null
+  const volumen = analitica.totalizador - prev.totalizador
+  const dias = Math.round((new Date(analitica.fecha) - new Date(prev.fecha)) / (1000 * 60 * 60 * 24))
+  return dias > 0 ? Math.round((volumen / dias) * 100) / 100 : null
+}
+
 const plantasStore = usePlantasStore()
 
 // const mainStore = useMainStore()
@@ -531,85 +557,185 @@ onMounted(async () => {
           </td>
         </tr>
         <tr v-if="expandedRows.includes(analitica.id)" :key="`expanded-${analitica.id}`">
-          <td colspan="5" class="lg:w-1">
-            <p><strong>Información adicional:</strong></p>
+          <td colspan="6" class="p-0 border-b border-gray-200 dark:border-slate-700">
+            <div class="bg-gray-50 dark:bg-slate-800/50 px-5 py-4">
 
-            <!-- Información adicional aquí -->
-            <div class="flex justify-center gap-40">
-              <div>
-                <li  class="text-gray-600" >
-                  <span
-                    class="font-semibold text-lg text-gray-700"
-                    :class="{ 'text-red-500 underline': isCloroWrong(analitica) }"
-                    >Cloro:</span
-                  >
-                  {{ analitica.cloro?analitica.cloro+' mg/l':'Sin muestra' }}
-                </li>
-                <li class="text-gray-600">
-                  <span
-                    class="font-semibold text-lg text-gray-700"
-                    :class="{ 'text-red-500 underline': isPhWrong(analitica) }"
-                    >pH:</span
-                  >
-                  {{ analitica.ph?analitica.ph+' ud':'Sin Muestra' }}
-                </li>
-                <li  class="text-gray-600">
-                  <span
-                    class="font-semibold text-lg text-gray-700"
-                    :class="{ 'text-red-500 underline': isTurbidezWrong(analitica) }"
-                    >Turbidez:</span
-                  >
-                  {{ analitica.turbidez?analitica.turbidez+' UNT':'Sin Muestra' }} 
-                </li>
+              <!-- Header -->
+              <div class="flex items-center justify-between mb-4">
+                <span class="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">
+                  Parámetros analíticos
+                </span>
+                <BaseButtons>
+                  <BaseButton color="info" :icon="mdiPencil" small @click="updateAnaliticaSeleccionada(analitica)" />
+                  <BaseButton color="danger" :icon="mdiTrashCan" small @click="deleteAnaliticaSeleccionada(analitica)" />
+                </BaseButtons>
               </div>
-              <div v-if="analitica.type === 29">
-                <li class="text-gray-600">
+
+              <!-- Metric cards -->
+              <div class="grid grid-cols-3 gap-3 mb-4" :class="{ 'lg:grid-cols-4': analitica.totalizador != null }">
+                <!-- Cloro -->
+                <div
+                  :class="[
+                    'rounded-xl p-3 flex flex-col gap-1 border',
+                    isCloroWrong(analitica)
+                      ? 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-700'
+                      : 'bg-white border-gray-200 dark:bg-slate-700 dark:border-slate-600'
+                  ]"
+                >
+                  <span class="text-xs font-medium uppercase tracking-wide text-gray-400">Cloro libre</span>
                   <span
-                    class="font-semibold text-lg text-gray-700"
-                    :class="{ 'text-red-500 underline': isOrganolepticWrong(analitica.olor) }"
-                    >Olor:</span
+                    :class="[
+                      'text-2xl font-bold',
+                      isCloroWrong(analitica) ? 'text-red-500' : 'text-gray-800 dark:text-white'
+                    ]"
                   >
-                  {{ analitica.olor ===ORGANOLEPTIC_CORRECT ? 'Correcto' : 'Incorrecto' }}
-                </li>
-                <li class="text-gray-600">
+                    {{ analitica.cloro != null ? analitica.cloro : '—' }}
+                  </span>
+                  <div class="flex items-center justify-between">
+                    <span class="text-xs text-gray-400">mg/l &nbsp;[0,4 – 1]</span>
+                    <span
+                      :class="[
+                        'text-xs font-semibold px-2 py-0.5 rounded-full',
+                        analitica.cloro == null
+                          ? 'bg-gray-100 text-gray-400 dark:bg-slate-600 dark:text-gray-400'
+                          : isCloroWrong(analitica)
+                            ? 'bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400'
+                            : 'bg-green-100 text-green-600 dark:bg-green-900/40 dark:text-green-400'
+                      ]"
+                    >
+                      {{ analitica.cloro == null ? 'Sin muestra' : isCloroWrong(analitica) ? '⚠ Fuera de rango' : '✓ Correcto' }}
+                    </span>
+                  </div>
+                </div>
+
+                <!-- pH -->
+                <div
+                  :class="[
+                    'rounded-xl p-3 flex flex-col gap-1 border',
+                    isPhWrong(analitica)
+                      ? 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-700'
+                      : 'bg-white border-gray-200 dark:bg-slate-700 dark:border-slate-600'
+                  ]"
+                >
+                  <span class="text-xs font-medium uppercase tracking-wide text-gray-400">pH</span>
                   <span
-                    class="font-semibold text-lg text-gray-700"
-                    :class="{ 'text-red-500 underline': isOrganolepticWrong(analitica.color) }"
-                    >Color:</span
+                    :class="[
+                      'text-2xl font-bold',
+                      isPhWrong(analitica) ? 'text-red-500' : 'text-gray-800 dark:text-white'
+                    ]"
                   >
-                  {{ analitica.color ===ORGANOLEPTIC_CORRECT ? 'Correcto' : 'Incorrecto' }}
-                </li>
-                <li class="text-gray-600">
+                    {{ analitica.ph != null ? analitica.ph : '—' }}
+                  </span>
+                  <div class="flex items-center justify-between">
+                    <span class="text-xs text-gray-400">ud &nbsp;[6,5 – 9,5]</span>
+                    <span
+                      :class="[
+                        'text-xs font-semibold px-2 py-0.5 rounded-full',
+                        analitica.ph == null
+                          ? 'bg-gray-100 text-gray-400 dark:bg-slate-600 dark:text-gray-400'
+                          : isPhWrong(analitica)
+                            ? 'bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400'
+                            : 'bg-green-100 text-green-600 dark:bg-green-900/40 dark:text-green-400'
+                      ]"
+                    >
+                      {{ analitica.ph == null ? 'Sin muestra' : isPhWrong(analitica) ? '⚠ Fuera de rango' : '✓ Correcto' }}
+                    </span>
+                  </div>
+                </div>
+
+                <!-- Turbidez -->
+                <div
+                  :class="[
+                    'rounded-xl p-3 flex flex-col gap-1 border',
+                    isTurbidezWrong(analitica)
+                      ? 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-700'
+                      : 'bg-white border-gray-200 dark:bg-slate-700 dark:border-slate-600'
+                  ]"
+                >
+                  <span class="text-xs font-medium uppercase tracking-wide text-gray-400">Turbidez</span>
                   <span
-                    class="font-semibold text-lg text-gray-700"
-                    :class="{ 'text-red-500 underline': isOrganolepticWrong(analitica.sabor) }"
-                    >Sabor:</span
+                    :class="[
+                      'text-2xl font-bold',
+                      isTurbidezWrong(analitica) ? 'text-red-500' : 'text-gray-800 dark:text-white'
+                    ]"
                   >
-                  {{ analitica.sabor ===ORGANOLEPTIC_CORRECT ? 'Correcto' : 'Incorrecto' }}
-                </li>
+                    {{ analitica.turbidez != null ? analitica.turbidez : '—' }}
+                  </span>
+                  <div class="flex items-center justify-between">
+                    <span class="text-xs text-gray-400">UNT &nbsp;[0 – 4]</span>
+                    <span
+                      :class="[
+                        'text-xs font-semibold px-2 py-0.5 rounded-full',
+                        analitica.turbidez == null
+                          ? 'bg-gray-100 text-gray-400 dark:bg-slate-600 dark:text-gray-400'
+                          : isTurbidezWrong(analitica)
+                            ? 'bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400'
+                            : 'bg-green-100 text-green-600 dark:bg-green-900/40 dark:text-green-400'
+                      ]"
+                    >
+                      {{ analitica.turbidez == null ? 'Sin muestra' : isTurbidezWrong(analitica) ? '⚠ Fuera de rango' : '✓ Correcto' }}
+                    </span>
+                  </div>
+                </div>
+                <!-- Totalizador / Volumen -->
+                <div
+                  v-if="analitica.totalizador != null"
+                  class="rounded-xl p-3 flex flex-col gap-1 border bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-700"
+                >
+                  <span class="text-xs font-medium uppercase tracking-wide text-gray-400">Totalizador</span>
+                  <span class="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                    {{ analitica.totalizador }} <span class="text-sm font-normal text-gray-400">m³</span>
+                  </span>
+                  <div v-if="getVolumen(analitica) != null" class="border-t border-blue-200 dark:border-blue-700 mt-1 pt-1">
+                    <span class="text-xs font-medium uppercase tracking-wide text-gray-400">Volumen consumido</span>
+                    <div class="flex items-baseline gap-3 flex-wrap">
+                      <span class="text-xl font-bold text-blue-500 dark:text-blue-300">
+                        {{ getVolumen(analitica) }} <span class="text-sm font-normal text-gray-400">m³</span>
+                      </span>
+                      <span
+                        v-if="getM3PerDia(analitica) != null"
+                        class="text-sm font-semibold text-blue-400 dark:text-blue-300 whitespace-nowrap"
+                      >
+                        · {{ getM3PerDia(analitica) }} m³/día
+                      </span>
+                    </div>
+                  </div>
+                  <span v-else class="text-xs text-gray-400 italic">Sin analítica anterior para calcular volumen</span>
+                </div>
               </div>
+
+              <!-- Organolépticos (solo Rutina tipo 29) -->
+              <div v-if="analitica.type === 29" class="flex flex-wrap items-center gap-2 mb-4">
+                <span class="text-xs font-semibold uppercase tracking-wide text-gray-400 mr-1">Organolépticos:</span>
+                <span
+                  v-for="({ key, label }) in [{ key: 'olor', label: 'Olor' }, { key: 'color', label: 'Color' }, { key: 'sabor', label: 'Sabor' }]"
+                  :key="key"
+                  :class="[
+                    'inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold',
+                    isOrganolepticWrong(analitica[key])
+                      ? 'bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400'
+                      : 'bg-green-100 text-green-600 dark:bg-green-900/40 dark:text-green-400'
+                  ]"
+                >
+                  {{ label }}: {{ analitica[key] === ORGANOLEPTIC_CORRECT ? '✓ Correcto' : '⚠ Incorrecto' }}
+                </span>
+              </div>
+
+              <!-- Datos secundarios -->
+              <div
+                class="flex flex-wrap gap-x-6 gap-y-1 text-sm text-gray-600 dark:text-gray-300 border-t border-gray-200 dark:border-slate-600 pt-3"
+              >
+                <span v-if="plantaStore.getPuntosMuestreo.find(p => p.id === analitica.punto_muestreo_fk)?.sn_contador">
+                  <span class="font-semibold text-gray-500 dark:text-gray-400">S/N Contador:</span>
+                  {{ plantaStore.getPuntosMuestreo.find(p => p.id === analitica.punto_muestreo_fk)?.sn_contador }}
+                </span>
+                <span v-if="analitica.observaciones" class="w-full">
+                  <span class="font-semibold text-gray-500 dark:text-gray-400">Observaciones:</span>
+                  {{ analitica.observaciones }}
+                </span>
+              </div>
+
             </div>
-            <li class="ml-4">
-              <span class="text-gray-800 font-semibold">Observaciones: </span>
-              {{ analitica.observaciones }}
-            </li>
-          </td>
-          <td class="before:hidden lg:w-1 whitespace-nowrap">
-            <BaseButtons>
-              <!-- <BaseButtons type="justify-start lg:justify-end" no-wrap> -->
-              <BaseButton
-                color="info"
-                :icon="mdiPencil"
-                small
-                @click="updateAnaliticaSeleccionada(analitica)"
-              />
-              <BaseButton
-                color="danger"
-                :icon="mdiTrashCan"
-                small
-                @click="deleteAnaliticaSeleccionada(analitica)"
-              />
-            </BaseButtons>
           </td>
         </tr>
       </template>

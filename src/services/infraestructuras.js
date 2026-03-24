@@ -9,7 +9,7 @@ export const createInfraestructura = async (infraestructura) => {
         id: infraestructura.id,
         name: infraestructura.name,
         type: infraestructura.tipo_infraestructura_fk,
-        operador: infraestructura.operador
+        operador: infraestructura.operador,
       })
       .select()
       .single()

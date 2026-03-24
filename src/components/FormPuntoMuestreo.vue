@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, reactive, ref, toValue, watch } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref, toValue, watch } from 'vue'
 import {
   mdiBallotOutline,
   mdiAccount,
@@ -62,7 +62,14 @@ const form = reactive({
   name: props.uo?.name,
   infraestructura_fk: props.uo?.infraestructura_fk,
   zona_fk: props.uo?.zona_fk,
-  posicion: props.uo?.posicion
+  posicion: props.uo?.posicion,
+  sn_contador: props.uo?.sn_contador || null
+})
+
+const esDeposito = computed(() => {
+  if (!form.infraestructura_fk) return false
+  const infra = plantasStore.getInfraestructuras.find((i) => i.id === form.infraestructura_fk)
+  return infra?.type === 2
 })
 
 const submitHandler = () => {
@@ -79,7 +86,8 @@ const submitHandler = () => {
     infraestructura_fk: form.infraestructura_fk,
     zona_fk: form.zona_fk,
     posicion: form.posicion,
-    esNuevo: form.esNuevo
+    esNuevo: form.esNuevo,
+    sn_contador: esDeposito.value ? form.sn_contador : null
   }
   emit('submit', uoData)
   // return uoData
@@ -96,6 +104,98 @@ const selectZona = computed(() => {
     return { value: zona.id, label: zona.name }
   })
 })
+
+// Combobox con búsqueda para Infraestructura
+const infraSearch = ref('')
+const showInfraDropdown = ref(false)
+const infraInputRef = ref(null)
+const infraDropdownStyle = ref({})
+
+const infraLabel = computed(() => {
+  const found = selectInfraestructura.value.find((o) => o.value === form.infraestructura_fk)
+  return found ? found.label : ''
+})
+
+const filteredInfraestructuras = computed(() => {
+  const q = infraSearch.value.toLowerCase()
+  return q
+    ? selectInfraestructura.value.filter((o) => o.label.toLowerCase().includes(q))
+    : selectInfraestructura.value
+})
+
+const onInfraFocus = () => {
+  infraSearch.value = ''
+  showInfraDropdown.value = true
+  nextTick(() => {
+    if (infraInputRef.value) {
+      const rect = infraInputRef.value.getBoundingClientRect()
+      infraDropdownStyle.value = {
+        position: 'fixed',
+        top: `${rect.bottom}px`,
+        left: `${rect.left}px`,
+        width: `${rect.width}px`,
+        zIndex: 9999
+      }
+    }
+  })
+}
+const onInfraBlur = () => {
+  setTimeout(() => {
+    showInfraDropdown.value = false
+    infraSearch.value = ''
+  }, 150)
+}
+const selectInfraOption = (opt) => {
+  form.infraestructura_fk = opt.value
+  showInfraDropdown.value = false
+  infraSearch.value = ''
+}
+
+// Combobox con búsqueda para Zona
+const zonaSearch = ref('')
+const showZonaDropdown = ref(false)
+const zonaInputRef = ref(null)
+const zonaDropdownStyle = ref({})
+
+const zonaLabel = computed(() => {
+  const found = selectZona.value.find((o) => o.value === form.zona_fk)
+  return found ? found.label : ''
+})
+
+const filteredZonas = computed(() => {
+  const q = zonaSearch.value.toLowerCase()
+  return q
+    ? selectZona.value.filter((o) => o.label.toLowerCase().includes(q))
+    : selectZona.value
+})
+
+const onZonaFocus = () => {
+  zonaSearch.value = ''
+  showZonaDropdown.value = true
+  nextTick(() => {
+    if (zonaInputRef.value) {
+      const rect = zonaInputRef.value.getBoundingClientRect()
+      zonaDropdownStyle.value = {
+        position: 'fixed',
+        top: `${rect.bottom}px`,
+        left: `${rect.left}px`,
+        width: `${rect.width}px`,
+        zIndex: 9999
+      }
+    }
+  })
+}
+const onZonaBlur = () => {
+  setTimeout(() => {
+    showZonaDropdown.value = false
+    zonaSearch.value = ''
+  }, 150)
+}
+const selectZonaOption = (opt) => {
+  form.zona_fk = opt.value
+  showZonaDropdown.value = false
+  zonaSearch.value = ''
+}
 
 const toggleEditarPosicion = () => {
   if (!posicionEditable.value && !form.posicion) {
@@ -164,7 +264,9 @@ watch(
     form.id = newUO?.id
     form.name = newUO?.name
     form.infraestructura_fk = newUO?.infraestructura_fk
-    ;(form.zona_fk = newUO?.zona_fk), (form.posicion = newUO?.posicion)
+    form.zona_fk = newUO?.zona_fk
+    form.posicion = newUO?.posicion
+    form.sn_contador = newUO?.sn_contador || null
     posicionEditable.value = false //resetear al abrir el modal
   },
   { inmediate: true }
@@ -295,24 +397,75 @@ defineExpose({
             />
           </div>
         </div>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <div class="flex flex-col w-full md:flex-row md:space-x-4 md:space-y-0 space-y-4 mb-6">
+          <!-- Infraestructura combobox con búsqueda -->
+          <div class="w-full">
+            <label class="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">Infraestructura</label>
+            <input
+              ref="infraInputRef"
+              type="text"
+              :value="showInfraDropdown ? infraSearch : infraLabel"
+              @input="infraSearch = $event.target.value"
+              @focus="onInfraFocus"
+              @blur="onInfraBlur"
+              placeholder="Buscar infraestructura..."
+              class="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm bg-white dark:bg-gray-800 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+            />
+            <Teleport to="body">
+              <ul
+                v-if="showInfraDropdown"
+                :style="infraDropdownStyle"
+                class="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md mt-1 max-h-52 overflow-y-auto shadow-lg"
+              >
+                <li v-if="filteredInfraestructuras.length === 0" class="px-3 py-2 text-sm text-gray-400">Sin resultados</li>
+                <li
+                  v-for="opt in filteredInfraestructuras"
+                  :key="opt.value"
+                  @mousedown.prevent="selectInfraOption(opt)"
+                  class="px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 dark:hover:bg-gray-700"
+                  :class="{ 'bg-blue-100 dark:bg-gray-600 font-medium': opt.value === form.infraestructura_fk }"
+                >{{ opt.label }}</li>
+              </ul>
+            </Teleport>
+          </div>
+          <!-- Zona combobox con búsqueda -->
+          <div class="w-full">
+            <label class="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">Zona</label>
+            <input
+              ref="zonaInputRef"
+              type="text"
+              :value="showZonaDropdown ? zonaSearch : zonaLabel"
+              @input="zonaSearch = $event.target.value"
+              @focus="onZonaFocus"
+              @blur="onZonaBlur"
+              placeholder="Buscar zona..."
+              class="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm bg-white dark:bg-gray-800 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+            />
+            <Teleport to="body">
+              <ul
+                v-if="showZonaDropdown"
+                :style="zonaDropdownStyle"
+                class="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md mt-1 max-h-52 overflow-y-auto shadow-lg"
+              >
+                <li v-if="filteredZonas.length === 0" class="px-3 py-2 text-sm text-gray-400">Sin resultados</li>
+                <li
+                  v-for="opt in filteredZonas"
+                  :key="opt.value"
+                  @mousedown.prevent="selectZonaOption(opt)"
+                  class="px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 dark:hover:bg-gray-700"
+                  :class="{ 'bg-blue-100 dark:bg-gray-600 font-medium': opt.value === form.zona_fk }"
+                >{{ opt.label }}</li>
+              </ul>
+            </Teleport>
+          </div>
+        </div>
+        <div v-if="esDeposito" class="mb-6">
           <FormKit
-            v-model="form.infraestructura_fk"
-            :options="selectInfraestructura"
-            type="select"
-            label="Infraestructura"
-            placeholder="Infraestructura"
+            v-model="form.sn_contador"
+            type="text"
+            label="S/N del contador"
+            placeholder="Número de serie del contador"
             :classes="{ outer: 'w-full min-w-0' }"
-            option-class="w-full"
-          />
-          <FormKit
-            v-model="form.zona_fk"
-            :options="selectZona"
-            type="select"
-            label="Zona"
-            placeholder="Zona"
-            :classes="{ outer: 'w-full min-w-0' }"
-            option-class="w-full"
           />
         </div>
         <div class="relative w-full border border-gray-200 dark:border-gray-600 rounded-lg p-4 mb-6">
