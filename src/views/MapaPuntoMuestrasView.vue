@@ -52,7 +52,7 @@ const crearAnalitica = (puntoId) => {
 
 const puntosMuestreo = computed(() => {
   // Si es rol 99, mostrar todos los puntos activos
-  if (loginStore.userRole === 99) {
+  if (Number(loginStore.userRole) === 99) {
     return plantasStore.getPuntosMuestreo.filter((punto) => punto.activo)
   }
   
