@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(/C:\\Users\\alejandro.minguez\\Documents\\webDev\\GitHub\\admin-one-vue-tailwind\\src\\stores/**)"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "supabase"
+  ],
+  "outputStyle": "Explanatory"
+}

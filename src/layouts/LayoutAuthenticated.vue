@@ -13,9 +13,13 @@ import AsideMenu from '@/components/AsideMenu.vue'
 import FooterBar from '@/components/FooterBar.vue'
 import useLoginStore from '@/stores/login.js'
 import UnAutorizedComponent from '@/components/UnAutorizedComponent.vue'
+import { useSessionSecurity } from '@/composables/useSessionSecurity.js'
 
 
 const loginStore = useLoginStore()
+
+// Inicializar seguridad de sesión
+useSessionSecurity()
 
 const layoutAsidePadding = 'xl:pl-60'
 
@@ -49,10 +53,11 @@ const menuClick = (event, item) => {
 
 <template>
   <div
-  v-if="loginStore.isAuthenticated "  >
+    v-if="loginStore.isAuthenticated"
     :class="{
       'overflow-hidden lg:overflow-visible': isAsideMobileExpanded
     }"
+  >
     <div
       :class="[layoutAsidePadding, { 'ml-60 lg:ml-0': isAsideMobileExpanded }]"
       class="pt-14 min-h-screen w-screen transition-position lg:w-auto bg-gray-50 dark:bg-slate-800 dark:text-slate-100"

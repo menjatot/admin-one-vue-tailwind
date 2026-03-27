@@ -120,6 +120,17 @@ export const PERMISSION_CATEGORIES = {
         PERMISSIONS.INFRAESTRUCTURAS.VER,
         PERMISSIONS.PUNTOS_MUESTREO.VER
       ]
+    },
+
+    VISUALIZADOR: {
+      nombre: 'visualizador',
+      descripcion: 'Usuario con acceso de visualización únicamente, sin capacidad de edición (tipo_personal.id = 10)',
+      permisos: [
+        // Solo permisos de visualización, sin exportar ni escribir
+        PERMISSIONS.ANALITICAS.VER,
+        PERMISSIONS.INFRAESTRUCTURAS.VER,
+        PERMISSIONS.PUNTOS_MUESTREO.VER
+      ]
     }
   };
   

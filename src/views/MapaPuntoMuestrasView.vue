@@ -30,6 +30,7 @@ const map=ref(null)
 
 const center=ref([39.4679255214283, -0.3762874990439122])
 const zoom = ref(13)
+const userLocation = ref(null)
 const API_KEY_ICONS = import.meta.env.VITE_ICONS_API_KEY
 const markerIcon = (icon) =>
   L.icon({
@@ -38,6 +39,19 @@ const markerIcon = (icon) =>
     iconAnchor: [15.5, 42], // point of the icon which will correspond to marker's location
     popupAnchor: [0, -45] // point from which the popup should open relative to the iconAnchor
   })
+
+// Icono para la posición actual del usuario (círculo azul pulsante)
+const userLocationIcon = L.divIcon({
+  html: `
+    <div class="user-location-marker">
+      <div class="user-location-pulse"></div>
+      <div class="user-location-dot"></div>
+    </div>
+  `,
+  className: 'user-location-icon',
+  iconSize: [24, 24],
+  iconAnchor: [12, 12]
+})
 
 const crearAnalitica = (puntoId) => {
   isModalActive.value = true
@@ -119,9 +133,11 @@ const getUserLocation = () => {
   navigator.geolocation.getCurrentPosition(
     (position) => {
       console.log('Ubicación obtenida:', position.coords)
-      center.value = [position.coords.latitude, position.coords.longitude]
+      const coords = [position.coords.latitude, position.coords.longitude]
+      center.value = coords
+      userLocation.value = coords
       isLoading.value = false
-      
+
       // Si tenemos referencia al mapa, forzar actualización
       if (map.value) {
         console.log('Actualizando centro del mapa')
@@ -189,7 +205,7 @@ onMounted(() => {
   </CardBoxModal>
 
   <LayoutAuthenticated>
-    <SectionMain>
+    <SectionMain class="pb-0">
       <SectionTitleLineWithButton :icon="mdiMap" title="Mapa Puntos Muestreo" main>
         <div class="flex gap-2">
           <!-- <BaseButton
@@ -215,25 +231,29 @@ onMounted(() => {
         <b>Responsive table.</b> Collapses on mobile
       </NotificationBar> -->
 
-      <CardBox class="mb-6" has-table>
-        <div class="flex flex-col items-center justify-center">
-          <div style="height: 600px; width: 95%">
+      <CardBox has-table class="overflow-hidden -mx-4 sm:-mx-6">
+        <div class="relative w-full" style="height: calc(100dvh - 13rem); min-height: 400px;">
+
+          <!-- Botón superpuesto sobre el mapa -->
+          <div class="absolute top-3 right-12 z-[1001]">
             <BaseButton
-  label="Centrar posición"
-  :icon="mdiCrosshairsGps"
-  color="info"
-  rounded
-  small
-  :disabled="isLoading"
-  class="w-full"
-  @click="centerOnUserLocation"
-/>
-            <l-map
-              ref="map"
-              v-model:zoom="zoom"
-              :center="center"
-              :use-global-leaflet="false"
-              >
+              label="Centrar posición"
+              :icon="mdiCrosshairsGps"
+              color="info"
+              rounded
+              small
+              :disabled="isLoading"
+              @click="centerOnUserLocation"
+            />
+          </div>
+
+          <l-map
+            ref="map"
+            v-model:zoom="zoom"
+            :center="center"
+            :use-global-leaflet="false"
+            style="height: 100%; width: 100%"
+            >
               <!-- :center="[39.54982998070428, -0.4656852311920545]" -->
               <l-tile-layer
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -241,8 +261,21 @@ onMounted(() => {
                 name="OpenStreetMap"
               ></l-tile-layer>
 
-                <l-marker 
-                :lat-lng="[39.54982998070428, -0.4656852311920545]"
+                <!-- Marcador de posición actual del usuario -->
+              <l-marker
+                v-if="userLocation"
+                :lat-lng="userLocation"
+                :icon="userLocationIcon"
+              >
+                <l-tooltip>
+                  <div class="text-center">
+                    <p class="text-sm font-semibold">Tu ubicación actual</p>
+                  </div>
+                </l-tooltip>
+              </l-marker>
+
+              <l-marker
+                :lat-lng="[39.55260629146044, -0.4660164890395499]"
                 :icon="L.icon({
                   iconUrl: aqlaraIcon,
                   iconSize: [32, 32],
@@ -255,8 +288,9 @@ onMounted(() => {
                     <AqlaraLogo class="text-center w-32"/>
                   <!-- <h1 class="text-lg font-bold">AQLARA</h1> -->
                   <p class="text-sm">Oficinas Centrales</p>
-                  <p class="text-sm">Rda. de Narcís Monturiol, nº 4</p>
-                  <p class="text-sm"> oficina 214-A, 46980 Paterna, Valencia</p>
+                  <p class="text-sm">Parque Tecnológico de Paterna,</p>
+                  <p class="text-sm"> Calle Sir Alexander Fleming 7</p>
+                  <p class="text-sm"> 46980 Paterna, Valencia (España)</p>
                   <p class="text-sm"> Tfno: 963 153 232</p>
                   </div>
                 </l-tooltip>
@@ -302,7 +336,6 @@ onMounted(() => {
                 </l-marker>
               </div>
             </l-map>
-          </div>
         </div>
       </CardBox>
      
@@ -341,5 +374,55 @@ onMounted(() => {
 /* Ensure modal content can scroll on mobile */
 :deep(.overflow-y-auto) {
   -webkit-overflow-scrolling: touch;
+}
+
+/* Estilos para el marcador de ubicación del usuario */
+:deep(.user-location-icon) {
+  background: transparent !important;
+  border: none !important;
+}
+
+:deep(.user-location-marker) {
+  position: relative;
+  width: 24px;
+  height: 24px;
+}
+
+:deep(.user-location-dot) {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 14px;
+  height: 14px;
+  background-color: #4285f4;
+  border: 3px solid white;
+  border-radius: 50%;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  z-index: 2;
+}
+
+:deep(.user-location-pulse) {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 24px;
+  height: 24px;
+  background-color: rgba(66, 133, 244, 0.3);
+  border-radius: 50%;
+  animation: pulse 2s ease-out infinite;
+  z-index: 1;
+}
+
+@keyframes pulse {
+  0% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(2.5);
+    opacity: 0;
+  }
 }
 </style>

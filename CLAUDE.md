@@ -2,83 +2,156 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Commands
+## Development Commands
 
-```bash
-npm run dev       # Start Vite dev server
-npm run build     # Production build
-npm run preview   # Preview production build on port 4173
-npm run lint      # ESLint with auto-fix (.vue, .js, .cjs, .mjs)
-npm run format    # Prettier format src/
-```
+- **Start development server**: `npm run dev` (Vite development server with Doppler dev config)
+- **Build for staging**: `npm run build:staging` (Vite build with Doppler staging config)
+- **Build for production**: `npm run build` (Vite build with Doppler production config)
+- **Preview production build**: `npm run preview` (Preview build with Doppler production config)
+- **Lint code**: `npm run lint` (ESLint with auto-fix)
 
-## Architecture Overview
+**Note**: All commands use Doppler for environment variable management. Ensure Doppler CLI is installed and configured.
 
-This is the **AQLARA Admin Panel** — a water utility management SPA (Vue 3 + Vite + Tailwind CSS) for managing water supply zones, infrastructure, sampling points, and water quality analytics (analíticas).
+## Deployment to Production
 
-### Auth Flow
+### Building for Production
 
-Two auth systems work together:
+1. Run `npm run build` to create production build with Doppler production config
+2. The build outputs to `dist/` directory
+3. Upload the entire `dist/` folder contents to the server path `apps.aqlara.com/sinaq/`
 
-1. **Microsoft MSAL** (`src/services/msalConfig.js`) handles login via Azure AD popup (desktop) or redirect (mobile).
-2. **Supabase** (`src/services/supabase.js`) is the database backend. After MSAL login, user email is looked up in the `personal` table to fetch their role.
-3. **`useLoginStore`** (`src/stores/login.js`) persists auth state to `localStorage` and is the primary auth check for the router guard (`requiresAuth` meta).
+### Important: .htaccess Configuration
 
-### Global State
+- The `.htaccess` file is located in `public/.htaccess`
+- Vite automatically copies files from `public/` to `dist/` during build
+- **The `.htaccess` file is required** for Vue Router hash mode and CORS headers
+- After uploading to server, verify `.htaccess` is present in `/sinaq/.htaccess`
+- Recommended permissions: `.htaccess` = 644, directories = 755, files = 644
 
-**`usePlantasStore`** (`src/stores/plantas.js`) is the central data store, initialized on app mount in `App.vue`. It loads all domain entities in parallel from Supabase:
-- `zonas` (zonas_abastecimiento), `operarios` (personal), `analiticas`, `puntosMuestreo`, `unidadesOperativas`, `comunidadesAutonomas`, `infraestructuras`, `tipo_infraestructura`, `zonas_infraestructuras`, `tipoPersonal`
+### Apache Requirements
 
-Components consume this store rather than making individual Supabase calls in most cases.
+The application requires the following Apache modules enabled:
+- `mod_rewrite` - For Vue Router URL handling
+- `mod_headers` - For CORS and security headers
 
-### Routing
+### Troubleshooting 403 Forbidden
 
-Uses `createWebHashHistory` (hash-based URLs). Routes with `meta.requiresAuth: true` are protected by a `beforeEach` guard that checks `loginStore.isAuthenticated`. Admin sub-routes live under `/admin/*`.
+If you get 403 Forbidden after deployment:
+1. Verify `.htaccess` exists in the deployment directory
+2. Check file permissions (644 for files, 755 for directories)
+3. Ensure `mod_rewrite` and `mod_headers` are enabled in Apache
+4. Verify `index.html` exists in the root deployment directory
 
-### Layouts
+## Project Architecture
 
-- `LayoutAuthenticated.vue` — full shell with NavBar, AsideMenu, FooterBar. Renders `UnAutorizedComponent` if not authenticated.
-- `LayoutGuest.vue` — minimal, for login/public pages.
+This is a Vue 3 admin dashboard application built with:
 
-Navigation items are defined in `src/menuAside.js` and `src/menuNavBar.js`.
+- **Vue 3** with Composition API and `<script setup>` syntax
+- **Vite** as build tool with custom base path `/sinaq/`
+- **Tailwind CSS 3** for styling with custom scrollbar utilities
+- **Vue Router 4** with hash-based routing and authentication guards
+- **Pinia** for state management
+- **PrimeVue 4** UI component library with custom theming
+- **FormKit** for form handling
+- **Vueform** for advanced form components
 
-### Services Layer
+### Key Dependencies
 
-`src/services/` contains one file per domain entity (e.g., `analiticas.js`, `operarios.js`, `zonas.js`, `puntosMuestreo.js`, `uo.js`, `infraestructuras.js`). These wrap Supabase queries. `supabase.js` also exports several direct utility functions (`deleteAnalitica`, `updateAnaliticabyId`, etc.).
+- **@azure/msal-browser**: Microsoft authentication (MSAL)
+- **@supabase/supabase-js**: Database integration
+- **axios**: HTTP client
+- **chart.js**: Data visualization
+- **leaflet + @vue-leaflet/vue-leaflet**: Interactive maps
+- **jspdf + jspdf-autotable**: PDF generation
+- **xlsx**: Excel file handling
+- **date-fns**: Date manipulation
 
-### Permissions System
+### Environment Management
 
-Roles (ADMIN, SUPERVISOR, OPERARIO, CONSULTOR) and their permissions are defined in `src/constants/permissions.js`. The `usePermissions` composable (`src/composables/usePermissions.js`) loads permissions from roles and exposes `hasPermission`, `hasRole`, `hasAnyPermission`, `hasAllPermissions`.
+This project uses **Doppler** for secure environment variable management:
 
-### Key Composables
+- **Environment variables** are injected automatically via Doppler CLI
+- **Configs**: `dev`, `staging`, `production` (mapped in package.json scripts)
+- **Required variables**:
+  - `VITE_SUPABASE_URL`: Supabase project URL
+  - `VITE_SUPABASE_ANON_KEY`: Supabase anonymous key
+  - `VITE_MICROSOFT_CLIENT_ID`: Azure AD application client ID
+  - `VITE_MICROSOFT_TENANT_ID`: Azure AD tenant ID
+  - `VITE_BASE_URL`: Base path for deployment (defaults to `/sinaq/`)
+  - `VITE_DEV_PORT`: Development server port (defaults to 3000)
 
-- `useUploadFile` / `useExtractData` — Excel file parsing via `xlsx` for SINAQ data upload (the main feature at `/`)
-- `useUploadFormData` — form-based data upload to Supabase
-- `useFormSelectData` — populates form dropdowns from store data
-- `useAuth` — auth helpers
+### Application Structure
 
-### Domain Model (Supabase tables)
+#### Authentication & Routing
+- **Authentication flow**: Microsoft Azure AD via MSAL (`src/services/msalConfig.js`)
+- **Session management**: 30-minute timeout with auto-logout in `src/stores/login.js`
+- **Route guards** in `src/router/index.js`:
+  - Routes with `meta.requiresAuth: true` require authentication
+  - Routes with `meta.requiredRole: 'admin'` require admin privileges (role '99', 99, or 'admin')
+  - Session expiry checked on each navigation with `checkSessionExpiry()`
+  - Session renewed on each authenticated route navigation via `renewSession()`
+- **User state persistence**: sessionStorage for user data, avatar, role, and session timestamps
+- **Router mode**: Hash-based routing (`createWebHashHistory`)
+- **Unauthenticated users** redirected to `/login`
+- **Unauthorized users** redirected to `/unauthorized`
 
-```
-comunidades_autonomas
-  └── unidades_operativas
-        └── zonas_abastecimiento
-              └── infraestructuras
-                    └── puntos_muestreo
-                          └── analiticas (water quality samples)
-personal (operarios) ←→ zonas_personal (junction) ←→ zonas_abastecimiento
-```
+#### Main Application Areas
+- **Home** (`/`): Excel uploader and analytics (`ExcelUploaderView.vue`)
+- **Admin Panel** (`/admin/*`): CRUD operations requiring admin role
+  - `/admin/operarios`: Operators management
+  - `/admin/unidades_operativas`: Operational units management
+  - `/admin/zonas`: Zones management
+  - `/admin/infraestructuras`: Infrastructure management
+  - `/admin/puntos_muestreo`: Sampling points management
+- **Map Visualization** (`/mapa`): Interactive map of sampling points using Leaflet
+- **Analytics Table** (`/tablaAnaliticas`): Table view of analytics data
+- **Settings** (`/settings`): Configuration panel (admin only)
 
-### Environment Variables
+#### Service Layer Architecture
+Services in `src/services/` handle data operations:
+- **Authentication**: `msalConfig.js` (Microsoft authentication integration)
+- **Database**: `supabase.js` (Supabase client configuration)
+- **Domain Services**: Separate files for each entity (operarios, uo, zonas, infraestructuras, puntosMuestreo, analiticas)
+- **External APIs**: `factorialConfig.js` (Factorial HR integration)
 
-Required in `.env`:
-```
-VITE_SUPABASE_URL
-VITE_SUPABASE_ANON_KEY
-VITE_MICROSOFT_CLIENT_ID
-VITE_MICROSOFT_TENANT_ID
-```
+#### Store Management (Pinia)
+- **main.js**: Sample data and general app state
+- **login.js**: Authentication state with session timeout management
+  - Watchers persist state to sessionStorage
+  - Session timeout clears after 30 minutes of inactivity
+  - Provides `login()`, `logout()`, `renewSession()`, `checkSessionExpiry()`
+- **auth.js**: Additional auth utilities
+- **plantas.js**: Plant/facility data
+- **darkMode.js**: Theme switching
 
-### PrimeVue
+### Code Style & Standards
 
-PrimeVue 4 is registered with `theme: 'none'`. Component-level CSS overrides live in `src/assets/primevue/`. Some components have a `_PrimeVue` variant (e.g., `AnaliticsTable_PrimeVue.vue`, `TablaOperarios_PrimeVue.vue`) as alternatives to the default implementations.
+- **ESLint**: Vue 3 recommended + eslint:recommended rules
+- **Prettier**: 2 spaces, single quotes, no semicolons, 100 char width, no trailing commas
+- **Components**: Use Composition API with `<script setup>` syntax
+- **Path alias**: `@/` points to `src/` directory
+- **ECMAScript**: Target ES2022 (top-level await supported)
+
+### Custom Styling
+
+- **Tailwind extended** with custom scrollbar utilities (`aside-scrollbars` with light/gray variants)
+- **PrimeVue theming**: Disabled in favor of Tailwind classes (`theme: 'none'`)
+- **Custom animations**: fade-in/fade-out keyframes and transitions
+- **Dark mode**: Supported via CSS classes (`darkMode: 'class'` in Tailwind config)
+- **Responsive layout**: Mobile-first design with collapsable sidebar
+
+### Build Configuration
+
+- **Vite target**: ES2022 for top-level await support
+- **Base path**: Dynamic via `VITE_BASE_URL` environment variable (defaults to `/sinaq/`)
+- **Vue options**: Production hydration mismatch details disabled (`__VUE_PROD_HYDRATION_MISMATCH_DETAILS__: false`)
+- **Dev server port**: Configurable via `VITE_DEV_PORT` (defaults to 3000)
+- **Asset handling**: Static assets served from configured base path
+
+### Important Development Notes
+
+- **Microsoft Authentication**: Uses popup-based login for desktop, redirect-based for mobile devices
+- **Graph API Integration**: Fetches user profile including photo from Microsoft Graph API
+- **Supabase Client**: Auto-refresh tokens enabled with persistent session support
+- **Service Layer Pattern**: Each domain entity has its own service file with CRUD operations
+- **Composables**: Reusable logic in `src/composables/` for auth, permissions, data loading, etc.

@@ -22,8 +22,9 @@ const routes = [
   },
   {
     meta: {
-      title: 'Aqlara Login',
-      requiresAuth: true
+      title: 'Aqlara Admin Panel',
+      requiresAuth: true,
+      requiredRole: 'admin'
     },
     path: '/admin',
     name: 'admin',
@@ -65,7 +66,8 @@ const routes = [
   {
     meta: {
       title: 'Aqlara Home',
-      requiresAuth: true
+      requiresAuth: true,
+      blockedRoles: [10, '10']
     },
     path: '/',
     name: 'home',
@@ -96,7 +98,8 @@ const routes = [
     // We combine it with defaultDocumentTitle set in `src/main.js` on router.afterEach hook
     meta: {
       title: 'Panel de Control',
-      requiresAuth: true
+      requiresAuth: true,
+      requiredRole: 'admin'
     },
     path: '/settings',
     name: 'settings',
@@ -114,7 +117,8 @@ const routes = [
   {
     meta: {
       title: 'Forms',
-      requiresAuth: true
+      requiresAuth: true,
+      blockedRoles: [10, '10']
     },
     path: '/forms',
     name: 'forms',
@@ -171,7 +175,9 @@ const routes = [
   },
   {
     meta: {
-      title: 'Sinaq'
+      title: 'Sinaq',
+      requiresAuth: true,
+      blockedRoles: [10, '10']
     },
     path: '/sinaq',
     name: 'sinaq',
@@ -204,23 +210,70 @@ const router = createRouter({
   }
 })
 
+// Función para verificar permisos de usuario
+const checkUserPermission = (userRole, requiredRole) => {
+  // Normalizar roles de admin: '99', 99, y 'admin' son equivalentes
+  const adminRoles = ['admin', '99', 99]
+  
+  if (requiredRole === 'admin') {
+    return adminRoles.includes(userRole)
+  }
+  
+  // Para otros roles, comparación directa
+  return userRole === requiredRole
+}
 
-
-// Guard de navegacion
+// Guard de navegacion mejorado con seguridad de sesión
 
 router.beforeEach((to, from, next) => {
-  // const { useLoginStore } = require('@/stores/login')
   const loginStore = useLoginStore();
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth);
 
-  // if (requiresAuth && !localStorage.getItem('token')) {
-  if (requiresAuth && !loginStore.isAuthenticated) {
-    
-    next({name:'login'});
-  } else {
-    next();
+  if (requiresAuth) {
+    // Verificar si está autenticado
+    if (!loginStore.isAuthenticated) {
+      console.warn('Usuario no autenticado, redirigiendo a login')
+      next({name: 'login'});
+      return;
+    }
+
+    // Verificar si la sesión ha expirado
+    if (!loginStore.checkSessionExpiry()) {
+      console.warn('Sesión expirada, redirigiendo a login')
+      next({name: 'login'});
+      return;
+    }
+
+    // Verificar autorización por roles si es requerido
+    const requiredRole = to.meta.requiredRole;
+    if (requiredRole) {
+      const hasPermission = checkUserPermission(loginStore.userRole, requiredRole);
+      if (!hasPermission) {
+        console.warn('Usuario sin permisos suficientes', {
+          userRole: loginStore.userRole,
+          requiredRole: requiredRole
+        });
+        next({name: 'Unauthorized'});
+        return;
+      }
+    }
+
+    // Verificar si el rol del usuario está bloqueado para esta ruta
+    const blockedRoles = to.meta.blockedRoles;
+    if (blockedRoles && blockedRoles.includes(loginStore.userRole)) {
+      console.warn('Rol bloqueado para esta ruta', {
+        userRole: loginStore.userRole,
+        blockedRoles: blockedRoles
+      });
+      next({name: 'Unauthorized'});
+      return;
+    }
+
+    // Renovar sesión en cada navegación autenticada
+    loginStore.renewSession();
   }
-  // to and from are both route objects. must call `next`.
+
+  next();
 })
 
 export default router

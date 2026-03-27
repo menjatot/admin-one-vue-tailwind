@@ -83,7 +83,7 @@ export default function useFormSelectData() {
         return { value: zona.id, label: zona.name }
       })
     return plantasStore.getZonas
-      .filter((zona) => zona.unidades_operativas_fk === form.uo)
+      .filter((zona) => zona.unidades_operativas_fk === Number(form.uo))
       .map((zona) => {
         return { value: zona.id, label: zona.name }
       })
@@ -95,7 +95,7 @@ export default function useFormSelectData() {
         return { value: infraestructura.id, label: infraestructura.name }
       })
     const infraestructuras = plantasStore.getZonasInfraestructuras
-      .filter((infraestructura) => infraestructura.zonas_fk === form.zona)
+      .filter((infraestructura) => infraestructura.zonas_fk === Number(form.zona))
       .map((infraestructura) => {
         // console.log(':Infraestructura: ',infraestructura)
         return {
@@ -118,14 +118,14 @@ export default function useFormSelectData() {
   }
 
 const selectPuntosMuestra = computed(() => {
-  if (loginStore.userRole === 99) {
+  if (Number(loginStore.userRole) === 99) {
     if (!form.infraestructura)
       return plantasStore.getPuntosMuestreo.map((punto) => {
         return { value: punto.id, label: punto.name }
       })
-  
+
     return plantasStore.getPuntosMuestreo
-      .filter((punto) => punto.infraestructura_fk === form.infraestructura)
+      .filter((punto) => punto.infraestructura_fk === Number(form.infraestructura))
       .map((punto) => {
         return { value: punto.id, label: punto.name }
       })
@@ -155,13 +155,13 @@ const selectPuntosMuestra = computed(() => {
 
   if (!form.infraestructura)
     return plantasStore.getPuntosMuestreo
-    .filter((punto) => (punto.activo &&  zonasIds.includes(punto.zona_fk)))
-    .map((punto) => {
-      return { value: punto.id, label: punto.name }
-    })
+      .filter((punto) => punto.activo && zonasIds.includes(punto.zona_fk))
+      .map((punto) => {
+        return { value: punto.id, label: punto.name }
+      })
 
   return plantasStore.getPuntosMuestreo
-    .filter((punto) => (punto.activo && punto.infraestructura_fk === form.infraestructura && zonasIds.includes(punto.zona_fk)))
+    .filter((punto) => punto.activo && punto.infraestructura_fk === Number(form.infraestructura) && zonasIds.includes(punto.zona_fk))
     .map((punto) => {
       return { value: punto.id, label: punto.name }
     })
@@ -175,7 +175,7 @@ const selectPuntosMuestra = computed(() => {
       })
 
     return plantasStore.getOperarios
-      .filter((operario) => operario.ud_operativa_fk === form.uo)
+      .filter((operario) => operario.ud_operativa_fk === Number(form.uo))
       .map((operario) => {
         return { value: operario.id, label: operario.name }
       })

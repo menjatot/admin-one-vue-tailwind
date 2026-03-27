@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { computed, onMounted, ref } from 'vue'
+import { computed, ref } from 'vue'
 import { supabase } from '@/services/supabase'
 
 export const usePlantasStore = defineStore('plantasStore', () => {
@@ -30,13 +30,13 @@ export const usePlantasStore = defineStore('plantasStore', () => {
   //   loadTipoPersonal()
   // })
 
-  // Función para inicializar todos los datos
+  // Función para inicializar datos básicos (sin analíticas)
   const initializeStore = async () => {
     try {
       await Promise.all([
         loadZonas(),
         loadOperarios(),
-        loadAnaliticas(),
+        // loadAnaliticas(), // ❌ Removido - se carga bajo demanda
         loadPuntosMuestreo(),
         loadUnidadesOperativas(),
         loadComunidadesAutonomas(),
@@ -45,8 +45,30 @@ export const usePlantasStore = defineStore('plantasStore', () => {
         loadZonasInfraestructuras(),
         loadTipoPersonal()
       ])
+      console.log('📊 Store inicializado (sin analíticas)')
     } catch (error) {
       console.error('Error inicializando store:', error)
+    }
+  }
+
+  // Nueva función para inicializar incluyendo analíticas (solo cuando se necesite)
+  const initializeStoreWithAnalytics = async () => {
+    try {
+      await Promise.all([
+        loadZonas(),
+        loadOperarios(),
+        loadAnaliticas(), // ✅ Solo se carga cuando explícitamente se necesita
+        loadPuntosMuestreo(),
+        loadUnidadesOperativas(),
+        loadComunidadesAutonomas(),
+        loadInfraestructuras(),
+        loadTipoInfraestructura(),
+        loadZonasInfraestructuras(),
+        loadTipoPersonal()
+      ])
+      console.log('📊 Store inicializado (con analíticas)')
+    } catch (error) {
+      console.error('Error inicializando store completo:', error)
     }
   }
 
@@ -221,6 +243,16 @@ const loadOperarios = async () => {
     return analiticas.value
   })
 
+  // Computed para verificar si las analíticas están cargadas
+  const isAnalyticasLoaded = computed(() => {
+    return analiticas.value.length > 0
+  })
+
+  // Computed para obtener el número de analíticas cargadas
+  const analyticsCount = computed(() => {
+    return analiticas.value.length
+  })
+
   const getPuntosMuestreo = computed(() => {
     return puntosMuestreo.value
   })
@@ -305,6 +337,8 @@ const getZonasOperario = computed(() => {
     getZonas,
     getOperarios,
     getAnaliticas,
+    isAnalyticasLoaded,
+    analyticsCount,
     getPuntosMuestreo,
     getUnidadesOperativas,
     getComunidadesAutonomas,
@@ -336,6 +370,7 @@ const getZonasOperario = computed(() => {
     loadTipoPersonal,
     analiticaToUpdate,
     initializeStore,
+    initializeStoreWithAnalytics,
     zonas_personal,
     loadZonasOperarios,
     getZonasOperario
