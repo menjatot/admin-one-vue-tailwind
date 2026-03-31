@@ -373,26 +373,51 @@ const handleSort = (column) => {
 
 // Flag para evitar aplicar filtros durante la inicialización
 const isInitializing = ref(true)
+// Flag para evitar que los resets en cascada disparen applyLocalFilters múltiples veces
+const isResetting = ref(false)
 
-// Observar cambios en filtros locales y aplicarlos inmediatamente (sin debounce)
-const stopWatching = []
-Object.keys(localFilters).forEach(key => {
-  const stopWatcher = watch(
+// Watchers con reset en cascada para filtros dependientes
+// UO → Zona → Infraestructura → Punto de Muestreo
+
+watch(() => localFilters.uo, async () => {
+  if (isInitializing.value || isResetting.value) return
+  isResetting.value = true
+  localFilters.zona = null
+  localFilters.infraestructura = null
+  localFilters.punto_muestreo_fk = null
+  await nextTick()
+  isResetting.value = false
+  applyLocalFilters()
+})
+
+watch(() => localFilters.zona, async () => {
+  if (isInitializing.value || isResetting.value) return
+  isResetting.value = true
+  localFilters.infraestructura = null
+  localFilters.punto_muestreo_fk = null
+  await nextTick()
+  isResetting.value = false
+  applyLocalFilters()
+})
+
+watch(() => localFilters.infraestructura, async () => {
+  if (isInitializing.value || isResetting.value) return
+  isResetting.value = true
+  localFilters.punto_muestreo_fk = null
+  await nextTick()
+  isResetting.value = false
+  applyLocalFilters()
+})
+
+// Watchers para filtros independientes (sin cascada)
+;['fecha_inicio', 'fecha_final', 'punto_muestreo_fk', 'operario', 'type'].forEach(key => {
+  watch(
     () => localFilters[key],
-    (newValue, oldValue) => {
-      // No aplicar filtros durante la inicialización
-      if (isInitializing.value) {
-        console.log(`⏭️ Ignorando cambio de "${key}" durante inicialización`)
-        return
-      }
-
-      console.log(`🎯 Watcher disparado para filtro "${key}":`, { oldValue, newValue })
-      // Aplicar filtros inmediatamente para máxima reactividad
+    () => {
+      if (isInitializing.value || isResetting.value) return
       applyLocalFilters()
-    },
-    { deep: true }
+    }
   )
-  stopWatching.push(stopWatcher)
 })
 
 onMounted(() => {
