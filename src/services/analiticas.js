@@ -65,15 +65,34 @@ export const getAnaliticasPaginated = async (options = {}) => {
       pmQuery = pmQuery.eq('infraestructura_fk', filters.infraestructura_fk)
     }
 
-    if (filters.zona_fk) {
-      console.log('  ➜ Filtrando por zona_fk directo:', filters.zona_fk)
-      pmQuery = pmQuery.eq('zona_fk', filters.zona_fk)
-    } else if (filters.zonas_fk && filters.zonas_fk.length > 0) {
-      console.log('  ➜ Filtrando por zonas_fk (array):', filters.zonas_fk)
-      pmQuery = pmQuery.in('zona_fk', filters.zonas_fk)
-    } else if (zonaIds) {
-      console.log('  ➜ Filtrando por zona_fk via UO:', zonaIds)
-      pmQuery = pmQuery.in('zona_fk', zonaIds)
+    const targetZonas = []
+    if (filters.zona_fk) targetZonas.push(filters.zona_fk)
+    else if (filters.zonas_fk && filters.zonas_fk.length > 0) targetZonas.push(...filters.zonas_fk)
+    else if (zonaIds) targetZonas.push(...zonaIds)
+
+    if (targetZonas.length > 0) {
+      console.log('  ➜ Buscando infraestructuras vinculadas a zonas:', targetZonas)
+      const { data: infrasData, error: infrasError } = await supabase
+        .from('zonas_infraestructuras')
+        .select('infraestructuras_fk')
+        .in('zonas_fk', targetZonas)
+
+      if (infrasError) {
+        console.error('❌ Error obteniendo infarestructuras de zonas:', infrasError)
+        throw infrasError
+      }
+
+      const infraIdsSet = new Set(infrasData.map(i => i.infraestructuras_fk))
+      const infraIdsArray = Array.from(infraIdsSet)
+
+      console.log(`  ➜ Encontradas ${infraIdsArray.length} infraestructuras para las zonas seleccionadas.`)
+      
+      // Filtramos puntos que pertenezcan a las infraestructuras encontradas O tengan directamente la zona guardada (legacy)
+      if (infraIdsArray.length > 0) {
+        pmQuery = pmQuery.or(`infraestructura_fk.in.(${infraIdsArray.join(',')}),zona_fk.in.(${targetZonas.join(',')})`)
+      } else {
+        pmQuery = pmQuery.in('zona_fk', targetZonas)
+      }
     }
 
     const { data: puntosMuestreo, error: pmError } = await pmQuery
@@ -213,7 +232,6 @@ export const getAnaliticasFiltered = async (options = {}) => {
       }
     }
 
-    // Sub-paso 1b: Obtener puntos de muestreo con los filtros correspondientes
     let pmQuery = supabase
       .from('puntos_muestreo')
       .select('id')
@@ -223,15 +241,34 @@ export const getAnaliticasFiltered = async (options = {}) => {
       pmQuery = pmQuery.eq('infraestructura_fk', filters.infraestructura_fk)
     }
 
-    if (filters.zona_fk) {
-      console.log('  ➜ Filtrando por zona_fk directo:', filters.zona_fk)
-      pmQuery = pmQuery.eq('zona_fk', filters.zona_fk)
-    } else if (filters.zonas_fk && filters.zonas_fk.length > 0) {
-      console.log('  ➜ Filtrando por zonas_fk (array):', filters.zonas_fk)
-      pmQuery = pmQuery.in('zona_fk', filters.zonas_fk)
-    } else if (zonaIds) {
-      console.log('  ➜ Filtrando por zona_fk via UO:', zonaIds)
-      pmQuery = pmQuery.in('zona_fk', zonaIds)
+    const targetZonas = []
+    if (filters.zona_fk) targetZonas.push(filters.zona_fk)
+    else if (filters.zonas_fk && filters.zonas_fk.length > 0) targetZonas.push(...filters.zonas_fk)
+    else if (zonaIds) targetZonas.push(...zonaIds)
+
+    if (targetZonas.length > 0) {
+      console.log('  ➜ Buscando infraestructuras vinculadas a zonas:', targetZonas)
+      const { data: infrasData, error: infrasError } = await supabase
+        .from('zonas_infraestructuras')
+        .select('infraestructuras_fk')
+        .in('zonas_fk', targetZonas)
+
+      if (infrasError) {
+        console.error('❌ Error obteniendo infarestructuras de zonas:', infrasError)
+        throw infrasError
+      }
+
+      const infraIdsSet = new Set(infrasData.map(i => i.infraestructuras_fk))
+      const infraIdsArray = Array.from(infraIdsSet)
+
+      console.log(`  ➜ Encontradas ${infraIdsArray.length} infraestructuras para las zonas seleccionadas.`)
+      
+      // Filtramos puntos que pertenezcan a las infraestructuras encontradas O tengan directamente la zona guardada (legacy)
+      if (infraIdsArray.length > 0) {
+        pmQuery = pmQuery.or(`infraestructura_fk.in.(${infraIdsArray.join(',')}),zona_fk.in.(${targetZonas.join(',')})`)
+      } else {
+        pmQuery = pmQuery.in('zona_fk', targetZonas)
+      }
     }
 
     const { data: puntosMuestreo, error: pmError } = await pmQuery

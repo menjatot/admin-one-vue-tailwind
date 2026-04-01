@@ -90,20 +90,36 @@ export default function useFormSelectData() {
   })
 
   const selectInfraestructura = computed(() => {
-    if (!form.zona)
-      return plantasStore.getPuntosMuestreo.map((infraestructura) => {
-        return { value: infraestructura.id, label: infraestructura.name }
-      })
-    const infraestructuras = plantasStore.getZonasInfraestructuras
-      .filter((infraestructura) => infraestructura.zonas_fk === Number(form.zona))
-      .map((infraestructura) => {
-        // console.log(':Infraestructura: ',infraestructura)
-        return {
-          value: infraestructura.infraestructuras_fk,
-          label: buscaInfraestructuraPorId(infraestructura.infraestructuras_fk)
-        }
-      })
-    return infraestructuras
+    let infraestructurasDisponibles = plantasStore.getZonasInfraestructuras
+    
+    if (form.zona) {
+      infraestructurasDisponibles = infraestructurasDisponibles.filter((infra) => infra.zonas_fk === Number(form.zona))
+    } else if (form.uo) {
+      const zonasDeUo = plantasStore.getZonas.filter(z => z.unidades_operativas_fk === Number(form.uo)).map(z => z.id)
+      infraestructurasDisponibles = infraestructurasDisponibles.filter(infra => zonasDeUo.includes(infra.zonas_fk))
+    } else if (Number(loginStore.userRole) !== 99 && loginStore.userRole !== 'admin') {
+      const operarioActual = plantasStore.getOperarios.find(op => op.email?.toLowerCase() === loginStore.userEmail?.toLowerCase())
+      if (operarioActual && operarioActual.zonas) {
+        const zonasIds = operarioActual.zonas.map(zona => typeof zona === 'object' ? zona.id : zona)
+        infraestructurasDisponibles = infraestructurasDisponibles.filter(infra => zonasIds.includes(infra.zonas_fk))
+      }
+    }
+
+    // Deduplicate infraestructuras in case they belong to multiple zones among the filtered ones
+    const infraIds = new Set()
+    const result = []
+    
+    infraestructurasDisponibles.forEach((infra) => {
+      if (!infraIds.has(infra.infraestructuras_fk)) {
+        infraIds.add(infra.infraestructuras_fk)
+        result.push({
+          value: infra.infraestructuras_fk,
+          label: buscaInfraestructuraPorId(infra.infraestructuras_fk)
+        })
+      }
+    })
+    
+    return result
   })
 
   const buscaInfraestructuraPorId = (id) => {
@@ -117,55 +133,39 @@ export default function useFormSelectData() {
     }
   }
 
-const selectPuntosMuestra = computed(() => {
-  if (Number(loginStore.userRole) === 99) {
-    if (!form.infraestructura)
-      return plantasStore.getPuntosMuestreo.map((punto) => {
-        return { value: punto.id, label: punto.name }
-      })
+  const selectPuntosMuestra = computed(() => {
+    let puntos = plantasStore.getPuntosMuestreo
 
-    return plantasStore.getPuntosMuestreo
-      .filter((punto) => punto.infraestructura_fk === Number(form.infraestructura))
-      .map((punto) => {
-        return { value: punto.id, label: punto.name }
-      })
-  }
-    
-  // Para otros roles, filtrar por las zonas del operario
-  const operarioActual = plantasStore.getOperarios.find(
-    (op) => op.email?.toLowerCase() === loginStore.userEmail?.toLowerCase()
-  )
-  
-  // Si no se encuentra el operario, devolver lista vacía o lista completa
-  if (!operarioActual || !operarioActual.zonas) {
-    console.warn('Operario no encontrado o sin zonas asignadas')
-    return []
-  }
-  
-  // Obtener IDs de zonas asignadas al operario
-  const zonasIds = operarioActual.zonas.map(zona => 
-    typeof zona === 'object' ? zona.id : zona
-  )
-  console.log('Zonas asignadas al operario:', zonasIds)
+    // Filtering by Role (Admin vs Operario)
+    if (Number(loginStore.userRole) !== 99 && loginStore.userRole !== 'admin') {
+      const operarioActual = plantasStore.getOperarios.find(op => op.email?.toLowerCase() === loginStore.userEmail?.toLowerCase())
+      if (!operarioActual || !operarioActual.zonas) {
+        console.warn('Operario no encontrado o sin zonas asignadas')
+        return []
+      }
+      const zonasIds = operarioActual.zonas.map(zona => typeof zona === 'object' ? zona.id : zona)
+      puntos = puntos.filter(punto => punto.activo && zonasIds.includes(punto.zona_fk))
+    }
 
-  // if (!form.infraestructura)
-  //   return plantasStore.getPuntosMuestreo.map((punto) => {
-  //     return { value: punto.id, label: punto.name }
-  //   })     
+    // Cascading geographical filters
+    if (form.infraestructura) {
+      puntos = puntos.filter(punto => punto.infraestructura_fk === Number(form.infraestructura))
+    } else if (form.zona) {
+      // To reliably find points for a zone, find the infrastructures that belong to the zone
+      const infrasEnZona = plantasStore.getZonasInfraestructuras
+        .filter(zi => zi.zonas_fk === Number(form.zona))
+        .map(zi => zi.infraestructuras_fk)
+      puntos = puntos.filter(punto => infrasEnZona.includes(punto.infraestructura_fk) || punto.zona_fk === Number(form.zona))
+    } else if (form.uo) {
+      const zonasDeUo = plantasStore.getZonas.filter(z => z.unidades_operativas_fk === Number(form.uo)).map(z => z.id)
+      const infrasDeUo = plantasStore.getZonasInfraestructuras
+        .filter(zi => zonasDeUo.includes(zi.zonas_fk))
+        .map(zi => zi.infraestructuras_fk)
+      puntos = puntos.filter(punto => infrasDeUo.includes(punto.infraestructura_fk) || zonasDeUo.includes(punto.zona_fk))
+    }
 
-  if (!form.infraestructura)
-    return plantasStore.getPuntosMuestreo
-      .filter((punto) => punto.activo && zonasIds.includes(punto.zona_fk))
-      .map((punto) => {
-        return { value: punto.id, label: punto.name }
-      })
-
-  return plantasStore.getPuntosMuestreo
-    .filter((punto) => punto.activo && punto.infraestructura_fk === Number(form.infraestructura) && zonasIds.includes(punto.zona_fk))
-    .map((punto) => {
-      return { value: punto.id, label: punto.name }
-    })
-})
+    return puntos.map(punto => ({ value: punto.id, label: punto.name }))
+  })
   
 
   const operarioPorZona = computed(() => {

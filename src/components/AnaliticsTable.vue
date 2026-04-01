@@ -142,32 +142,38 @@ const userZonas = computed(() => {
   return operario.zonas || []
 })
 
-// Función para obtener la zona de una analítica a través del punto de muestreo
-const getZonaFromAnalitica = (analitica) => {
+// Función para verificar si una analítica pertenece a una zona, ya sea directamente o por su infraestructura
+const analiticaBelongsToZona = (analitica, zonaId) => {
+  if (!zonaId) return true
+  const targetZona = Number(zonaId)
+
+  // 1. Si de alguna manera ya está mapeada la zona
+  if (analitica.zona_id === targetZona) return true
+
+  // 2. Revisar el punto
   const puntoMuestreo = plantasStore.getPuntosMuestreo.find(
     punto => punto.id === analitica.punto_muestreo_fk
   )
-  return puntoMuestreo ? puntoMuestreo.zona_fk : null
+  if (!puntoMuestreo) return false
+
+  // 3. Revisar directa
+  if (Number(puntoMuestreo.zona_fk) === targetZona) return true
+
+  // 4. Múltiples zonas mediante infraestructura -> zonas_infraestructuras
+  if (puntoMuestreo.infraestructura_fk) {
+    const fromInfra = plantasStore.getZonasInfraestructuras.some(
+      zi => zi.infraestructuras_fk === puntoMuestreo.infraestructura_fk && zi.zonas_fk === targetZona
+    )
+    if (fromInfra) return true
+  }
+
+  return false
 }
 
-
-
-// const analiticsFiltered = computed(() =>
-//   plantaStore.getAnaliticas.filter((analitica) => {
-//     const wrongValuesFilter = !showOnlyWrongValues.value || isWrongValues(analitica)
-//     return (
-//       wrongValuesFilter &&
-//       (!filters.fecha_inicio || analitica.fecha >= filters.fecha_inicio) &&
-//       (!filters.fecha_final || analitica.fecha <= filters.fecha_final) &&
-//       (!filters.punto_muestreo_fk || analitica.punto_muestreo_fk === filters.punto_muestreo_fk) &&
-//       (!filters.persona || analitica.personal_fk === filters.persona) &&
-//       (!filters.zona || analitica.zona_fk === filters.zona) &&
-//       (!filters.operario || analitica.personal_fk === filters.operario) &&
-//       (!filters.infraestructura || analitica.infraestructura_id === filters.infraestructura) &&
-//       (!filters.type || analitica.type === filters.type)
-//     )
-//   })
-// )
+const checkAnaliticaUserZonas = (analitica, userZonasArray) => {
+  if (!userZonasArray || userZonasArray.length === 0) return true
+  return userZonasArray.some(zonaId => analiticaBelongsToZona(analitica, zonaId))
+}
 
 // Modificar el filtrado para incluir restricción por zonas del usuario
 const analiticsFiltered = computed(() =>
@@ -176,23 +182,20 @@ const analiticsFiltered = computed(() =>
     const isAdmin = loginStore.userRole === 'admin' || loginStore.userRole === 99 || loginStore.userRole === '99'
     const zonaFilter = 
       isAdmin || // Administrador ve todo
-      (userZonas.value && userZonas.value.some(zona => zona === getZonaFromAnalitica(analitica))) ||
-      !userZonas.value // Si no hay restricciones de zona, mostrar todo
+      checkAnaliticaUserZonas(analitica, userZonas.value) // Comprobar array de zonas del operario
     const wrongValuesFilter = !showOnlyWrongValues.value || isWrongValues(analitica)
 
-    
-    
     return (
       zonaFilter && // Nueva restricción por zona
       wrongValuesFilter &&
       (!filters.fecha_inicio || analitica.fecha >= filters.fecha_inicio) &&
       (!filters.fecha_final || analitica.fecha <= filters.fecha_final) &&
-      (!filters.punto_muestreo_fk || analitica.punto_muestreo_fk === filters.punto_muestreo_fk) &&
-      (!filters.persona || analitica.personal_fk === filters.persona) &&
-      (!filters.zona || getZonaFromAnalitica(analitica) === filters.zona) &&
-      (!filters.operario || analitica.personal_fk === filters.operario) &&
-      (!filters.infraestructura || analitica.infraestructura_id === filters.infraestructura) &&
-      (!filters.type || analitica.type === filters.type)
+      (!filters.punto_muestreo_fk || Number(analitica.punto_muestreo_fk) === Number(filters.punto_muestreo_fk)) &&
+      (!filters.persona || Number(analitica.personal_fk) === Number(filters.persona)) &&
+      (!filters.zona || analiticaBelongsToZona(analitica, filters.zona)) &&
+      (!filters.operario || Number(analitica.personal_fk) === Number(filters.operario)) &&
+      (!filters.infraestructura || Number(analitica.infraestructura_id) === Number(filters.infraestructura)) &&
+      (!filters.type || Number(analitica.type) === Number(filters.type))
     )
   })
 )

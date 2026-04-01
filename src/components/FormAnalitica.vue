@@ -162,7 +162,6 @@ const submitHandler = async () => {
         personal_fk: form.operario,
         ph: form.ph ? Number(form.ph) : null,
         turbidez: form.turbidez ? Number(form.turbidez) : null,
-        zona_fk: form.zona,
         totalizador: esDeposito.value && totalizador.value !== '' ? Number(totalizador.value) : null
       }
     ])
