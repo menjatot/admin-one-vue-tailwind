@@ -1,0 +1,1 @@
+if('serviceWorker' in navigator) navigator.serviceWorker.register('/sinaq/dev-sw.js?dev-sw', { scope: '/sinaq/', type: 'classic' })

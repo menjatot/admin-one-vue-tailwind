@@ -4,6 +4,7 @@ import { usePlantasStore } from '@/stores/plantas'
 import { useLoginStore } from '@/stores/login'
 import useFormSelectData from '@/composables/useFormSelectData'
 import { supabase } from '@/services/supabase'
+import { saveAnaliticaOffline } from '@/services/offlineSync'
 import CardBox from './CardBox.vue'
 import { confetti } from '@tsparticles/confetti'
 import { mdiHistory, mdiAlertCircle, mdiCheckCircle } from '@mdi/js'
@@ -149,22 +150,32 @@ const getVolumenData = (analitica) => {
 
 const submitHandler = async () => {
   try {
-    const { data, error } = await supabase.from('analiticas').insert([
-      {
-        punto_muestreo_fk: form.punto_muestreo_fk,
-        fecha: form.fecha,
-        color: form.color ? Number(form.color) : null,
-        olor: form.olor,
-        sabor: form.sabor,
-        cloro: form.cloro ? Number(form.cloro) : null,
-        type: form.type,
-        observaciones: form.observaciones,
-        personal_fk: form.operario,
-        ph: form.ph ? Number(form.ph) : null,
-        turbidez: form.turbidez ? Number(form.turbidez) : null,
-        totalizador: esDeposito.value && totalizador.value !== '' ? Number(totalizador.value) : null
-      }
-    ])
+    const newAnalitica = {
+      punto_muestreo_fk: form.punto_muestreo_fk,
+      fecha: form.fecha,
+      color: form.color ? Number(form.color) : null,
+      olor: form.olor,
+      sabor: form.sabor,
+      cloro: form.cloro ? Number(form.cloro) : null,
+      type: form.type,
+      observaciones: form.observaciones,
+      personal_fk: form.operario,
+      ph: form.ph ? Number(form.ph) : null,
+      turbidez: form.turbidez ? Number(form.turbidez) : null,
+      totalizador: esDeposito.value && totalizador.value !== '' ? Number(totalizador.value) : null
+    }
+
+    // 1. Verificar conexión a internet
+    if (!navigator.onLine) {
+      saveAnaliticaOffline(newAnalitica)
+      resetForm()
+      emit('closeModal')
+      alert('⚠️ Sin cobertura. La analítica se ha guardado en el dispositivo y se enviará automáticamente cuando recuperes la señal.')
+      return
+    }
+
+    // 2. Envío normal si hay conexión
+    const { data, error } = await supabase.from('analiticas').insert([newAnalitica])
 
     if (error) {
       console.error('Error al insertar datos:', error)
@@ -177,7 +188,6 @@ const submitHandler = async () => {
       // fiestaConfetti()
       
       alert('Datos insertados correctamente')
-    
     }
   } catch (error) {
     console.error('Error en la solicitud:', error)

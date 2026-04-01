@@ -1,6 +1,8 @@
 import { defineStore } from 'pinia'
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, onMounted } from 'vue'
 import { getUserProfile } from '@/services/msalConfig'
+import { setSupabaseAuthContext } from '@/services/supabase'
+import { usePlantasStore } from '@/stores/plantas'
 
 
 export const useLoginStore = defineStore('loginStore', () => {
@@ -104,6 +106,13 @@ export const useLoginStore = defineStore('loginStore', () => {
         userEmail.value = userProfile.email
         // userAvatar.value = userProfile.photoUrl
         userLogged.value = { ...userLogged.value, ...userProfile }
+        
+        // Sincronizar contexto de seguridad con Supabase (RLS)
+        setSupabaseAuthContext(userProfile.email, userRole.value)
+        
+        // Re-inicializar el store de plantas para cargar solo los datos autorizados
+        const plantasStore = usePlantasStore()
+        await plantasStore.initializeStore()
       }
     } catch (error) {
       console.error('Error en login:', error)
@@ -114,6 +123,9 @@ export const useLoginStore = defineStore('loginStore', () => {
   const logout = async () => {
     // Limpiar timeout de sesión
     clearSessionTimeout()
+    
+    // Limpiar contexto de seguridad de Supabase
+    setSupabaseAuthContext(null)
     
     user.value = null
     isAuthenticated.value = false
@@ -149,6 +161,15 @@ export const useLoginStore = defineStore('loginStore', () => {
       role: role
     }
     userRole.value = role
+    
+    // Sincronizar contexto si el rol cambia
+    if (isAuthenticated.value && userEmail.value) {
+      setSupabaseAuthContext(userEmail.value, role)
+      
+      // Refrescar datos autorizados según el nuevo rol
+      const plantasStore = usePlantasStore()
+      plantasStore.initializeStore()
+    }
   }
   const setUserId = (id) => {
      // Si userLogged.value no es un objeto, lo inicializamos
@@ -172,6 +193,14 @@ export const useLoginStore = defineStore('loginStore', () => {
   }
   const setProfilePhoto = (valor) => {
     profilePhoto.value = valor
+  }
+
+  // Inicialización: Sincronizar contexto si ya hay sesión en sessionStorage
+  if (isAuthenticated.value && userEmail.value) {
+    setSupabaseAuthContext(userEmail.value, userRole.value)
+    
+    // Podemos disparar initializeStore aquí también si es necesario, 
+    // pero App.vue suele encargarse del arranque inicial.
   }
 
   return {
