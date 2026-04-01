@@ -91,8 +91,7 @@ export const updateAnaliticabyId = async (id, data) => {
       ph: data.ph,
       turbidez: data.turbidez,
       observaciones: data.observaciones,
-      registro: data.registro,
-      zona_fk: data.zona_fk
+      registro: data.registro
     }
     const { data: updateData, error } = await supabase
       .from('analiticas')
