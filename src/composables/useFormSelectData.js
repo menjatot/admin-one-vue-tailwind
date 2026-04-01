@@ -73,20 +73,43 @@ export default function useFormSelectData() {
 
   
   const selectUO = computed(() => {
+    // Si no es admin, filtrar UOs basándonos en las zonas que el operario tiene asignadas
+    if (Number(loginStore.userRole) !== 99 && loginStore.userRole !== 'admin') {
+      const operario = operarioLogueado.value
+      if (!operario) return []
+      
+      // Obtener el ID de la UO del operario
+      const uoId = operario.ud_operativa_fk
+      return plantasStore.getUnidadesOperativas
+        .filter(uo => uo.id === uoId)
+        .map(uo => ({ value: uo.id, label: uo.name }))
+    }
+
     return plantasStore.getUnidadesOperativas.map((uo) => {
       return { value: uo.id, label: uo.name }
     })
   })
+
   const selectZona = computed(() => {
-    if (!form.uo)
-      return plantasStore.getZonas.map((zona) => {
-        return { value: zona.id, label: zona.name }
-      })
-    return plantasStore.getZonas
-      .filter((zona) => zona.unidades_operativas_fk === Number(form.uo))
-      .map((zona) => {
-        return { value: zona.id, label: zona.name }
-      })
+    let zonas = plantasStore.getZonas
+
+    // 1. Filtrado por Rol (Operario)
+    if (Number(loginStore.userRole) !== 99 && loginStore.userRole !== 'admin') {
+      const operario = operarioLogueado.value
+      if (operario && operario.zonas) {
+        const zonasIds = operario.zonas.map(z => typeof z === 'object' ? z.id : z)
+        zonas = zonas.filter(z => zonasIds.includes(z.id))
+      } else {
+        return []
+      }
+    }
+
+    // 2. Filtrado por UO seleccionada (Cascada)
+    if (form.uo) {
+      zonas = zonas.filter((zona) => zona.unidades_operativas_fk === Number(form.uo))
+    }
+
+    return zonas.map((zona) => ({ value: zona.id, label: zona.name }))
   })
 
   const selectInfraestructura = computed(() => {
@@ -169,16 +192,21 @@ export default function useFormSelectData() {
   
 
   const operarioPorZona = computed(() => {
-    if (!form.uo)
-      return plantasStore.getOperarios.map((operario) => {
-        return { value: operario.id, label: operario.name }
-      })
+    let operariosRaw = plantasStore.getOperarios
 
-    return plantasStore.getOperarios
-      .filter((operario) => operario.ud_operativa_fk === Number(form.uo))
-      .map((operario) => {
-        return { value: operario.id, label: operario.name }
-      })
+    // 1. Filtrado por Rol (Si no es admin, solo puede verse a sí mismo)
+    if (Number(loginStore.userRole) !== 99 && loginStore.userRole !== 'admin') {
+      const operario = operarioLogueado.value
+      if (!operario) return []
+      return [{ value: operario.id, label: operario.name }]
+    }
+
+    // 2. Filtrado por UO seleccionada para Administradores
+    if (form.uo) {
+      operariosRaw = operariosRaw.filter((operario) => operario.ud_operativa_fk === Number(form.uo))
+    }
+
+    return operariosRaw.map((operario) => ({ value: operario.id, label: operario.name }))
   })
 
 

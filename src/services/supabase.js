@@ -46,6 +46,23 @@ supabase.auth.onAuthStateChange((event, session) => {
   }
 })
 
+/**
+ * Establece el contexto de seguridad para las políticas RLS de Supabase.
+ * Esto inyecta cabeceras personalizadas que son leídas por la función SQL auth_check_zone.
+ */
+export const setSupabaseAuthContext = (email, role) => {
+  if (email) {
+    console.log(`🔐 Estableciendo contexto Supabase para: ${email} (${role})`);
+    // Modificamos las cabeceras directamente para que PostgREST las reciba
+    supabase.rest.headers['X-User-Email'] = email;
+    supabase.rest.headers['X-User-Role'] = role || '';
+  } else {
+    console.log('🔓 Limpiando contexto Supabase');
+    delete supabase.rest.headers['X-User-Email'];
+    delete supabase.rest.headers['X-User-Role'];
+  }
+};
+
 
 
 export const searchOperarios = async () => {
