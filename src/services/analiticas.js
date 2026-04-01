@@ -288,9 +288,10 @@ export const getAnaliticasFiltered = async (options = {}) => {
   }
 
   // **PASO 2: Query principal de analíticas**
+  let selectQuery = '*,personal:personal_fk(id, name),punto_muestreo:punto_muestreo_fk(id, name, zona_fk)'
   let query = supabase
     .from('analiticas')
-    .select('*')
+    .select(selectQuery)
 
   // Si obtuvimos IDs de puntos de muestreo en el PASO 1, aplicar ese filtro
   if (puntosMuestreoIds !== null) {

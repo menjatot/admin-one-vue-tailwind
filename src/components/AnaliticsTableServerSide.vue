@@ -1,6 +1,6 @@
 <script setup>
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
-import { mdiChevronDown, mdiChevronLeft, mdiPencil, mdiTrashCan, mdiRefresh, mdiMagnify, mdiLoading } from '@mdi/js'
+import { mdiChevronDown, mdiChevronLeft, mdiPencil, mdiTrashCan, mdiRefresh, mdiMagnify, mdiLoading, mdiRocket } from '@mdi/js'
 import TableCheckboxCell from '@/components/TableCheckboxCell.vue'
 import BaseLevel from '@/components/BaseLevel.vue'
 import BaseButtons from '@/components/BaseButtons.vue'
@@ -14,8 +14,10 @@ import { deleteAnalitica, updateAnaliticabyId, supabase } from '@/services/supab
 import { useServerPagination } from '@/composables/useServerPagination'
 import useFormSelectData from '../composables/useFormSelectData'
 import { FormKit } from '@formkit/vue'
+import AutocompleteSelect from './AutocompleteSelect.vue'
 
 const checkedRows = ref([])
+const fetchingAll = ref(false)
 const plantaStore = usePlantasStore()
 const loginStore = useLoginStore()
 
@@ -248,17 +250,26 @@ const isWrongValues = (analitica) => {
     isOrganolepticWrong(analitica.sabor)
 }
 
-const toggleAllRows = (isChecked) => {
+const toggleAllRows = async (isChecked) => {
   if (isChecked) {
-    filteredAnalitics.value.forEach((analitica) => {
-      if (!checkedRows.value.some((row) => row.id === analitica.id)) {
-        checkedRows.value.push(analitica)
+    try {
+      fetchingAll.value = true
+      // Fetch all matching data from the server instead of just the current page
+      // This is crucial for exports (XML, Excel, Print) to include the full dataset
+      const allData = await loadAllFilteredData()
+      if (allData && allData.length > 0) {
+        checkedRows.value = [...allData]
+        console.log(`✅ Seleccionadas ${allData.length} analíticas (conjunto completo)`)
       }
-    })
+    } catch (error) {
+      console.error('Error fetching all filtered data for selection:', error)
+      // Fallback: select only current page if total fetch fails
+      checkedRows.value = [...filteredAnalitics.value]
+    } finally {
+      fetchingAll.value = false
+    }
   } else {
-    checkedRows.value = checkedRows.value.filter(
-      (row) => !filteredAnalitics.value.some((analitica) => analitica.id === row.id)
-    )
+    checkedRows.value = []
   }
 }
 
@@ -507,62 +518,76 @@ onMounted(() => {
 
   <!-- Filtros -->
   <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-    <FormKit
-      v-model="localFilters.fecha_inicio"
-      type="date"
-      placeholder="Fecha Inicio"
-      label="Fecha Inicio"
-      :disabled="loading"
-    />
-    <FormKit
-      v-model="localFilters.fecha_final"
-      type="date"
-      placeholder="Fecha Final"
-      label="Fecha Final"
-      :disabled="loading"
-    />
-    <FormKit
-      v-model="localFilters.uo"
-      type="select"
-      :options="selectUO"
-      placeholder="Unidad Operativa"
-      label="Unidad Operativa"
-      :disabled="loading"
-    />
+    <div class="flex flex-col">
+      <label class="font-bold mb-1 text-sm text-gray-700 dark:text-gray-300">Fecha Inicio</label>
+      <input 
+        type="date" 
+        v-model="localFilters.fecha_inicio" 
+        :disabled="loading"
+        class="w-full border rounded shadow-sm px-3 py-2 text-sm transition-colors bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-200 border-gray-300 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none disabled:bg-gray-100 disabled:dark:bg-slate-800 disabled:text-gray-400 disabled:cursor-not-allowed"
+      />
+    </div>
+    <div class="flex flex-col">
+      <label class="font-bold mb-1 text-sm text-gray-700 dark:text-gray-300">Fecha Final</label>
+      <input 
+        type="date" 
+        v-model="localFilters.fecha_final" 
+        :disabled="loading"
+        class="w-full border rounded shadow-sm px-3 py-2 text-sm transition-colors bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-200 border-gray-300 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none disabled:bg-gray-100 disabled:dark:bg-slate-800 disabled:text-gray-400 disabled:cursor-not-allowed"
+      />
+    </div>
+    <div class="flex flex-col">
+      <label class="font-bold mb-1 text-sm text-gray-700 dark:text-gray-300">Unidad Operativa</label>
+      <AutocompleteSelect
+        v-model="localFilters.uo"
+        :options="selectUO"
+        placeholder="Unidad Operativa"
+        class="w-full"
+        :disabled="loading"
+      />
+    </div>
   </div>
   <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-    <FormKit
-      v-model="localFilters.zona"
-      type="select"
-      :options="selectZona"
-      placeholder="Zona de Muestra"
-      label="Zona"
-      :disabled="loading"
-    />
-    <FormKit
-      v-model="localFilters.infraestructura"
-      type="select"
-      :options="selectInfraestructura"
-      placeholder="Infraestructura"
-      label="Infraestructura"
-      :disabled="loading"
-    />
-    <FormKit
-      v-model="localFilters.punto_muestreo_fk"
-      type="select"
-      :options="selectPuntosMuestra"
-      placeholder="Punto de muestra"
-      label="Punto de Muestra"
-      :disabled="loading"
-    />
-    <FormKit
-      v-model.number="localFilters.operario"
-      type="select"
-      :options="operarioPorZona"
-      placeholder="Operario"
-      label="Operario"
-      :disabled="loading"
-    />
+    <div class="flex flex-col">
+      <label class="font-bold mb-1 text-sm text-gray-700 dark:text-gray-300">Zona de Muestra</label>
+      <AutocompleteSelect
+        v-model="localFilters.zona"
+        :options="selectZona"
+        placeholder="Zona de Muestra"
+        class="w-full"
+        :disabled="loading"
+      />
+    </div>
+    <div class="flex flex-col">
+      <label class="font-bold mb-1 text-sm text-gray-700 dark:text-gray-300">Infraestructura</label>
+      <AutocompleteSelect
+        v-model="localFilters.infraestructura"
+        :options="selectInfraestructura"
+        placeholder="Infraestructura"
+        class="w-full"
+        :disabled="loading"
+      />
+    </div>
+    <div class="flex flex-col">
+      <label class="font-bold mb-1 text-sm text-gray-700 dark:text-gray-300">Punto de Muestra</label>
+      <AutocompleteSelect
+        v-model="localFilters.punto_muestreo_fk"
+        :options="selectPuntosMuestra"
+        placeholder="Punto de muestra"
+        class="w-full"
+        :disabled="loading"
+      />
+    </div>
+    <div class="flex flex-col">
+      <label class="font-bold mb-1 text-sm text-gray-700 dark:text-gray-300">Operario</label>
+      <AutocompleteSelect
+        v-model="localFilters.operario"
+        :options="operarioPorZona"
+        placeholder="Operario"
+        class="w-full"
+        :disabled="loading"
+      />
+    </div>
   </div>
 
   <!-- Error state -->
@@ -577,6 +602,13 @@ onMounted(() => {
     />
   </div>
 
+  <div v-if="checkedRows.length > 0" class="mb-2 flex items-center justify-between text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-3 py-2 rounded-lg border border-blue-100 dark:border-blue-900/50">
+    <div class="flex items-center gap-2">
+      <BaseIcon :path="mdiRocket" size="18" />
+      <span>Has seleccionado <strong>{{ checkedRows.length }}</strong> analíticas filtradas (en todas las páginas).</span>
+    </div>
+    <button @click="checkedRows = []" class="text-xs font-bold hover:underline">Deseleccionar todas</button>
+  </div>
   <!-- Loading overlay para la tabla -->
   <div class="relative">
     <div v-if="loading" class="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10 rounded">
@@ -589,8 +621,12 @@ onMounted(() => {
     <table class="w-full" :class="{ 'opacity-50': loading }">
       <thead>
         <tr>
-          <th v-if="checkable" class="text-center">
+          <th v-if="checkable" class="text-center w-12" title="Seleccionar todas las analíticas de todas las páginas que cumplan los filtros actuales">
+            <div v-if="fetchingAll" class="flex items-center justify-center">
+              <BaseIcon :path="mdiLoading" class="animate-spin text-blue-500" w="w-5" h="h-5" />
+            </div>
             <TableCheckboxCell
+              v-else
               :model-value="allRowsChecked"
               :disabled="loading || filteredAnalitics.length === 0"
               @update:model-value="toggleAllRows"
@@ -635,7 +671,7 @@ onMounted(() => {
           <tr>
             <TableCheckboxCell
               v-if="checkable"
-              :model-value="checkedRows.includes(analitica)"
+              :model-value="checkedRows.some((row) => row.id === analitica.id)"
               :disabled="loading"
               @update:model-value="(isChecked) => addAnalitica(analitica, isChecked)"
             />
