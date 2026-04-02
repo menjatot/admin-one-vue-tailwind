@@ -1,6 +1,7 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import { plugin, defaultConfig } from '@formkit/vue'
+import { initOfflineSync } from '@/services/offlineSync'
 import PrimeVue from 'primevue/config'
 
 import config from '../formkit.config'
@@ -29,6 +30,7 @@ createApp(App)
 
 // Init main store
 const mainStore = useMainStore(pinia)
+initOfflineSync()
 // await supabase.initialize() // Uso de Top-level await
 
 // Fetch sample data

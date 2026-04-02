@@ -18,6 +18,7 @@ import { FormKit } from '@formkit/vue'
 const checkedRows = ref([])
 import { deleteAnalitica, updateAnaliticabyId } from '@/services/supabase'
 import CardBoxModal from './CardBoxModal.vue'
+import AutocompleteSelect from './AutocompleteSelect.vue'
 
 const plantaStore = usePlantasStore()
 const loginStore = useLoginStore()
@@ -449,57 +450,69 @@ onMounted(async () => {
   </CardBoxModal>
 
   <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-    <FormKit
-      v-model="filters.fecha_inicio"
-      type="date"
-      :options="selectUO"
-      placeholder="Fecha Inicio"
-      label="Fecha Inicio"
-    />
-    <FormKit
-      v-model="filters.fecha_final"
-      type="date"
-      :options="selectZona"
-      placeholder="Fecha Final"
-      label="Fecha Final"
-    />
-    <FormKit
-      v-model="filters.uo"
-      type="select"
-      :options="selectUO"
-      placeholder="Unidad Operativa"
-      label="Unidad Operativa"
-    />
+    <div class="flex flex-col">
+      <label class="font-bold mb-1 text-sm text-gray-700 dark:text-gray-300">Fecha Inicio</label>
+      <input 
+        type="date" 
+        v-model="filters.fecha_inicio" 
+        class="w-full border rounded shadow-sm px-3 py-2 text-sm transition-colors bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-200 border-gray-300 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+      />
+    </div>
+    <div class="flex flex-col">
+      <label class="font-bold mb-1 text-sm text-gray-700 dark:text-gray-300">Fecha Final</label>
+      <input 
+        type="date" 
+        v-model="filters.fecha_final" 
+        class="w-full border rounded shadow-sm px-3 py-2 text-sm transition-colors bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-200 border-gray-300 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+      />
+    </div>
+    <div class="flex flex-col">
+      <label class="font-bold mb-1 text-sm text-gray-700 dark:text-gray-300">Unidad Operativa</label>
+      <AutocompleteSelect
+        v-model="filters.uo"
+        :options="selectUO"
+        placeholder="Unidad Operativa"
+        class="w-full"
+      />
+    </div>
   </div>
-  <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-    <FormKit
-      v-model="filters.zona"
-      type="select"
-      :options="selectZona"
-      placeholder="Zona de Muestra"
-      label="Zona"
-    />
-    <FormKit
-      v-model="filters.infraestructura"
-      type="select"
-      :options="selectInfraestructura"
-      placeholder="Infraestructura"
-      label="Infraestructura"
-    />
-    <FormKit
-      v-model="filters.punto_muestreo_fk"
-      type="select"
-      :options="selectPuntosMuestra"
-      placeholder="Punto de muestra"
-      label="Punto de Muestra"
-    />
-    <FormKit
-      v-model.number="filters.operario"
-      type="select"
-      :options="operarioPorZona"
-      placeholder="Operario"
-      label="Operario"
-    />
+  <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
+    <div class="flex flex-col">
+      <label class="font-bold mb-1 text-sm text-gray-700 dark:text-gray-300">Zona de Muestra</label>
+      <AutocompleteSelect
+        v-model="filters.zona"
+        :options="selectZona"
+        placeholder="Zona de Muestra"
+        class="w-full"
+      />
+    </div>
+    <div class="flex flex-col">
+      <label class="font-bold mb-1 text-sm text-gray-700 dark:text-gray-300">Infraestructura</label>
+      <AutocompleteSelect
+        v-model="filters.infraestructura"
+        :options="selectInfraestructura"
+        placeholder="Infraestructura"
+        class="w-full"
+      />
+    </div>
+    <div class="flex flex-col">
+      <label class="font-bold mb-1 text-sm text-gray-700 dark:text-gray-300">Punto de Muestra</label>
+      <AutocompleteSelect
+        v-model="filters.punto_muestreo_fk"
+        :options="selectPuntosMuestra"
+        placeholder="Punto de muestra"
+        class="w-full"
+      />
+    </div>
+    <div class="flex flex-col">
+      <label class="font-bold mb-1 text-sm text-gray-700 dark:text-gray-300">Operario</label>
+      <AutocompleteSelect
+        v-model="filters.operario"
+        :options="operarioPorZona"
+        placeholder="Operario"
+        class="w-full"
+      />
+    </div>
   </div>
 
   <table>
