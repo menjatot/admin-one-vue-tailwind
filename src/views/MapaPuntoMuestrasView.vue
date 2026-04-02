@@ -169,8 +169,15 @@ const centerOnUserLocation = () => {
   getUserLocation()
 }
 
-onMounted(() => {
-  console.log('Componente montado, solicitando ubicación...')
+onMounted(async () => {
+  console.log('Componente montado, inicializando mapa...')
+  
+  // Asegurar que las infraestructuras básicas están cargadas para mostrar los iconos correctos
+  if (!plantasStore.getInfraestructuras || plantasStore.getInfraestructuras.length === 0) {
+    console.log('Infraestructuras no detectadas, cargando...')
+    await plantasStore.loadInfraestructuras()
+  }
+
   // Esperar un momento para que el mapa se inicialice completamente
   setTimeout(() => {
     getUserLocation()
