@@ -54,6 +54,7 @@ export default defineConfig(({ mode }) => {
           ]
         },
         workbox: {
+          maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
           runtimeCaching: [
             {
@@ -72,7 +73,21 @@ export default defineConfig(({ mode }) => {
       })
     ],
     build: {
-      target: 'ES2022'
+      target: 'ES2022',
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            'xlsx-vendor': ['xlsx'],
+            'pdf-vendor': ['jspdf', 'jspdf-autotable'],
+            'chart-vendor': ['chart.js'],
+            'leaflet-vendor': ['leaflet', '@vue-leaflet/vue-leaflet'],
+            'msal-vendor': ['@azure/msal-browser'],
+            'supabase-vendor': ['@supabase/supabase-js'],
+            'primevue-vendor': ['primevue'],
+            'formkit-vendor': ['@formkit/vue', '@formkit/themes'],
+          }
+        }
+      }
     },
     define: {
       '__VUE_PROD_HYDRATION_MISMATCH_DETAILS__': false,

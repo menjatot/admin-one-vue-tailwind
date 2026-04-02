@@ -1,8 +1,8 @@
 import { createRouter, createWebHashHistory } from 'vue-router';
-import Home from '@/views/HomeView.vue'
+const Home = () => import('@/views/HomeView.vue')
 import useLoginStore from '@/stores/login';
-import LoginAqlaraView from '@/views/LoginAqlaraView.vue';
-import UnAutorizedComponent from '@/components/UnAutorizedComponent.vue';
+const LoginAqlaraView = () => import('@/views/LoginAqlaraView.vue')
+const UnAutorizedComponent = () => import('@/components/UnAutorizedComponent.vue')
 
 // const loginStore = useLoginStore();
 

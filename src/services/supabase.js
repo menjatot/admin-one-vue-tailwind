@@ -33,16 +33,25 @@ export const supabase = createClient(supabaseUrl, supabaseKey, {
 });
 
 
+// Variables locales para persistencia de contexto entre refrescos de token
+let currentEmail = null;
+let currentRole = null;
+
 // Interceptor para manejar cambios en la autenticación
 supabase.auth.onAuthStateChange((event, session) => {
   if (event === 'SIGNED_IN') {
-    console.log('Usuario autenticado:', session.user)
+    console.log('Usuario autenticado:', session?.user?.email)
   }
   if (event === 'SIGNED_OUT') {
     console.log('Usuario desconectado')
+    currentEmail = null;
+    currentRole = null;
   }
-  if (event === 'TOKEN_REFRESHED') {
-    console.log('Token actualizado')
+  if (event === 'TOKEN_REFRESHED' || event === 'SIGNED_IN') {
+    console.log('Token actualizado o sesión iniciada, re-aplicando contexto RLS')
+    if (currentEmail) {
+      setSupabaseAuthContext(currentEmail, currentRole);
+    }
   }
 })
 
@@ -51,6 +60,9 @@ supabase.auth.onAuthStateChange((event, session) => {
  * Esto inyecta cabeceras personalizadas que son leídas por la función SQL auth_check_zone.
  */
 export const setSupabaseAuthContext = (email, role) => {
+  currentEmail = email;
+  currentRole = role;
+
   if (email) {
     console.log(`🔐 Estableciendo contexto Supabase para: ${email} (${role})`);
     // Modificamos las cabeceras directamente para que PostgREST las reciba
