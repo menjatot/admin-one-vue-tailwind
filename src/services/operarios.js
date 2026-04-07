@@ -33,13 +33,17 @@ export const setOperarios = async (operario) => {
       zonas_fk: zona_fk
     }))
 
-    // 3. Insertar zonas
-    const { data: insertedZonas, error: errorZonas } = await supabase
-      .from('zonas_personal')
-      .insert(zonasToInsert)
-      .select()
+    // 3. Insertar zonas (solo si hay zonas seleccionadas)
+    let insertedZonas = []
+    if (zonasToInsert.length > 0) {
+      const { data, error: errorZonas } = await supabase
+        .from('zonas_personal')
+        .insert(zonasToInsert)
+        .select()
 
-    if (errorZonas) throw errorZonas
+      if (errorZonas) throw errorZonas
+      insertedZonas = data
+    }
 
     return {
       operario: newOperario,
