@@ -1,11 +1,17 @@
 import { defineStore } from 'pinia'
 import { computed, ref, watch, onMounted } from 'vue'
+import msalInstance from '@/services/msalConfig'
 import { getUserProfile } from '@/services/msalConfig'
 import { setSupabaseAuthContext } from '@/services/supabase'
 import { usePlantasStore } from '@/stores/plantas'
+import { useNotifications } from '@/composables/useNotifications'
 
+
+const OFFLINE_AUTH_KEY = 'aqlara_offline_auth'
+const OFFLINE_AUTH_MAX_AGE = 7 * 24 * 60 * 60 * 1000 // 7 días en ms
 
 export const useLoginStore = defineStore('loginStore', () => {
+  const { warning } = useNotifications()
   const user = ref(JSON.parse(sessionStorage.getItem('user')) || null)
   const isAuthenticated = ref(sessionStorage.getItem('isAuthenticated') === 'true')
   const userName = ref(sessionStorage.getItem('userName') || '')
@@ -57,8 +63,9 @@ export const useLoginStore = defineStore('loginStore', () => {
     sessionTimeout.value = setTimeout(() => {
       console.warn('Sesión expirada por inactividad')
       logout()
-      // Opcional: mostrar mensaje al usuario
-      alert('Tu sesión ha expirado por inactividad. Por favor, inicia sesión nuevamente.')
+      warning('Tu sesión ha expirado por inactividad. Por favor, inicia sesión nuevamente.', {
+        title: 'Sesion expirada'
+      })
     }, SESSION_DURATION)
   }
 
@@ -109,7 +116,7 @@ export const useLoginStore = defineStore('loginStore', () => {
         
         // Sincronizar contexto de seguridad con Supabase (RLS)
         setSupabaseAuthContext(userProfile.email, userRole.value)
-        
+
         // Re-inicializar el store de plantas para cargar solo los datos autorizados
         const plantasStore = usePlantasStore()
         await plantasStore.initializeStore()
@@ -126,13 +133,14 @@ export const useLoginStore = defineStore('loginStore', () => {
     
     // Limpiar contexto de seguridad de Supabase
     setSupabaseAuthContext(null)
-    
+
+    // Limpiar caché de auth offline
+    localStorage.removeItem(OFFLINE_AUTH_KEY)
+
     user.value = null
     isAuthenticated.value = false
     userName.value = ''
     userEmail.value = ''
-    // sessionStorage.removeItem('isAuthenticated')
-    // sessionStorage.removeItem('user')
     sessionStorage.clear()
   }
 
@@ -151,6 +159,27 @@ export const useLoginStore = defineStore('loginStore', () => {
     }
   }
 
+  const saveOfflineCache = () => {
+    if (userEmail.value) {
+      localStorage.setItem(OFFLINE_AUTH_KEY, JSON.stringify({
+        email: userEmail.value,
+        role: userRole.value,
+        userId: userId.value,
+        name: userName.value,
+        savedAt: Date.now()
+      }))
+    }
+  }
+
+  const loadAuthorizedData = async () => {
+    try {
+      const plantasStore = usePlantasStore()
+      await plantasStore.initializeStore()
+    } catch (error) {
+      console.error('Error cargando datos autorizados tras restaurar sesion:', error)
+    }
+  }
+
   const setUserRole = (role) => {
      // Si userLogged.value no es un objeto, lo inicializamos
      if (typeof userLogged.value !== 'object' || userLogged.value === null) {
@@ -161,16 +190,19 @@ export const useLoginStore = defineStore('loginStore', () => {
       role: role
     }
     userRole.value = role
-    
+
     // Sincronizar contexto si el rol cambia
     if (isAuthenticated.value && userEmail.value) {
       setSupabaseAuthContext(userEmail.value, role)
-      
+
       // Refrescar datos autorizados según el nuevo rol
       const plantasStore = usePlantasStore()
       plantasStore.initializeStore()
     }
+
+    saveOfflineCache()
   }
+
   const setUserId = (id) => {
      // Si userLogged.value no es un objeto, lo inicializamos
      if (typeof userLogged.value !== 'object' || userLogged.value === null) {
@@ -181,6 +213,7 @@ export const useLoginStore = defineStore('loginStore', () => {
       id: id
     }
     userId.value = id
+    saveOfflineCache()
   }
 
 
@@ -196,11 +229,45 @@ export const useLoginStore = defineStore('loginStore', () => {
   }
 
   // Inicialización: Sincronizar contexto si ya hay sesión en sessionStorage
+  // (caso: app en background restaurada, sessionStorage preservado)
   if (isAuthenticated.value && userEmail.value) {
     setSupabaseAuthContext(userEmail.value, userRole.value)
-    
-    // Podemos disparar initializeStore aquí también si es necesario, 
-    // pero App.vue suele encargarse del arranque inicial.
+    loadAuthorizedData()
+  } else {
+    // Intento de restauración silenciosa desde caché offline
+    // (caso: PWA cerrada completamente y reabierta — sessionStorage borrado)
+    try {
+      const cached = JSON.parse(localStorage.getItem(OFFLINE_AUTH_KEY) || 'null')
+      const msalAccounts = msalInstance.getAllAccounts()
+      const matchingAccount = cached && msalAccounts.find(
+        (acc) => acc.username?.toLowerCase() === cached.email?.toLowerCase()
+      )
+
+      const cacheExpired = cached && (Date.now() - cached.savedAt > OFFLINE_AUTH_MAX_AGE)
+      if (cacheExpired) {
+        localStorage.removeItem(OFFLINE_AUTH_KEY)
+        console.warn('Cache de sesion offline expirado (>7 dias). Se requiere nuevo login.')
+      }
+
+      if (cached && matchingAccount && !cacheExpired) {
+        console.log('Restaurando sesion offline para:', cached.email)
+        isAuthenticated.value = true
+        userEmail.value = cached.email
+        userRole.value = cached.role
+        userId.value = cached.userId
+        userName.value = cached.name
+
+        const now = Date.now()
+        sessionStorage.setItem('loginTime', now.toString())
+        sessionStorage.setItem('lastActivity', now.toString())
+        startSessionTimeout()
+
+        setSupabaseAuthContext(cached.email, cached.role)
+        loadAuthorizedData()
+      }
+    } catch (e) {
+      console.warn('No se pudo restaurar la sesión offline:', e)
+    }
   }
 
   return {

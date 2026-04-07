@@ -18,6 +18,7 @@ import FormUO from './FormUO.vue'
 import CardBoxModalForm from './CardBoxModalForm.vue'
 import { anularUO, createUO, updateUO } from '@/services/uo'
 import FlagIcons from './FlagIcons.vue'
+import { useNotifications } from '@/composables/useNotifications'
 
 defineProps({
   checkable: {
@@ -27,6 +28,7 @@ defineProps({
 })
 
 const plantaStore = usePlantasStore()
+const { success: notifySuccess, error: notifyError } = useNotifications()
 const unidadesOperativas = computed(() => plantaStore.unidadesOperativas.filter((uo) => uo.activo))
 
 const isModalDangerActive = ref(false)
@@ -69,10 +71,14 @@ const handleDeleteUO = async () => {
     await plantaStore.loadUnidadesOperativas()
     isModalDangerActive.value = false
     uoToEdit.value = null
-    alert('Unidad Operativa eliminada correctamente')
+    notifySuccess('La unidad operativa se ha eliminado correctamente.', {
+      title: 'Unidad operativa eliminada'
+    })
   } catch (error) {
     console.log('error al borrar UO: ', error)
-    alert('error al borrar UO: ')
+    notifyError('No se ha podido eliminar la unidad operativa.', {
+      title: 'Error al eliminar unidad operativa'
+    })
   }
 }
 
@@ -88,6 +94,9 @@ const saveForm = async (form) => {
   }
   await plantaStore.loadUnidadesOperativas()
   closeModal()
+  notifySuccess('La unidad operativa se ha guardado correctamente.', {
+    title: 'Unidad operativa guardada'
+  })
 }
 
 watch(unidadesOperativas, (newValue) => {

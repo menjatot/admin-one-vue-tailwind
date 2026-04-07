@@ -58,36 +58,14 @@ const submitHandler = () => {
   return operarioData
 }
 
-
-watch(
-  () => props.client,
-  (newClient) => {
-    form.id = newClient?.id || null
-    form.name = newClient?.name
-    // form.surname = newClient.surname
-    form.email = newClient?.email
-    form.phone = newClient?.phone
-    form.id_zona = newClient?.id_zona
-    form.type = newClient?.type
-    form.ud_operativa_fk = newClient?.ud_operativa_fk
-    // form.type_bak = newClient.type_bak
-    zonasOperarioSeleccionadas(newClient?.id)
-  },
-  { inmediate: true }
-)
-
-
 const selectUO = computed(() => {
   return plantasStore.getUnidadesOperativas.map((uo) => {
     return { value: uo.id, label: uo.name }
   })
 })
 
-
-
 const buscaZonasUO = (uo) => {
   if (!uo) {
-    console.warn('El valor de unidad operativa es undefined o null')
     return []
   }
   return plantasStore.getZonas
@@ -98,19 +76,30 @@ const buscaZonasUO = (uo) => {
 }
 
 const zonasOperarioSeleccionadas = async (id) => {
-
-  if(!id) {
-    console.warn('El valor de id es undefined o null')
-    return []
+  if (!id) {
+    form.zonas = []
+    return
   }
   const zonas = await searchZonasOperarios(id)
   form.zonas = zonas.flatMap((zona) =>
     zona.zonas_personal.map((zone) => zone.zonas_abastecimiento.id)
   )
-
 }
 
-zonasOperarioSeleccionadas(form.id)
+watch(
+  () => props.client,
+  (newClient) => {
+    form.id = newClient?.id || null
+    form.name = newClient?.name
+    form.email = newClient?.email
+    form.phone = newClient?.phone
+    form.id_zona = newClient?.id_zona
+    form.type = newClient?.type
+    form.ud_operativa_fk = newClient?.ud_operativa_fk
+    zonasOperarioSeleccionadas(newClient?.id)
+  },
+  { immediate: true }
+)
 
 defineExpose({
   submitHandler

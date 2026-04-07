@@ -4,6 +4,7 @@ import BaseButton from '@/components/BaseButton.vue';
 import { mdiPrinter, mdiFileExcel } from '@mdi/js';
 import { usePlantasStore } from '@/stores/plantas';
 import * as XLSX from 'xlsx';
+import { useNotifications } from '@/composables/useNotifications'
 
 const props = defineProps({
   selectedRows: {
@@ -98,7 +99,11 @@ const getM3PerDia = (analitica) => {
 
 const getAnaliticasParaExportar = () => {
   if (selectedRows.value.length === 0) {
-    alert('Por favor, seleccione al menos una analítica para definir el rango de fechas.');
+    notifyWarning('Selecciona al menos una analitica para definir el rango de fechas.', {
+      title: 'Seleccion requerida'
+    })
+
+    const { warning: notifyWarning } = useNotifications()
     return null;
   }
 
@@ -114,7 +119,9 @@ const getAnaliticasParaExportar = () => {
   });
 
   if (analiticasFiltradas.length === 0) {
-    alert('No se encontraron analíticas en el rango de fechas seleccionado.');
+    notifyWarning('No se han encontrado analiticas en el rango de fechas seleccionado.', {
+      title: 'Sin datos para exportar'
+    })
     return null;
   }
   return { analiticas: analiticasFiltradas, minDate, maxDate };

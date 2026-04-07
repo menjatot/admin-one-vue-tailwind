@@ -1,4 +1,7 @@
 import { supabase } from "./supabase";
+import { useNotifications } from '@/composables/useNotifications'
+
+const { error: notifyError } = useNotifications()
 
 
 export const createInfraestructura = async (infraestructura) => {
@@ -53,7 +56,9 @@ export const updateInfraestructura = async (id) => {
 
     } catch (error) {
         console.error('Error al Actualizar la Infraestructura:', error)
-        alert('Error al Actualizar la Infraestructura:', error)
+      notifyError('No se ha podido actualizar la infraestructura.', {
+        title: 'Error al actualizar infraestructura'
+      })
         throw error
     }
 }

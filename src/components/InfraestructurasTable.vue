@@ -23,6 +23,7 @@ import FormZona from './FormZona.vue'
 import { createZona, anularZona, updateZona } from '@/services/zonas'
 import { createInfraestructura, anularInfraestructura, updateInfraestructura } from '@/services/infraestructuras'
 import FormInfraestructura from './FormInfraestructura.vue'
+import { useNotifications } from '@/composables/useNotifications'
 
 defineProps({
   checkable: {
@@ -32,6 +33,7 @@ defineProps({
 })
 
 const plantaStore = usePlantasStore()
+const { success: notifySuccess, error: notifyError } = useNotifications()
 
 // Variables para filtros
 const filters = ref({
@@ -140,10 +142,14 @@ const handleDeleteData = async () => {
     await plantaStore.loadInfraestructuras()
     isModalDangerActive.value = false
     dataToEdit.value = null
-    alert('Infraestructura eliminada correctamente')
+    notifySuccess('La infraestructura se ha eliminado correctamente.', {
+      title: 'Infraestructura eliminada'
+    })
   } catch (error) {
     console.log('error al borrar la Infraestructura: ', error)
-    alert('error al borrar la Infraestructura: ')
+    notifyError('No se ha podido eliminar la infraestructura.', {
+      title: 'Error al eliminar infraestructura'
+    })
   }
 }
 
@@ -160,7 +166,9 @@ const saveForm = async (form) => {
   }
   await plantaStore.loadInfraestructuras()
   closeModal()
-  alert('Infraestructura guardada correctamente')
+  notifySuccess('La infraestructura se ha guardado correctamente.', {
+    title: 'Infraestructura guardada'
+  })
 }
 
 watch(infraestructuras, (newValue) => {

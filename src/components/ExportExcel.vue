@@ -5,6 +5,7 @@ import { mdiDownload, mdiFileExcel } from '@mdi/js';
 import useExtractdata from '@/composables/useUploadFormData'; // Para la lógica XML
 import * as XLSX from 'xlsx'; // Para la lógica Excel
 import { usePlantasStore } from '@/stores/plantas'; // Para obtener nombres/datos adicionales si es necesario
+import { useNotifications } from '@/composables/useNotifications'
 
 const props = defineProps({
   selectedRows: {
@@ -32,6 +33,7 @@ const props = defineProps({
 const { selectedRows, allAnaliticasForDateRange, fileNameBase } = toRefs(props);
 const { exportXMLData } = useExtractdata(); // Asumiendo que esta es tu lógica de generación de XML
 const plantasStore = usePlantasStore(); // Para obtener datos de referencia como nombres
+const { warning: notifyWarning, info: notifyInfo } = useNotifications()
 
 // --- Lógica para formatear datos para Excel (similar a la propuesta anterior) ---
 const getPuntoMuestreoNombre = (id) => plantasStore.getPuntosMuestreo.find(p => p.id === id)?.name || 'N/A';
@@ -55,14 +57,21 @@ const formatOrganoleptico = (value) => {
 
 const handleDownloadXML = () => {
   if (selectedRows.value.length === 0) {
-    alert('Por favor, seleccione al menos una analítica para exportar a XML.');
+    notifyWarning('Selecciona al menos una analitica para exportar a XML.', {
+      title: 'Seleccion requerida'
+    })
     return;
   }
   // Filtrar solo tipos 28 y 29 para XML
   const analiticasParaXml = selectedRows.value.filter(item => item.type === 28 || item.type === 29);
 
   if (analiticasParaXml.length === 0) {
-    alert('Las analíticas seleccionadas no son de tipo Operacional o Rutina, requeridas para la exportación XML.');
+    notifyWarning(
+      'Las analiticas seleccionadas deben ser de tipo Operacional o Rutina para exportar XML.',
+      {
+        title: 'Tipos no validos'
+      }
+    )
     return;
   }
 
@@ -76,11 +85,19 @@ const handleDownloadXML = () => {
   link.click();
   document.body.removeChild(link);
   window.URL.revokeObjectURL(url);
+  notifyInfo('La descarga del XML se ha iniciado.', {
+    title: 'Exportacion en curso'
+  })
 };
 
 const handleDownloadExcel = () => {
   if (selectedRows.value.length === 0) {
-    alert('Por favor, seleccione al menos una analítica para definir el rango de fechas para la exportación a Excel.');
+    notifyWarning(
+      'Selecciona al menos una analitica para definir el rango de fechas de exportacion a Excel.',
+      {
+        title: 'Seleccion requerida'
+      }
+    )
     return;
   }
 
@@ -97,7 +114,9 @@ const handleDownloadExcel = () => {
   });
 
   if (analiticasEnRango.length === 0) {
-    alert('No se encontraron analíticas en el rango de fechas determinado por su selección.');
+    notifyWarning('No se han encontrado analiticas en el rango de fechas seleccionado.', {
+      title: 'Sin datos para exportar'
+    })
     return;
   }
 
@@ -119,6 +138,9 @@ const handleDownloadExcel = () => {
   XLSX.utils.book_append_sheet(workbook, worksheet, 'Analíticas');
   const excelFileName = `${fileNameBase.value}_${minDate}_a_${maxDate}.xlsx`;
   XLSX.writeFile(workbook, excelFileName);
+  notifyInfo('La descarga del Excel se ha iniciado.', {
+    title: 'Exportacion en curso'
+  })
 };
 
 </script>

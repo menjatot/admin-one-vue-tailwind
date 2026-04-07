@@ -22,6 +22,7 @@ import BaseLevel from './BaseLevel.vue'
 import FormZona from './FormZona.vue'
 import { createZona, anularZona, updateZona } from '@/services/zonas'
 import FlagIcons from './FlagIcons.vue'
+import { useNotifications } from '@/composables/useNotifications'
 
 defineProps({
   checkable: {
@@ -38,6 +39,7 @@ const filters = ref({
   unidadOperativa: '',
   comunidadAutonoma: ''
 })
+const { success: notifySuccess, error: notifyError } = useNotifications()
 
 // Función para limpiar filtros
 const clearFilters = () => {
@@ -163,10 +165,14 @@ const handleDeleteZona = async () => {
     await plantaStore.loadZonas()
     isModalDangerActive.value = false
     dataToEdit.value = null
-    alert('Zona de Abastecimiento eliminada correctamente')
+    notifySuccess('La zona de abastecimiento se ha eliminado correctamente.', {
+      title: 'Zona eliminada'
+    })
   } catch (error) {
     console.log('error al borrar Zona de Abastecimiento: ', error)
-    alert('error al borrar Zona de Abastecimiento: ')
+    notifyError('No se ha podido eliminar la zona de abastecimiento.', {
+      title: 'Error al eliminar zona'
+    })
   }
 }
 
