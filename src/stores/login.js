@@ -3,9 +3,11 @@ import { computed, ref, watch, onMounted } from 'vue'
 import { getUserProfile } from '@/services/msalConfig'
 import { setSupabaseAuthContext } from '@/services/supabase'
 import { usePlantasStore } from '@/stores/plantas'
+import { useNotifications } from '@/composables/useNotifications'
 
 
 export const useLoginStore = defineStore('loginStore', () => {
+  const { warning } = useNotifications()
   const user = ref(JSON.parse(sessionStorage.getItem('user')) || null)
   const isAuthenticated = ref(sessionStorage.getItem('isAuthenticated') === 'true')
   const userName = ref(sessionStorage.getItem('userName') || '')
@@ -57,8 +59,9 @@ export const useLoginStore = defineStore('loginStore', () => {
     sessionTimeout.value = setTimeout(() => {
       console.warn('Sesión expirada por inactividad')
       logout()
-      // Opcional: mostrar mensaje al usuario
-      alert('Tu sesión ha expirado por inactividad. Por favor, inicia sesión nuevamente.')
+      warning('Tu sesión ha expirado por inactividad. Por favor, inicia sesión nuevamente.', {
+        title: 'Sesion expirada'
+      })
     }, SESSION_DURATION)
   }
 

@@ -29,6 +29,7 @@ import {
 import FormInfraestructura from './FormInfraestructura.vue'
 import FormPuntoMuestreo from './FormPuntoMuestreo.vue'
 import { anularPuntoMuestreo, createPuntoMuestreo, updatePuntoMuestreo } from '@/services/puntosMuestreo'
+import { useNotifications } from '@/composables/useNotifications'
 
 defineProps({
   checkable: {
@@ -45,6 +46,7 @@ const filters = ref({
   zona: '',
   infraestructura: ''
 })
+const { success: notifySuccess, error: notifyError } = useNotifications()
 
 // Funciones para limpiar filtros
 const clearFilters = () => {
@@ -193,10 +195,14 @@ const handleDeleteData = async () => {
     await plantaStore.loadPuntosMuestreo()
     isModalDangerActive.value = false
     dataToEdit.value = null
-    alert('Punto de Muestreo eliminado correctamente')
+    notifySuccess('El punto de muestreo se ha eliminado correctamente.', {
+      title: 'Punto de muestreo eliminado'
+    })
   } catch (error) {
     console.log('error al borrar el Punto de Muestreo: ', error)
-    alert('error al borrar el Punto de Muestreo: ', error)
+    notifyError('No se ha podido eliminar el punto de muestreo.', {
+      title: 'Error al eliminar punto de muestreo'
+    })
   }
 }
 
@@ -212,7 +218,9 @@ const saveForm = async (form) => {
   }
   await plantaStore.loadPuntosMuestreo()
   closeModal()
-  alert('Punto de Muestreo guardado correctamente')
+  notifySuccess('El punto de muestreo se ha guardado correctamente.', {
+    title: 'Punto de muestreo guardado'
+  })
 }
 
 // Cargar datos iniciales

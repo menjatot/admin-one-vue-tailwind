@@ -15,11 +15,13 @@ import { useServerPagination } from '@/composables/useServerPagination'
 import useFormSelectData from '../composables/useFormSelectData'
 import { FormKit } from '@formkit/vue'
 import AutocompleteSelect from './AutocompleteSelect.vue'
+import { useNotifications } from '@/composables/useNotifications'
 
 const checkedRows = ref([])
 const fetchingAll = ref(false)
 const plantaStore = usePlantasStore()
 const loginStore = useLoginStore()
+const { error: notifyError } = useNotifications()
 
 const ORGANOLEPTIC_CORRECT = 1
 
@@ -322,7 +324,9 @@ const handleConfirmDelete = async () => {
     analiticaToDelete.value = null
   } catch (error) {
     console.error('Error al eliminar:', error)
-    alert('Error al eliminar la analítica')
+    notifyError('No se ha podido eliminar la analitica seleccionada.', {
+      title: 'Error al eliminar'
+    })
   }
 }
 
@@ -338,7 +342,9 @@ const handleConfirmUpdate = async () => {
     analiticaToUpdate.value = null
   } catch (error) {
     console.error('Error al actualizar:', error)
-    alert('Error al actualizar la analítica')
+    notifyError('No se ha podido actualizar la analitica seleccionada.', {
+      title: 'Error al actualizar'
+    })
   }
 }
 
