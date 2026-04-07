@@ -10,9 +10,7 @@ const graphScopes = {
     'User.Read',
     'profile',
     'openid',
-    'email',
-    'User.ReadBasic.All',
-    // 'user.read.all'
+    'email'
   ]
 };
 
