@@ -73,7 +73,7 @@ watch(
     // form.type_bak = newClient.type_bak
     zonasOperarioSeleccionadas(newClient?.id)
   },
-  { inmediate: true }
+  { immediate: true }
 )
 
 
