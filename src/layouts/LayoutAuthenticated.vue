@@ -21,7 +21,7 @@ const loginStore = useLoginStore()
 // Inicializar seguridad de sesión
 useSessionSecurity()
 
-const layoutAsidePadding = 'xl:pl-60'
+const layoutAsidePadding = 'lg:pl-60'
 
 const darkModeStore = useDarkModeStore()
 
@@ -73,12 +73,12 @@ const menuClick = (event, item) => {
         >
           <BaseIcon :path="isAsideMobileExpanded ? mdiBackburger : mdiForwardburger" size="24" />
         </NavBarItemPlain>
-        <NavBarItemPlain display="hidden lg:flex xl:hidden" @click.prevent="isAsideLgActive = true">
+        <NavBarItemPlain display="hidden" @click.prevent="isAsideLgActive = true">
           <BaseIcon :path="mdiMenu" size="24" />
         </NavBarItemPlain>
-        <NavBarItemPlain use-margin>
+        <!-- <NavBarItemPlain use-margin>
           <FormControl placeholder="Search (ctrl+k)" ctrl-k-focus transparent borderless />
-        </NavBarItemPlain>
+        </NavBarItemPlain> -->
       </NavBar>
       <AsideMenu
         :is-aside-mobile-expanded="isAsideMobileExpanded"

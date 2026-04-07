@@ -57,22 +57,22 @@ export default [
   {
     isCurrentUser: true,
     menu: [
-      {
-        icon: mdiAccount,
-        label: 'Mi Perfil',
-        to: '/profile'
-      },
-      {
-        icon: mdiCogOutline,
-        label: 'Settings'
-      },
-      {
-        icon: mdiEmail,
-        label: 'Mensajes'
-      },
-      {
-        isDivider: true
-      },
+      // {
+      //   icon: mdiAccount,
+      //   label: 'Mi Perfil',
+      //   to: '/profile'
+      // },
+      // {
+      //   icon: mdiCogOutline,
+      //   label: 'Settings'
+      // },
+      // {
+      //   icon: mdiEmail,
+      //   label: 'Mensajes'
+      // },
+      // {
+      //   isDivider: true
+      // },
       {
         icon: mdiLogout,
         label: 'Salir',

@@ -41,7 +41,9 @@ const asideMenuItemActiveStyle = computed(() =>
   hasColor.value ? '' : 'aside-menu-item-active font-bold'
 )
 
-const isDropdownActive = ref(false)
+const hasDropdown = computed(() => !!props.item.menu)
+
+const isDropdownActive = ref(hasDropdown.value)
 
 const componentClass = computed(() => [
   props.isDropdownList ? 'py-3 px-6 text-sm' : 'py-3',
@@ -49,8 +51,6 @@ const componentClass = computed(() => [
     ? getButtonColor(props.item.color, false, true)
     : `aside-menu-item dark:text-slate-300 dark:hover:text-white`
 ])
-
-const hasDropdown = computed(() => !!props.item.menu)
 
 const menuClick = (event) => {
   emit('menu-click', event, props.item)
