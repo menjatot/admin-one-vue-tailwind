@@ -5,6 +5,7 @@ import { useLoginStore } from '@/stores/login'
 import useFormSelectData from '@/composables/useFormSelectData'
 import { supabase } from '@/services/supabase'
 import { saveAnaliticaOffline } from '@/services/offlineSync'
+import { useNotifications } from '@/composables/useNotifications'
 import CardBox from './CardBox.vue'
 import { confetti } from '@tsparticles/confetti'
 import { mdiHistory, mdiAlertCircle, mdiCheckCircle } from '@mdi/js'
@@ -12,6 +13,11 @@ import BaseIcon from './BaseIcon.vue'
 
 const plantaStore = usePlantasStore()
 const loginStore = useLoginStore()
+const {
+  warning: notifyWarning,
+  error: notifyError,
+  success: notifySuccess
+} = useNotifications()
 
 const totalizador = ref('')
 
@@ -170,7 +176,13 @@ const submitHandler = async () => {
       saveAnaliticaOffline(newAnalitica)
       resetForm()
       emit('closeModal')
-      alert('⚠️ Sin cobertura. La analítica se ha guardado en el dispositivo y se enviará automáticamente cuando recuperes la señal.')
+      notifyWarning(
+        'Sin cobertura. La analitica se ha guardado en el dispositivo y se enviara automaticamente cuando recuperes la señal.',
+        {
+          title: 'Modo sin conexion',
+          life: 7000
+        }
+      )
       return
     }
 
@@ -179,19 +191,25 @@ const submitHandler = async () => {
 
     if (error) {
       console.error('Error al insertar datos:', error)
-      alert('Error al insertar datos: ' + error.message)
+      notifyError(`Error al insertar datos: ${error.message}`, {
+        title: 'No se ha podido guardar la analitica'
+      })
     } else {
       plantaStore.loadAnaliticas()
       console.log('Datos insertados:', data)
       resetForm()
       emit('closeModal')
       // fiestaConfetti()
-      
-      alert('Datos insertados correctamente')
+
+      notifySuccess('Los datos se han insertado correctamente.', {
+        title: 'Analitica guardada'
+      })
     }
   } catch (error) {
     console.error('Error en la solicitud:', error)
-    alert('Error en la solicitud: ' + error.message)
+    notifyError(`Error en la solicitud: ${error.message}`, {
+      title: 'Solicitud fallida'
+    })
   } finally {
     recargaFormulario()
   }

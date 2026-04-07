@@ -18,8 +18,10 @@ import CardBoxModal from './CardBoxModal.vue'
 import UserAvatar from '@/components/UserAvatar.vue'
 import BaseButton from '@/components/BaseButton.vue'
 import { deleteOperario } from '@/services/operarios'
+import { useNotifications } from '@/composables/useNotifications'
 
 const plantaStore = usePlantasStore()
+const { success: notifySuccess, error: notifyError } = useNotifications()
 const isModalActive = ref(false)
 const selectedClient = ref(null)
 const operarioSeleccionado = ref(null)
@@ -43,9 +45,13 @@ const handleDeleteOperario = async () => {
     await plantaStore.loadOperarios()
     isModalDangerActive.value = false
     operarioSeleccionado.value = null
-    alert('Operario eliminado correctamente')
+    notifySuccess('El operario se ha eliminado correctamente.', {
+      title: 'Operario eliminado'
+    })
   } catch (error) {
-    alert('Error al borrar operario')
+    notifyError('No se ha podido eliminar el operario.', {
+      title: 'Error al eliminar operario'
+    })
     console.log('error al borrar operario: ', error)
   }
 }
