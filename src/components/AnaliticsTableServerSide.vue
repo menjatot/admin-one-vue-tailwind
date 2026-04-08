@@ -16,6 +16,8 @@ import useFormSelectData from '../composables/useFormSelectData'
 import { FormKit } from '@formkit/vue'
 import AutocompleteSelect from './AutocompleteSelect.vue'
 import { useNotifications } from '@/composables/useNotifications'
+import { getAllParametrosCalidad } from '@/services/parametrosCalidad'
+import { DEFAULT_ANALITICA_RANGES, normalizeParametrosCalidad, formatRangeLabel } from '@/constants/parametrosCalidad'
 
 const checkedRows = ref([])
 const fetchingAll = ref(false)
@@ -23,20 +25,11 @@ const plantaStore = usePlantasStore()
 const loginStore = useLoginStore()
 const { error: notifyError } = useNotifications()
 
-const ORGANOLEPTIC_CORRECT = 1
+const isViewerRole = computed(() => loginStore.userRole === 10 || loginStore.userRole === '10')
+const canEditAnaliticas = computed(() => !isViewerRole.value)
+const canDeleteAnaliticas = computed(() => !isViewerRole.value)
 
-const turbidezValues = {
-  min: 0,
-  max: 4
-}
-const phValues = {
-  min: 6.5,
-  max: 9.5
-}
-const cloroValues = {
-  min: 0.4,
-  max: 1
-}
+const ORGANOLEPTIC_CORRECT = 1
 
 const analiticaToDelete = ref(null)
 const analiticaToEdit = ref(null)
@@ -98,6 +91,49 @@ const isModalActive = ref(false)
 const refreshing = ref(false)
 
 const volumenCache = ref({})
+const parametrosByComunidad = ref({})
+
+const getComunidadIdFromAnalitica = (analitica) => {
+  if (analitica?.comunidad_id) return analitica.comunidad_id
+
+  const puntoMuestreo = plantaStore.getPuntosMuestreo.find(
+    (punto) => punto.id === analitica?.punto_muestreo_fk
+  )
+
+  if (!puntoMuestreo?.zona_fk) return null
+
+  const zona = plantaStore.getZonas.find((z) => z.id === puntoMuestreo.zona_fk)
+  return zona?.com_autonoma_fk ?? null
+}
+
+const getRangesForAnalitica = (analitica) => {
+  const comunidadId = getComunidadIdFromAnalitica(analitica)
+
+  if (!comunidadId) return DEFAULT_ANALITICA_RANGES
+
+  return parametrosByComunidad.value[comunidadId] || DEFAULT_ANALITICA_RANGES
+}
+
+const getCloroRangeLabel = (analitica) => formatRangeLabel(getRangesForAnalitica(analitica).cloro)
+const getPhRangeLabel = (analitica) => formatRangeLabel(getRangesForAnalitica(analitica).ph)
+const getTurbidezRangeLabel = (analitica) => formatRangeLabel(getRangesForAnalitica(analitica).turbidez)
+
+const loadParametrosCalidad = async () => {
+  try {
+    const records = await getAllParametrosCalidad()
+    const parsed = {}
+
+    records.forEach((record) => {
+      if (!record.comunidades_autonomas_fk) return
+      parsed[record.comunidades_autonomas_fk] = normalizeParametrosCalidad(record)
+    })
+
+    parametrosByComunidad.value = parsed
+  } catch (e) {
+    console.error('No se pudieron cargar los rangos por comunidad:', e)
+    parametrosByComunidad.value = {}
+  }
+}
 
 const fetchVolumen = async (analitica) => {
   if (analitica.totalizador == null) return
@@ -225,17 +261,20 @@ const allRowsChecked = computed(() => {
 // Funciones de validación (mantenidas de la implementación original)
 const isCloroWrong = (analitica) => {
   if (analitica.cloro === null || analitica.cloro === undefined) return false
-  return analitica.cloro < cloroValues.min || analitica.cloro > cloroValues.max
+  const range = getRangesForAnalitica(analitica).cloro
+  return analitica.cloro < range.min || analitica.cloro > range.max
 }
 
 const isPhWrong = (analitica) => {
   if (analitica.ph === null || analitica.ph === undefined) return false
-  return analitica.ph < phValues.min || analitica.ph > phValues.max
+  const range = getRangesForAnalitica(analitica).ph
+  return analitica.ph < range.min || analitica.ph > range.max
 }
 
 const isTurbidezWrong = (analitica) => {
   if (analitica.turbidez === null || analitica.turbidez === undefined) return false
-  return analitica.turbidez < turbidezValues.min || analitica.turbidez > turbidezValues.max
+  const range = getRangesForAnalitica(analitica).turbidez
+  return analitica.turbidez < range.min || analitica.turbidez > range.max
 }
 
 const isOrganolepticWrong = (organolepticValue) => {
@@ -318,6 +357,10 @@ const applyLocalFilters = () => {
 // Funciones de CRUD (mantenidas de la implementación original)
 const handleConfirmDelete = async () => {
   try {
+    if (!canDeleteAnaliticas.value) {
+      throw new Error('No tienes permisos para borrar analiticas')
+    }
+
     await deleteAnalitica(analiticaToDelete.value.id)
     await refresh() // Usar refresh del composable
     isModalDeleteAnaliticsActive.value = false
@@ -332,6 +375,10 @@ const handleConfirmDelete = async () => {
 
 const handleConfirmUpdate = async () => {
   try {
+    if (!canEditAnaliticas.value) {
+      throw new Error('No tienes permisos para editar analiticas')
+    }
+
     if (!analiticaToUpdate.value) {
       throw new Error('No hay analítica para actualizar')
     }
@@ -355,11 +402,15 @@ const closeModal = () => {
 }
 
 const deleteAnaliticaSeleccionada = async (analitica) => {
+  if (!canDeleteAnaliticas.value) return
+
   analiticaToDelete.value = analitica
   isModalDeleteAnaliticsActive.value = true
 }
 
 const updateAnaliticaSeleccionada = async (analitica) => {
+  if (!canEditAnaliticas.value) return
+
   analiticaToEdit.value = JSON.parse(JSON.stringify(analitica))
   
   const today = new Date().toLocaleDateString()
@@ -440,6 +491,7 @@ watch(() => localFilters.infraestructura, async () => {
 onMounted(() => {
   console.log('🚀 Componente montado, inicializando...')
   resetForm()
+  loadParametrosCalidad()
 
   // Si el usuario no es admin, aplicar restricción de zonas desde el inicio
   const zonaIds = getUserZonaIds()
@@ -713,9 +765,23 @@ onMounted(() => {
                   <span class="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">
                     Parámetros analíticos
                   </span>
-                  <BaseButtons>
-                    <BaseButton color="info" :icon="mdiPencil" small :disabled="loading" @click="updateAnaliticaSeleccionada(analitica)" />
-                    <BaseButton color="danger" :icon="mdiTrashCan" small :disabled="loading" @click="deleteAnaliticaSeleccionada(analitica)" />
+                  <BaseButtons v-if="canEditAnaliticas || canDeleteAnaliticas">
+                    <BaseButton
+                      v-if="canEditAnaliticas"
+                      color="info"
+                      :icon="mdiPencil"
+                      small
+                      :disabled="loading"
+                      @click="updateAnaliticaSeleccionada(analitica)"
+                    />
+                    <BaseButton
+                      v-if="canDeleteAnaliticas"
+                      color="danger"
+                      :icon="mdiTrashCan"
+                      small
+                      :disabled="loading"
+                      @click="deleteAnaliticaSeleccionada(analitica)"
+                    />
                   </BaseButtons>
                 </div>
 
@@ -740,7 +806,7 @@ onMounted(() => {
                       {{ analitica.cloro != null ? analitica.cloro : '—' }}
                     </span>
                     <div class="flex flex-wrap items-center gap-1">
-                      <span class="text-xs text-gray-400">mg/l &nbsp;[0,4 – 1]</span>
+                      <span class="text-xs text-gray-400">mg/l &nbsp;{{ getCloroRangeLabel(analitica) }}</span>
                       <span
                         :class="[
                           'text-xs font-semibold px-2 py-0.5 rounded-full',
@@ -775,7 +841,7 @@ onMounted(() => {
                       {{ analitica.ph != null ? analitica.ph : '—' }}
                     </span>
                     <div class="flex flex-wrap items-center gap-1">
-                      <span class="text-xs text-gray-400">ud &nbsp;[6,5 – 9,5]</span>
+                      <span class="text-xs text-gray-400">ud &nbsp;{{ getPhRangeLabel(analitica) }}</span>
                       <span
                         :class="[
                           'text-xs font-semibold px-2 py-0.5 rounded-full',
@@ -810,7 +876,7 @@ onMounted(() => {
                       {{ analitica.turbidez != null ? analitica.turbidez : '—' }}
                     </span>
                     <div class="flex flex-wrap items-center gap-1">
-                      <span class="text-xs text-gray-400">UNT &nbsp;[0 – 4]</span>
+                      <span class="text-xs text-gray-400">UNT &nbsp;{{ getTurbidezRangeLabel(analitica) }}</span>
                       <span
                         :class="[
                           'text-xs font-semibold px-2 py-0.5 rounded-full',

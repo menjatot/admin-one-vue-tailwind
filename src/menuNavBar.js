@@ -10,6 +10,7 @@ import {
   mdiTestTube,
   mdiSetCenter,
   mdiPipeDisconnected,
+  mdiTune,
   
 } from '@mdi/js'
 
@@ -44,6 +45,11 @@ export default [
         icon: mdiTestTube,
         label: 'Puntos de Muestreo',
         to: {name:'puntosMuestreo'}
+      },
+      {
+        icon: mdiTune,
+        label: 'Parámetros de Calidad',
+        to: {name:'parametrosCalidad'}
       },
       {
         isDivider: true
