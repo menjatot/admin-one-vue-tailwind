@@ -255,7 +255,7 @@ defineExpose({
       <thead>
         <tr>
           <th  />
-          <th>ID</th>
+          <th>ID SINAC</th>
           <th>Nombre</th>
           <th>Tipo</th>
           <th>Operador</th>
@@ -271,8 +271,8 @@ defineExpose({
               <!-- <UserAvatar :username="zona.name" class="w-24 h-24 mx-auto lg:w-6 lg:h-6" /> -->
               <!-- debe enviar un string para escribir el avatar -->
             </td>
-            <td data-label="ID">
-              {{ infraestructura.id }}
+            <td data-label="ID SINAC">
+              {{ infraestructura.sinac_id ?? '—' }}
             </td>
             <td data-label="Name">
               {{ infraestructura.name }}

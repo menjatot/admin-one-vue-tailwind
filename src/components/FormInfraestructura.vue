@@ -39,6 +39,7 @@ const props = defineProps({
 const form = reactive({
   esNuevo: props.uo?.esNuevo ?? true,
   id: props.uo?.id || null,
+  sinac_id: props.uo?.sinac_id || null,
   name: props.uo?.name,
   type: props.uo?.type,
   operador: props.uo?.operador,
@@ -55,6 +56,7 @@ const submitHandler = () => {
 
   const uoData = {
     id: form.id,
+    sinac_id: form.sinac_id,
     name: form.name,
     type: form.type,
     operador: form.operador,
@@ -93,6 +95,7 @@ watch(
   (newUO) => {
     form.esNuevo = newUO?.esNuevo
     form.id = newUO?.id
+    form.sinac_id = newUO?.sinac_id || null
     form.name = newUO?.name
     form.type = newUO?.type
     form.operador = newUO?.operador
@@ -131,13 +134,11 @@ defineExpose({
         <div class="grid grid-cols-1 lg:grid-cols-6 mb-6 gap-4 w-full">
           <div class="col-span-1 w-full">
             <FormKit
-              v-model="form.id"
+              v-model="form.sinac_id"
               type="text"
-              label="Código"
+              label="Cód. SINAC"
               placeholder="Nº SINAC"
-              validation="required"
               class="col-span-1 w-full"
-              :disabled="form.esNuevo?false:true"
             />
           </div>
           <div class="col-span-5 w-full">
