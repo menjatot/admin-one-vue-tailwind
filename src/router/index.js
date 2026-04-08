@@ -59,6 +59,12 @@ const routes = [
       name: 'puntosMuestreo',
       component: () => import('@/views/PuntosMuestreoAdminView.vue') 
       },
+      {
+        title: 'Parámetros de Calidad',
+      path: '/admin/parametros_calidad',
+      name: 'parametrosCalidad',
+      component: () => import('@/views/ParametrosCalidadAdminView.vue')
+      },
 
 
     ],

@@ -37,6 +37,30 @@ export const supabase = createClient(supabaseUrl, supabaseKey, {
 let currentEmail = null;
 let currentRole = null;
 
+const isViewerRole = (role) => {
+  if (role === null || role === undefined) return false
+  const normalizedRole = String(role).trim().toLowerCase()
+  return normalizedRole === '10' || normalizedRole === 'visualizador'
+}
+
+const assertAnaliticaMutationPermission = (action) => {
+  if (isViewerRole(currentRole)) {
+    throw new Error(`Permiso denegado: el perfil visualizador no puede ${action} analiticas`)
+  }
+}
+
+const isAdminRole = (role) => {
+  if (role === null || role === undefined) return false
+  const normalizedRole = String(role).trim().toLowerCase()
+  return normalizedRole === '99' || normalizedRole === 'admin'
+}
+
+export const assertAdminPermission = (action) => {
+  if (!isAdminRole(currentRole)) {
+    throw new Error(`Permiso denegado: solo administradores pueden ${action}`)
+  }
+}
+
 // Interceptor para manejar cambios en la autenticación
 supabase.auth.onAuthStateChange((event, session) => {
   if (event === 'SIGNED_IN') {
@@ -95,6 +119,8 @@ export const searchZonasOperarios = async (id) => {
 
 
 export const deleteAnalitica = async (id) => {
+  assertAnaliticaMutationPermission('borrar')
+
   const { error } = await supabase
       .from('analiticas')
       .delete()
@@ -105,6 +131,8 @@ export const deleteAnalitica = async (id) => {
 
 export const updateAnaliticabyId = async (id, data) => {
   try {
+    assertAnaliticaMutationPermission('editar')
+
     console.log('updateAnaliticabyId: ',id, data);
     // Limpiar datos antes de actualizar
     const cleanData = {
