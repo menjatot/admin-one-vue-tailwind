@@ -23,6 +23,15 @@ import AqlaraLogo from '@/components/AqlaraLogo.vue'
 const plantasStore = usePlantasStore()
 const loginStore=useLoginStore()
 const isModalActive = ref(false)
+const historyOnly = ref(false)
+
+const isVisualizadorRole = (role) => {
+  const normalizedRole = String(role ?? '').trim().toLowerCase()
+  return normalizedRole === '10' || normalizedRole === 'visualizador' || Number(role) === 10
+}
+
+const isVisualizador = computed(() => isVisualizadorRole(loginStore.userRole))
+const canCreateAnalitica = computed(() => !isVisualizador.value)
 const selectedPunto = ref(null)
 const isLoading = ref(false)
 const geoLocationError = ref(null)
@@ -54,6 +63,13 @@ const userLocationIcon = L.divIcon({
 })
 
 const crearAnalitica = (puntoId) => {
+  historyOnly.value = false
+  isModalActive.value = true
+  selectedPunto.value = puntoId
+}
+
+const verAnaliticas = (puntoId) => {
+  historyOnly.value = true
   isModalActive.value = true
   selectedPunto.value = puntoId
 }
@@ -93,20 +109,10 @@ const puntosMuestreo = computed(() => {
   )
 })
 
-const handleSubmitSuccess = async () => {
-  // Recargar datos
-  await plantasStore.loadAnaliticas()
-
-  // Cerrar modal
-  isModalActive.value = false
-
-  // Limpiar punto seleccionado
-  selectedPunto.value = null
-}
-
 const closeModal = () => {
   isModalActive.value = false
   selectedPunto.value = null
+  historyOnly.value = false
 }
 
 const onDragEnd = (event) => {
@@ -189,15 +195,15 @@ onMounted(async () => {
 <template>
   <CardBoxModal
     v-model="isModalActive"
-    :title="'Nueva analitica en ' + selectedPunto?.name"
+    :title="historyOnly ? 'Últimas 5 analíticas en ' + selectedPunto?.name : 'Nueva analitica en ' + selectedPunto?.name"
     no-button
     class="modal-overlay"
     :modal-size="'xl'"
-    @confirm="handleSubmitSuccess"
     @cancel="closeModal"
   >
     <FormAnalitica
       :initial-position="selectedPunto?.id"
+      :history-only="historyOnly"
       class="h-full"
       @close-modal="closeModal"
       />
@@ -242,7 +248,7 @@ onMounted(async () => {
         <div class="relative w-full" style="height: calc(100dvh - 13rem); min-height: 400px;">
 
           <!-- Botón superpuesto sobre el mapa -->
-          <div class="absolute top-3 right-12 z-[1001]">
+          <div class="absolute top-3 right-12 z-10">
             <BaseButton
               label="Centrar posición"
               :icon="mdiCrosshairsGps"
@@ -334,10 +340,17 @@ onMounted(async () => {
                       <!-- <a href="http://google.com" target="_blank" class="text-sm">Ver en Google Maps</a> -->
                       <p class="text-sm">SINAC Id: {{ punto.id }}</p>
                       <BaseButton
+                        v-if="canCreateAnalitica"
                         label="Añadir analítica"
                         color="info"
                         @click="crearAnalitica(punto)"
-                      ></BaseButton>
+                      />
+                      <BaseButton
+                        v-else
+                        label="Ver analíticas"
+                        color="info"
+                        @click="verAnaliticas(punto)"
+                      />
                     </div>
                   </l-popup>
                 </l-marker>
