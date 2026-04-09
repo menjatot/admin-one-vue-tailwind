@@ -84,7 +84,6 @@ const allAnaliticasForDateRange = computed(() => {
 
 // Método para cargar todas las analíticas filtradas cuando se necesite para exportación (server-side)
 const loadAllAnalyticsForExport = async () => {
-  if (!isAdminRole.value) return [];
 
   if (useServerSide.value) {
     console.log('🔄 Cargando todas las analíticas filtradas para exportación...')
@@ -134,7 +133,6 @@ const loadAllAnalyticsForExport = async () => {
           />
 
           <AdvancedExportControls
-            v-if="isAdminRole"
             :selected-rows="selectedAnaliticasFromTable"
             :all-analiticas-for-date-range="allAnaliticasForDateRange"
             file-name-base="Informe_Analiticas_AQLARA"
