@@ -27,6 +27,14 @@ const isAdminRole = computed(() => {
   return normalizedRole === '99' || normalizedRole === 'admin';
 });
 
+const isVisualizadorRole = computed(() => {
+  return loginStore.userRole === 10 || loginStore.userRole === '10';
+});
+
+const canExportAndPrint = computed(() => {
+  return isAdminRole.value || isVisualizadorRole.value;
+});
+
 const limpiarFiltros = () => {
   tablaAnaliticas.value?.resetForm();
 };
@@ -84,6 +92,7 @@ const allAnaliticasForDateRange = computed(() => {
 
 // Método para cargar todas las analíticas filtradas cuando se necesite para exportación (server-side)
 const loadAllAnalyticsForExport = async () => {
+  if (!canExportAndPrint.value) return [];
 
   if (useServerSide.value) {
     console.log('🔄 Cargando todas las analíticas filtradas para exportación...')
@@ -133,6 +142,7 @@ const loadAllAnalyticsForExport = async () => {
           />
 
           <AdvancedExportControls
+            v-if="canExportAndPrint"
             :selected-rows="selectedAnaliticasFromTable"
             :all-analiticas-for-date-range="allAnaliticasForDateRange"
             file-name-base="Informe_Analiticas_AQLARA"
