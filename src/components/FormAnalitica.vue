@@ -3,7 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { usePlantasStore } from '@/stores/plantas'
 import { useLoginStore } from '@/stores/login'
 import useFormSelectData from '@/composables/useFormSelectData'
-import { supabase } from '@/services/supabase'
+import { supabase, assertAnaliticaWritePermission } from '@/services/supabase'
 import { saveAnaliticaOffline } from '@/services/offlineSync'
 import { useNotifications } from '@/composables/useNotifications'
 import CardBox from './CardBox.vue'
@@ -160,6 +160,8 @@ const getVolumenData = (analitica) => {
 
 const submitHandler = async () => {
   try {
+    assertAnaliticaWritePermission('crear')
+
     const newAnalitica = {
       punto_muestreo_fk: form.punto_muestreo_fk,
       fecha: form.fecha,

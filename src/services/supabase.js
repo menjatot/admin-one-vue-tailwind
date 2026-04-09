@@ -49,6 +49,10 @@ const assertAnaliticaMutationPermission = (action) => {
   }
 }
 
+export const assertAnaliticaWritePermission = (action = 'modificar') => {
+  assertAnaliticaMutationPermission(action)
+}
+
 const isAdminRole = (role) => {
   if (role === null || role === undefined) return false
   const normalizedRole = String(role).trim().toLowerCase()

@@ -100,18 +100,18 @@ export const usePlantasStore = defineStore('plantasStore', () => {
             name,
             infraestructuras (
               id,
+              name
+            ),
+            zonas_abastecimiento (
+              id,
               name,
-              zonas_abastecimiento (
+              unidades_operativas (
                 id,
-                name,
-                unidades_operativas (
-                  id,
-                  name
-                ),
-                comunidades_autonomas (
-                  id,
-                  name
-                )
+                name
+              ),
+              comunidades_autonomas (
+                id,
+                name
               )
             )
           )
@@ -123,7 +123,7 @@ export const usePlantasStore = defineStore('plantasStore', () => {
         const mappedData = data.map(item => {
           const puntoMuestreo = item.puntos_muestreo
           const infraestructura = puntoMuestreo?.infraestructuras || {}
-          const zonaAbastecimiento = infraestructura?.zonas_abastecimiento || {}
+          const zonaAbastecimiento = puntoMuestreo?.zonas_abastecimiento || {}
           const unidadOperativa = zonaAbastecimiento?.unidades_operativas || {}
           const comunidadAutonoma = zonaAbastecimiento?.comunidades_autonomas || {}
   
