@@ -95,7 +95,7 @@ const submitHandler = () => {
 
 const selectInfraestructura = computed(() => {
   return plantasStore.getInfraestructuras.map((inf) => {
-    return { value: inf.id, label: inf.name }
+    return { value: inf.id, label: inf.sinac_id ? `[${inf.sinac_id}] ${inf.name}` : inf.name }
   })
 })
 

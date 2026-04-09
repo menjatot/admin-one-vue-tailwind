@@ -3,6 +3,7 @@ import { mdiFlaskEmptyOutline, mdiFilter, mdiDownload, mdiRocket } from '@mdi/js
 import SectionMain from '@/components/SectionMain.vue';
 import { computed, ref, watch } from 'vue';
 import { usePlantasStore } from '@/stores/plantas';
+import useLoginStore from '@/stores/login';
 import CardBox from '@/components/CardBox.vue';
 import LayoutAuthenticated from '@/layouts/LayoutAuthenticated.vue';
 import SectionTitleLineWithButton from '@/components/SectionTitleLineWithButton.vue';
@@ -16,15 +17,22 @@ import AdvancedExportControls from '@/components/AdvancedExportControls.vue';
 
 const tablaAnaliticas = ref();
 const plantasStore = usePlantasStore();
+const loginStore = useLoginStore();
 const { exportXMLData } = useExtractdata();
 const selectedZona= ref(null);
 const useServerSide = ref(true); // Toggle para alternar entre implementaciones
+
+const isAdminRole = computed(() => {
+  const normalizedRole = String(loginStore.userRole ?? '').trim().toLowerCase();
+  return normalizedRole === '99' || normalizedRole === 'admin';
+});
 
 const limpiarFiltros = () => {
   tablaAnaliticas.value?.resetForm();
 };
 
 const toggleTableMode = () => {
+  if (!isAdminRole.value) return;
   useServerSide.value = !useServerSide.value;
 };
 
@@ -39,6 +47,8 @@ watch(() => tablaAnaliticas.value?.filters?.zona, (newZona) => {
 
 
 const downloadXML = () => {
+  if (!isAdminRole.value) return;
+
   const analiticasSeleccionadas = (tablaAnaliticas.value?.checkedRows || [])
     .filter(item => item.type === 28 || item.type === 29);
   if (analiticasSeleccionadas.length === 0) {
@@ -74,6 +84,7 @@ const allAnaliticasForDateRange = computed(() => {
 
 // Método para cargar todas las analíticas filtradas cuando se necesite para exportación (server-side)
 const loadAllAnalyticsForExport = async () => {
+
   if (useServerSide.value) {
     console.log('🔄 Cargando todas las analíticas filtradas para exportación...')
     try {
@@ -101,6 +112,7 @@ const loadAllAnalyticsForExport = async () => {
       <SectionTitleLineWithButton :icon="mdiFlaskEmptyOutline" title="Analíticas" main>
         <div class="flex flex-wrap gap-2">
           <BaseButton
+            v-if="isAdminRole"
             :icon="mdiRocket"
             :label="useServerSide ? 'Usar Client-Side' : 'Usar Server-Side'"
             :color="useServerSide ? 'success' : 'warning'"
@@ -110,7 +122,7 @@ const loadAllAnalyticsForExport = async () => {
           />
 
           <BaseButton
-            v-if="exportXMLData"
+            v-if="isAdminRole && exportXMLData"
             :icon="mdiDownload"
             label="Download XML"
             color="info"
@@ -189,4 +201,3 @@ const loadAllAnalyticsForExport = async () => {
     </SectionMain>
   </LayoutAuthenticated>
 </template>
-``` 

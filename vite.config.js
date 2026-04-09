@@ -74,6 +74,7 @@ export default defineConfig(({ mode }) => {
     ],
     build: {
       target: 'ES2022',
+      minify: 'esbuild',
       rollupOptions: {
         output: {
           manualChunks: {
@@ -88,6 +89,9 @@ export default defineConfig(({ mode }) => {
           }
         }
       }
+    },
+    esbuild: {
+      drop: mode === 'production' ? ['console', 'debugger'] : [],
     },
     define: {
       '__VUE_PROD_HYDRATION_MISMATCH_DETAILS__': false,

@@ -39,6 +39,10 @@ const props = defineProps({
   initialPosition: {
     type: Number,
     default: null
+  },
+  historyOnly: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -296,13 +300,14 @@ watch(
     <div v-if="form.punto_muestreo_fk || props.initialPosition" class="mb-4">
       <!-- Botón para móvil -->
       <button
+        v-if="!props.historyOnly"
         type="button"
         class="md:hidden w-full flex items-center justify-between bg-blue-50 dark:bg-slate-700 p-3 rounded-lg border border-blue-200 dark:border-slate-600"
         @click="showHistorico = !showHistorico"
       >
         <span class="flex items-center gap-2 text-blue-700 dark:text-blue-300 font-medium">
           <BaseIcon :path="mdiHistory" :size="20" />
-          {{ ultimasAnaliticas.length > 0 ? `Ver últimas ${ultimasAnaliticas.length} analíticas` : 'Histórico de analíticas' }}
+          {{ ultimasAnaliticas.length > 0 ? 'Ver últimas 5 analíticas' : 'Histórico de analíticas' }}
         </span>
         <svg
           :class="['w-5 h-5 transition-transform text-blue-700 dark:text-blue-300', { 'rotate-180': showHistorico }]"
@@ -315,11 +320,11 @@ watch(
       </button>
 
       <!-- Contenido del histórico (siempre visible en md+, toggle en móvil) -->
-      <div :class="['md:block', showHistorico ? 'block mt-2' : 'hidden']">
+      <div :class="['md:block', props.historyOnly || showHistorico ? 'block mt-2' : 'hidden']">
         <div class="bg-blue-50 dark:bg-slate-700 rounded-lg p-4 border border-blue-200 dark:border-slate-600 max-h-80 overflow-y-auto">
           <h3 class="hidden md:flex items-center gap-2 text-blue-700 dark:text-blue-300 font-semibold mb-3">
             <BaseIcon :path="mdiHistory" :size="20" />
-            {{ ultimasAnaliticas.length > 0 ? `Últimas ${ultimasAnaliticas.length} analíticas de este punto` : 'Histórico de analíticas' }}
+            {{ ultimasAnaliticas.length > 0 ? 'Mostrando últimas 5 analíticas de este punto' : 'Histórico de analíticas' }}
           </h3>
 
           <!-- Mensaje cuando no hay analíticas -->
@@ -436,7 +441,7 @@ watch(
       </div>
     </div>
 
-    <CardBox>
+    <CardBox v-if="!props.historyOnly">
       <FormKit type="form" submit-label="Enviar" @submit="submitHandler">
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
           <FormKit

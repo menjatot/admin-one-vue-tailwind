@@ -1,181 +1,188 @@
-# [Admin One &mdash; Free Vue 3.x Tailwind 3.x Admin Dashboard with dark mode](https://justboil.me/tailwind-admin-templates/free-vue-dashboard/)
+# SinAQ - AQLARA SINAC Manager
 
-[![version](https://img.shields.io/github/v/release/justboil/admin-one-vue-tailwind)](https://justboil.me/tailwind-admin-templates/free-vue-dashboard/)  [![license](https://img.shields.io/badge/license-MIT-blue.svg)](https://justboil.me/tailwind-admin-templates/free-vue-dashboard/)
+Sistema integral de gestión y monitoreo de calidad de agua. Plataforma web moderna para administrar datos de análisis, puntos de muestreo, infraestructuras y visualización geoespacial.
 
-### Tailwind 3.x Vue 3.x with Vite or Nuxt or Laravel
+## 📋 Características
 
-[![Free Vue 3 Tailwind 3 admin dashboard with dark mode](https://static.justboil.me/templates/one/repo-tailwind-vue.png)](https://justboil.github.io/admin-one-vue-tailwind/)
+- ✅ **Carga y gestión de datos** - Importar análisis desde Excel
+- ✅ **Panel de administración** - Gestión de:
+  - Personal (operarios)
+  - Unidades operativas
+  - Zonas geográficas
+  - Infraestructuras
+  - Puntos de muestreo
+- ✅ **Visualización en mapas** - Mapa interactivo de puntos de muestreo con Leaflet
+- ✅ **Tablas analíticas** - Visualización y análisis de datos
+- ✅ **Autenticación** - Integración con Azure AD (MSAL)
+- ✅ **Tema oscuro/claro** - Soporte completo de dark mode
+- ✅ **Seguridad de sesión** - Timeout automático y renovación de sesión
+- ✅ **Control de roles** - Sistema de permisos basado en roles de usuario
 
-[![Vue Tailwind white & dark styles](https://static.justboil.me/templates/one/repo-styles.png)](https://justboil.github.io/admin-one-vue-tailwind/)
+## 🛠 Stack Tecnológico
 
-### Tailwind 3.x Vue 3.x with Vite or Nuxt or Laravel
+- **Frontend**: Vue 3 (Composition API + `<script setup>`)
+- **Build Tool**: Vite
+- **Estilos**: Tailwind CSS 3
+- **Ruteo**: Vue Router 4 (hash-based)
+- **Estado**: Pinia
+- **UI Components**: PrimeVue 4
+- **Formularios**: FormKit + Vueform
+- **Base de datos**: Supabase
+- **Autenticación**: Azure AD (MSAL)
+- **Mapas**: Leaflet + Vue Leaflet
+- **Exportación**: jsPDF + xlsx
+- **Gráficos**: Chart.js
 
-**Admin One** is simple, beautiful and free Vue.js 3.x Tailwind CSS 3.x admin dashboard. Nuxt 3.x or Laravel 9.x integrations available
+## 📦 Requisitos
 
-* Built with **Vue.js 3**, **Tailwind CSS 3** framework & **Composition API**
-* **Vite** under the hood &mdash; [Info](https://vitejs.dev)
-* **Nuxt 3** integration available &mdash; [Info](#nuxt-3-integration)
-* **Laravel Breeze Inertia Vue** integration available &mdash; [Info](#laravel-9x-integration)
-* **SFC** `<script setup>` &mdash; [Info](https://v3.vuejs.org/api/sfc-script-setup.html)
-* **Pinia** state library (official Vuex 5) &mdash; [Info](https://pinia.vuejs.org/)
-* **Dark mode**
-* **Styled** scrollbars
-* SPA with **Router**
-* **Production CSS** is only **&thickapprox;38kb**
-* Reusable components
-* Free under MIT License
-* [Premium version](https://justboil.me/tailwind-admin-templates/vue-dashboard/) available
+- Node.js 16+
+- npm o yarn
+- Doppler CLI (para gestión de variables de entorno)
 
-## Table of Contents
+## 🚀 Instalación
 
-* [React TypeScript version](#looking-for-react-typescript-version)
-* [Responsive layout](#responsive-layout)
-  * [Mobile & tablet](#mobile--tablet)
-  * [Small laptops](#small-laptops-1024px)
-  * [Laptops & desktops](#laptops--desktops)
-* [Demo](#demo)
-  * [Free dashboard demo](#free-dashboard-demo)
-  * [Premium dashboard demo](#premium-dashboard-demo)
-* [Quick Start](#quick-start)
-  * [Get code & install](#get-code--install)
-  * [Vite builds](#vite-builds)
-  * [Linting](#linting)
-  * [Nuxt 3.x integration](#nuxt-3x-integration)
-  * [Laravel 9.x integration](#laravel-9x-integration)
-* [Docs](#docs)
-* [Browser Support](#browser-support)
-* [Reporting Issues](#reporting-issues)
-* [Licensing](#licensing)
-* [Useful Links](#useful-links)
+```bash
+# Clonar repositorio
+git clone <repo-url>
+cd sinaq
 
-## Looking for React TypeScript version?
+# Instalar dependencias
+npm install
 
-This is **Tailwind Vue dashboard** version
-
-Looking for **Tailwind React TypeScript**? Check [Admin One - React TypeScript Tailwind dashboard](https://github.com/justboil/admin-one-react-tailwind) version
-
-## Responsive layout
-
-### Mobile & tablet
-
-Mobile layout with hidden aside menu and collapsable cards & tables
-
-[![Free Vue 3 Tailwind CSS 3 admin dashboard](https://static.justboil.me/templates/one/one-tailwind-vue-mobile.png)](https://justboil.github.io/admin-one-vue-tailwind/)
-
-### Small laptops 1024px
-
-Small laptop layout with show/hide aside menu option
-
-[![Free Vue 3 Tailwind CSS 3 admin dashboard](https://static.justboil.me/templates/one/one-tailwind-vue-1024.png)](https://justboil.github.io/admin-one-vue-tailwind/)
-
-[![Free Vue 3 Tailwind CSS 3 admin dashboard](https://static.justboil.me/templates/one/one-tailwind-vue-1024-menu-open.png)](https://justboil.github.io/admin-one-vue-tailwind/)
-
-### Laptops & desktops
-
-Classic layout with aside menus on the left
-
-[![Free Vue 3 Tailwind CSS 3 admin dashboard](https://static.justboil.me/templates/one/one-tailwind-vue-widescreen.png)](https://justboil.github.io/admin-one-vue-tailwind/)
-
-## Demo
-
-### Free Dashboard Demo
-
-https://justboil.github.io/admin-one-vue-tailwind/
-
-### Premium Dashboard Demo
-
-https://tailwind-vue.justboil.me/
-
-## Quick Start
-
-Get code & install. Then `dev` or `build` with [Vite](#vite-builds) or integrate with [Nuxt](#nuxt-3x-integration) or [Laravel](#laravel-9x-integration)
-
-* [Get code & install](#get-code--install)
-* [Vite builds](#vite-builds)
-* [Linting](#linting)
-* [Nuxt 3.x integration](#nuxt-3x-integration)
-* [Laravel 9.x integration](#laravel-9x-integration)
-
-### Get code & install
-
-#### Get the repo
-
-* [Create new repo](https://github.com/justboil/admin-one-vue-tailwind/generate) with this template
-* &hellip; or clone this repo on GitHub
-* &hellip; or [download .zip](https://github.com/justboil/admin-one-vue-tailwind/archive/master.zip) from GitHub
-
-#### Install
-
-`cd` to project's dir and run `npm install`
-
-### Vite builds
-
-[Vite](https://vitejs.dev) is next Generation Frontend Tooling featuring unbundled web-development
-
-#### Hot-reloads for development
-
+# Configurar variables de entorno con Doppler
+doppler setup
 ```
+
+## 🏃 Cómo ejecutar
+
+```bash
+# Desarrollo
 npm run dev
-```
 
-#### Builds and minifies for production
+# Build staging
+npm run build:staging
 
-```
+# Build producción
 npm run build
-```
 
-#### Serves recently built app
-
-```
+# Preview build
 npm run preview
-```
 
-### Linting
-
-#### Lint
-
-```
+# Lint + autofix
 npm run lint
 ```
 
-### Nuxt 3.x integration
+La aplicación se ejecutará en `http://localhost:3000` (o el puerto configurado en `VITE_DEV_PORT`).
 
-This dashboard can be integrated with Nuxt 3.x. [Check guide](https://github.com/justboil/admin-one-vue-tailwind/tree/master/.nuxt-guide) for more information
+## 📝 Variables de Entorno
 
-### Laravel 9.x integration
+Variables requeridas en Doppler:
 
-This dashboard can be integrated with Laravel 9.x Breeze Inertia + Vue.js stack. [Check guide](https://github.com/justboil/admin-one-vue-tailwind/tree/master/.laravel-guide) for more information
+- `VITE_SUPABASE_URL` - URL del proyecto Supabase
+- `VITE_SUPABASE_ANON_KEY` - Clave anónima de Supabase
+- `VITE_MICROSOFT_CLIENT_ID` - Client ID de Azure AD
+- `VITE_MICROSOFT_TENANT_ID` - Tenant ID de Azure AD
+- `VITE_BASE_URL` - Base path de deployment (default: `/sinaq/`)
+- `VITE_DEV_PORT` - Puerto de desarrollo (default: 3000)
 
-## Docs
+## 📂 Estructura del Proyecto
 
-Customization & info: https://justboil.github.io/docs/
+```
+src/
+├── components/        # Componentes reutilizables
+├── composables/       # Lógica compartida (hooks)
+├── constants/         # Constantes globales
+├── helpers/           # Funciones auxiliares
+├── layouts/           # Layouts principales
+├── router/            # Configuración de ruteo
+├── services/          # Servicios (API, autenticación, BD)
+├── stores/            # Estado global (Pinia)
+├── views/             # Páginas/Vistas
+├── assets/            # Recursos estáticos
+├── App.vue            # Componente raíz
+└── main.js            # Punto de entrada
+```
 
-## Browser Support
+## 🔐 Autenticación
 
-We try to make sure Dashboard works well in the latest versions of all major browsers
+- **Método**: Azure AD (Microsoft Entra)
+- **Librería**: MSAL (@azure/msal-browser)
+- **Tipo de login**: Popup en desktop, redirect en mobile
+- **Session timeout**: 30 minutos de inactividad
+- **Auto-logout**: Se ejecuta automáticamente tras expiración
 
-<img src="https://justboil.me/images/browsers-svg/chrome.svg" width="64" height="64" alt="Chrome"> <img src="https://justboil.me/images/browsers-svg/firefox.svg" width="64" height="64" alt="Firefox"> <img src="https://justboil.me/images/browsers-svg/edge.svg" width="64" height="64" alt="Edge"> <img src="https://justboil.me/images/browsers-svg/safari.svg" width="64" height="64" alt="Safari"> <img src="https://justboil.me/images/browsers-svg/opera.svg" width="64" height="64" alt="Opera">
+## 🔑 Sistema de Roles y Permisos
 
-## Reporting Issues
+- **Admin** - Rol '99', 99 o 'admin' (acceso a panel de administración)
+- **Usuario estándar** - Acceso a visualización y formularios
+- **Rutas protegidas** - Verificadas en guardias de Router
 
-JustBoil's free items are limited to community support on GitHub.
+## 📊 Rutas Principales
 
-The issue list is reserved exclusively for bug reports and feature requests. That means we do not accept usage questions. If you open an issue that does not conform to the requirements, it will be closed.
+- `/` - Home (Excel uploader)
+- `/login` - Autenticación
+- `/mapa` - Visualización de puntos en mapa
+- `/tablaAnaliticas` - Tabla de datos analíticos
+- `/forms` - Formulario de análitica
+- `/admin/operarios` - Gestión de personal
+- `/admin/unidadesOperativas` - Gestión de unidades
+- `/admin/zonas` - Gestión de zonas
+- `/admin/infraestructuras` - Gestión de infraestructuras
+- `/admin/puntosMuestreo` - Gestión de puntos de muestreo
 
-1. Make sure that you are using the latest version of the Dashboard. Issues for outdated versions are irrelevant
-2. Provide steps to reproduce
-3. Provide an expected behavior
-4. Describe what is actually happening
-5. Platform, Browser & version as some issues may be browser specific
+## 🎨 Personalización
 
-## Licensing
+### Tema (Dark Mode)
+Controlado por Pinia store `darkMode`. Usa clases CSS `dark:` de Tailwind.
 
-- Copyright &copy; 2019-2022 JustBoil.me (https://justboil.me)
-- Licensed under MIT
+### Colores
+Ver `src/colors.js` para paleta de colores personalizada.
 
-## Useful Links
+### Menús
+- `src/menuAside.js` - Menú lateral
+- `src/menuNavBar.js` - Barra superior
 
-- [JustBoil.me](https://justboil.me/)
-- [Tailwind CSS](https://tailwindcss.com/)
-- [Vue.js 3](https://v3.vuejs.org/)
-- [Vite](https://vitejs.dev)
+## 📦 Despliegue
+
+### En Producción
+
+```bash
+npm run build
+```
+
+Sube el contenido de `dist/` a tu servidor:
+
+```bash
+# Ejemplo: servidor Apache
+scp -r dist/* user@server:/var/www/apps.aqlara.com/sinaq/
+```
+
+### Requisitos Apache
+
+- `mod_rewrite` - Para Vue Router
+- `mod_headers` - Para CORS y headers de seguridad
+- `.htaccess` configurado (se copia automáticamente desde `public/.htaccess`)
+
+## 🐛 Troubleshooting
+
+### 403 Forbidden después de deployment
+1. Verificar que `.htaccess` existe en el directorio de despliegue
+2. Revisar permisos: `644` para archivos, `755` para directorios
+3. Confirmar que `mod_rewrite` y `mod_headers` están habilitados en Apache
+
+### Error de sesión expirada
+- Session timeout: 30 minutos de inactividad
+- Se renueva automáticamente con cada actividad del usuario
+- Check: `src/stores/login.js`
+
+## 📄 Licencia
+
+MIT
+
+## 👥 Autor
+
+Alejandro Mínguez Escriba
+
+## 📧 Soporte
+
+Para reportar issues o sugerencias, contactar al equipo de desarrollo de AQLARA (alejandro.minguez@aqlara.com)

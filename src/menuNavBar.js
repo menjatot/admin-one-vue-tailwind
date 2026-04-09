@@ -10,6 +10,7 @@ import {
   mdiTestTube,
   mdiSetCenter,
   mdiPipeDisconnected,
+  mdiTune,
   
 } from '@mdi/js'
 
@@ -46,6 +47,11 @@ export default [
         to: {name:'puntosMuestreo'}
       },
       {
+        icon: mdiTune,
+        label: 'Parámetros de Calidad',
+        to: {name:'parametrosCalidad'}
+      },
+      {
         isDivider: true
       },
       // {
@@ -57,22 +63,22 @@ export default [
   {
     isCurrentUser: true,
     menu: [
-      {
-        icon: mdiAccount,
-        label: 'Mi Perfil',
-        to: '/profile'
-      },
-      {
-        icon: mdiCogOutline,
-        label: 'Settings'
-      },
-      {
-        icon: mdiEmail,
-        label: 'Mensajes'
-      },
-      {
-        isDivider: true
-      },
+      // {
+      //   icon: mdiAccount,
+      //   label: 'Mi Perfil',
+      //   to: '/profile'
+      // },
+      // {
+      //   icon: mdiCogOutline,
+      //   label: 'Settings'
+      // },
+      // {
+      //   icon: mdiEmail,
+      //   label: 'Mensajes'
+      // },
+      // {
+      //   isDivider: true
+      // },
       {
         icon: mdiLogout,
         label: 'Salir',

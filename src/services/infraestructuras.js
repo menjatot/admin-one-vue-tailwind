@@ -9,7 +9,7 @@ export const createInfraestructura = async (infraestructura) => {
     const { data } = await supabase
       .from('infraestructuras')
       .insert({
-        id: infraestructura.id,
+        sinac_id: infraestructura.sinac_id ?? null,
         name: infraestructura.name,
         type: infraestructura.tipo_infraestructura_fk,
         operador: infraestructura.operador,
@@ -46,6 +46,7 @@ export const updateInfraestructura = async (id) => {
         const { data } = await supabase
             .from('infraestructuras')
             .update({
+                sinac_id: id.sinac_id ?? null,
                 name: id.name,
                 type: id.type,
                 operador: id.operador })
