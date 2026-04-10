@@ -453,10 +453,15 @@ const updateAnaliticaSeleccionada = async (analitica) => {
 
 // Cargar analíticas solo cuando este componente se monte
 onMounted(async () => {
-  console.log('FILTROS: ', filters.value)
   resetForm()
-  
-  // Usar el composable para carga inteligente
+
+  // On page reload the store starts empty — ensure operarios are loaded before
+  // loadAnalytics() resolves, otherwise userZonas returns null and analiticsFiltered
+  // shows all rows (even to non-admin users) until the reactive computed self-corrects.
+  if (!plantasStore.getOperarios.length) {
+    await plantasStore.loadOperarios()
+  }
+
   try {
     await loadAnalytics()
     await loadParametrosCalidad()

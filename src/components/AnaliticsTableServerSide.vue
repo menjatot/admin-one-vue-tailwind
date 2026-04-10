@@ -488,24 +488,26 @@ watch(() => localFilters.infraestructura, async () => {
   )
 })
 
-onMounted(() => {
-  console.log('🚀 Componente montado, inicializando...')
+onMounted(async () => {
   resetForm()
   loadParametrosCalidad()
 
-  // Si el usuario no es admin, aplicar restricción de zonas desde el inicio
+  // On page reload the store starts empty — ensure operarios are loaded
+  // before evaluating zone restrictions, otherwise getUserZonaIds() returns
+  // null (operario not found) and loadData() runs without any filter.
+  if (!plantaStore.getOperarios.length) {
+    await plantaStore.loadOperarios()
+  }
+
   const zonaIds = getUserZonaIds()
   if (zonaIds !== null) {
-    console.log('🔒 Aplicando restricción de zonas para usuario no-admin:', zonaIds)
     applyFilters({ zonas_fk: zonaIds })
   } else {
     loadData()
   }
 
-  // Habilitar watchers después de la carga inicial
   nextTick(() => {
     isInitializing.value = false
-    console.log('✅ Inicialización completa, watchers activos')
   })
 })
 </script>
