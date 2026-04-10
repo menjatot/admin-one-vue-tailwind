@@ -11,7 +11,7 @@ export const createInfraestructura = async (infraestructura) => {
       .insert({
         sinac_id: infraestructura.sinac_id ?? null,
         name: infraestructura.name,
-        type: infraestructura.tipo_infraestructura_fk,
+        type: infraestructura.type ? Number(infraestructura.type) : null,
         operador: infraestructura.operador,
       })
       .select()
@@ -48,7 +48,7 @@ export const updateInfraestructura = async (id) => {
             .update({
                 sinac_id: id.sinac_id ?? null,
                 name: id.name,
-                type: id.type,
+                type: id.type ? Number(id.type) : null,
                 operador: id.operador })
             .eq('id', id.id)
             .single()
