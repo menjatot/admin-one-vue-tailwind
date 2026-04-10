@@ -1,6 +1,7 @@
-import { computed, reactive, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { usePlantasStore } from '@/stores/plantas'
 import { useLoginStore } from '@/stores/login'
+import { supabase } from '@/services/supabase'
 
 export default function useFormSelectData() {
   const loginStore = useLoginStore()
@@ -156,39 +157,69 @@ export default function useFormSelectData() {
     }
   }
 
-  const selectPuntosMuestra = computed(() => {
-    let puntos = plantasStore.getPuntosMuestreo
+  const puntosCargados = ref([])
+  const cargandoPuntos = ref(false)
 
-    // Filtering by Role (Admin vs Operario)
-    if (Number(loginStore.userRole) !== 99 && loginStore.userRole !== 'admin') {
-      const operarioActual = plantasStore.getOperarios.find(op => op.email?.toLowerCase() === loginStore.userEmail?.toLowerCase())
-      if (!operarioActual || !operarioActual.zonas) {
-        console.warn('Operario no encontrado o sin zonas asignadas')
-        return []
+  watch(
+    () => [form.zona, form.infraestructura],
+    async ([zona, infra]) => {
+      if (!zona && !infra) {
+        puntosCargados.value = []
+        return
       }
-      const zonasIds = operarioActual.zonas.map(zona => typeof zona === 'object' ? zona.id : zona)
-      puntos = puntos.filter(punto => punto.activo && zonasIds.includes(punto.zona_fk))
-    }
 
-    // Cascading geographical filters
-    if (form.infraestructura) {
-      puntos = puntos.filter(punto => punto.infraestructura_fk === Number(form.infraestructura))
-    } else if (form.zona) {
-      // To reliably find points for a zone, find the infrastructures that belong to the zone
-      const infrasEnZona = plantasStore.getZonasInfraestructuras
-        .filter(zi => zi.zonas_fk === Number(form.zona))
-        .map(zi => zi.infraestructuras_fk)
-      puntos = puntos.filter(punto => infrasEnZona.includes(punto.infraestructura_fk) || punto.zona_fk === Number(form.zona))
-    } else if (form.uo) {
-      const zonasDeUo = plantasStore.getZonas.filter(z => z.unidades_operativas_fk === Number(form.uo)).map(z => z.id)
-      const infrasDeUo = plantasStore.getZonasInfraestructuras
-        .filter(zi => zonasDeUo.includes(zi.zonas_fk))
-        .map(zi => zi.infraestructuras_fk)
-      puntos = puntos.filter(punto => infrasDeUo.includes(punto.infraestructura_fk) || zonasDeUo.includes(punto.zona_fk))
-    }
+      // Non-admin: validate the selected zone is actually assigned to the operario
+      if (Number(loginStore.userRole) !== 99 && loginStore.userRole !== 'admin') {
+        const operario = operarioLogueado.value
+        if (!operario?.zonas) {
+          puntosCargados.value = []
+          return
+        }
+        const zonasIds = operario.zonas.map(z => (typeof z === 'object' ? z.id : z))
+        if (zona && !zonasIds.includes(Number(zona))) {
+          puntosCargados.value = []
+          return
+        }
+      }
 
-    return puntos.map(punto => ({ value: punto.id, label: punto.name }))
-  })
+      cargandoPuntos.value = true
+      try {
+        let query = supabase
+          .from('puntos_muestreo')
+          .select('id, name, infraestructura_fk, zona_fk')
+          .eq('activo', true)
+
+        if (infra) {
+          query = query.eq('infraestructura_fk', Number(infra))
+        } else if (zona) {
+          const { data: ziData } = await supabase
+            .from('zonas_infraestructuras')
+            .select('infraestructuras_fk')
+            .eq('zonas_fk', Number(zona))
+
+          const infraIds = (ziData ?? []).map(r => r.infraestructuras_fk)
+
+          if (infraIds.length > 0) {
+            query = query.or(`zona_fk.eq.${zona},infraestructura_fk.in.(${infraIds.join(',')})`)
+          } else {
+            query = query.eq('zona_fk', Number(zona))
+          }
+        }
+
+        const { data } = await query
+        puntosCargados.value = data ?? []
+      } catch (error) {
+        console.error('Error cargando puntos de muestreo:', error)
+        puntosCargados.value = []
+      } finally {
+        cargandoPuntos.value = false
+      }
+    }
+  )
+
+  const selectPuntosMuestra = computed(() =>
+    puntosCargados.value.map(p => ({ value: p.id, label: p.name }))
+  )
   
 
   const operarioPorZona = computed(() => {
@@ -219,6 +250,8 @@ export default function useFormSelectData() {
     selectPuntosMuestra,
     operarioPorZona,
     findOperarioByUser,
-    operarioLogueado
+    operarioLogueado,
+    puntosCargados,
+    cargandoPuntos
   }
 }

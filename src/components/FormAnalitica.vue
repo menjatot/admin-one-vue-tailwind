@@ -25,7 +25,9 @@ const esDeposito = computed(() => {
   const puntoId = form.punto_muestreo_fk || props.initialPosition
   if (!puntoId) return false
 
-  const punto = plantaStore.getPuntosMuestreo.find((p) => p.id === puntoId)
+  const punto =
+    puntosCargados.value.find((p) => p.id === puntoId) ||
+    plantaStore.getPuntosMuestreo.find((p) => p.id === puntoId)
   if (!punto?.infraestructura_fk) return false
 
   const infra = plantaStore.getInfraestructuras.find((i) => i.id === punto.infraestructura_fk)
@@ -58,7 +60,9 @@ const {
   selectUO,
   operarioPorZona,
   findOperarioByUser,
-  operarioLogueado
+  operarioLogueado,
+  puntosCargados,
+  cargandoPuntos
 } = useFormSelectData()
 
 const resetForm = () => {
@@ -481,8 +485,9 @@ watch(
             v-model="form.punto_muestreo_fk"
             type="select"
             :options="selectPuntosMuestra"
-            placeholder="Punto de muestra"
+            :placeholder="cargandoPuntos ? 'Cargando...' : 'Punto de muestra'"
             label="Punto de Muestra"
+            :disabled="cargandoPuntos"
           />
         </div>
 
