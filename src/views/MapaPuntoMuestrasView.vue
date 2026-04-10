@@ -9,14 +9,21 @@ import { usePlantasStore } from '@/stores/plantas'
 import {useLoginStore} from '@/stores/login'
 
 import 'leaflet/dist/leaflet.css'
-import { LMap, LTileLayer, LMarker, LTooltip, LPopup } from '@vue-leaflet/vue-leaflet'
-import { computed, ref } from 'vue'
+import 'leaflet.markercluster/dist/MarkerCluster.css'
+import 'leaflet.markercluster/dist/MarkerCluster.Default.css'
+import { LMap, LTileLayer, LMarker, LTooltip } from '@vue-leaflet/vue-leaflet'
+import { computed, ref, watch } from 'vue'
 import CardBoxModal from '@/components/CardBoxModal.vue'
 import FormAnalitica from '@/components/FormAnalitica.vue'
 import SectionMain from '@/components/SectionMain.vue'
 import { getIconByInfraestructura } from '@/helpers/maps'
 import L from 'leaflet'
+import 'leaflet.markercluster'
 import { onMounted } from 'vue'
+// Force all Leaflet consumers (vue-leaflet, markercluster, our code) to share the same instance.
+// Without this, Vite loads the ESM entry for imports and the UMD entry for CJS requires,
+// producing two incompatible LatLngBounds class hierarchies that break markercluster.
+window.L = L
 import aqlaraIcon from '@/assets/icons/aqlara-icon-192.png'
 import AqlaraLogo from '@/components/AqlaraLogo.vue'
 
@@ -41,13 +48,103 @@ const center=ref([39.4679255214283, -0.3762874990439122])
 const zoom = ref(13)
 const userLocation = ref(null)
 const API_KEY_ICONS = import.meta.env.VITE_ICONS_API_KEY
-const markerIcon = (icon) =>
-  L.icon({
+// Memoized icon factory — only 5 distinct types, so we create each L.icon once
+const iconCache = {}
+const markerIcon = (icon) => {
+  if (iconCache[icon]) return iconCache[icon]
+  iconCache[icon] = L.icon({
     iconUrl: `https://api.geoapify.com/v1/icon/?type=material&color=blue&icon=${icon}&iconType=awesome&apiKey=${API_KEY_ICONS}`,
-    iconSize: [31, 46], // size of the icon
-    iconAnchor: [15.5, 42], // point of the icon which will correspond to marker's location
-    popupAnchor: [0, -45] // point from which the popup should open relative to the iconAnchor
+    iconSize: [31, 46],
+    iconAnchor: [15.5, 42],
+    popupAnchor: [0, -45]
   })
+  return iconCache[icon]
+}
+
+let clusterGroup = null
+let popupOpenHandler = null
+const mapLoaded = ref(false)
+
+const buildClusterGroup = () => {
+  const leafletMap = map.value?.leafletObject
+  if (!leafletMap || !mapLoaded.value) return
+
+  // Clean up previous cluster and its event listener
+  if (clusterGroup) {
+    leafletMap.removeLayer(clusterGroup)
+    clusterGroup = null
+  }
+  if (popupOpenHandler) {
+    leafletMap.off('popupopen', popupOpenHandler)
+    popupOpenHandler = null
+  }
+
+  clusterGroup = L.markerClusterGroup({
+    chunkedLoading: true,
+    maxClusterRadius: 60,
+    spiderfyOnMaxZoom: true,
+    showCoverageOnHover: false,
+  })
+
+  const useCreate = canCreateAnalitica.value
+  const buttonLabel = useCreate ? 'Añadir analítica' : 'Ver analíticas'
+  const action = useCreate ? 'crear' : 'ver'
+
+  puntosMuestreo.value.forEach((punto) => {
+    if (!punto.posicion) return
+
+    const marker = L.marker([punto.posicion.lat, punto.posicion.lon], {
+      icon: markerIcon(getIconByInfraestructura(punto.infraestructura_fk)),
+      draggable: true,
+    })
+
+    marker.bindTooltip(`<b>${punto.name}</b><br><span style="font-size:0.85em">id: ${punto.id}</span>`)
+    marker.bindPopup(`
+      <div style="text-align:center;min-width:150px">
+        <p style="font-weight:bold;margin:0 0 4px">${punto.name}</p>
+        <p style="font-size:0.85em;margin:0 0 8px">SINAC Id: ${punto.id}</p>
+        <button
+          data-punto-id="${punto.id}"
+          data-action="${action}"
+          style="background:#3b82f6;color:#fff;padding:5px 14px;border-radius:4px;border:none;cursor:pointer;font-size:0.9em"
+        >${buttonLabel}</button>
+      </div>
+    `)
+    marker.on('dragend', onDragEnd)
+    clusterGroup.addLayer(marker)
+  })
+
+  // Single delegated click handler for popup buttons
+  popupOpenHandler = (e) => {
+    const btn = e.popup.getElement()?.querySelector('button[data-punto-id]')
+    if (!btn) return
+    btn.addEventListener('click', () => {
+      const puntoId = Number(btn.dataset.puntoId)
+      const punto = puntosMuestreo.value.find((p) => p.id === puntoId)
+      if (!punto) return
+      if (btn.dataset.action === 'crear') crearAnalitica(punto)
+      else verAnaliticas(punto)
+      leafletMap.closePopup()
+    }, { once: true })
+  }
+  leafletMap.on('popupopen', popupOpenHandler)
+
+  leafletMap.addLayer(clusterGroup)
+}
+
+const onMapReady = () => {
+  const leafletMap = map.value.leafletObject
+  const afterLoad = () => {
+    mapLoaded.value = true
+    buildClusterGroup()
+  }
+  // _loaded is set by Leaflet after setView() is first called
+  if (leafletMap._loaded) {
+    afterLoad()
+  } else {
+    leafletMap.once('load', afterLoad)
+  }
+}
 
 // Icono para la posición actual del usuario (círculo azul pulsante)
 const userLocationIcon = L.divIcon({
@@ -175,16 +272,16 @@ const centerOnUserLocation = () => {
   getUserLocation()
 }
 
+// Rebuild cluster when puntos data becomes available or changes (only after map has valid bounds)
+watch(puntosMuestreo, () => {
+  if (mapLoaded.value) buildClusterGroup()
+})
+
 onMounted(async () => {
-  console.log('Componente montado, inicializando mapa...')
-  
-  // Asegurar que las infraestructuras básicas están cargadas para mostrar los iconos correctos
   if (!plantasStore.getInfraestructuras || plantasStore.getInfraestructuras.length === 0) {
-    console.log('Infraestructuras no detectadas, cargando...')
     await plantasStore.loadInfraestructuras()
   }
 
-  // Esperar un momento para que el mapa se inicialice completamente
   setTimeout(() => {
     getUserLocation()
   }, 500)
@@ -264,8 +361,9 @@ onMounted(async () => {
             ref="map"
             v-model:zoom="zoom"
             :center="center"
-            :use-global-leaflet="false"
+            use-global-leaflet
             style="height: 100%; width: 100%"
+            @ready="onMapReady"
             >
               <!-- :center="[39.54982998070428, -0.4656852311920545]" -->
               <l-tile-layer
@@ -318,43 +416,7 @@ onMounted(async () => {
                   </div>
                 </l-popup> -->
                 </l-marker>
-              <div v-for="punto in puntosMuestreo" :key="punto.id">
-                <l-marker
-                  v-if="punto.posicion"
-                  :lat-lng="[punto.posicion.lat, punto.posicion.lon]"
-                  draggable
-                  :icon="markerIcon(getIconByInfraestructura(punto.infraestructura_fk))"
-                  @dragend="onDragEnd"
-                >
-                  <!-- @dragend="onDragEnd" -->
-                  <l-tooltip>
-                    <div class="text-center">
-                      <h1 class="text-lg font-bold">{{ punto.name }}</h1>
-                      <p class="text-sm">id: {{ punto.id }}</p>
-                    </div>
-                  </l-tooltip>
-
-                  <l-popup>
-                    <div class="text-center">
-                      <h1 class="text-lg font-bold">{{ punto.name }}</h1>
-                      <!-- <a href="http://google.com" target="_blank" class="text-sm">Ver en Google Maps</a> -->
-                      <p class="text-sm">SINAC Id: {{ punto.id }}</p>
-                      <BaseButton
-                        v-if="canCreateAnalitica"
-                        label="Añadir analítica"
-                        color="info"
-                        @click="crearAnalitica(punto)"
-                      />
-                      <BaseButton
-                        v-else
-                        label="Ver analíticas"
-                        color="info"
-                        @click="verAnaliticas(punto)"
-                      />
-                    </div>
-                  </l-popup>
-                </l-marker>
-              </div>
+              <!-- Puntos de muestreo rendered imperatively via L.markerClusterGroup in onMapReady/watch -->
             </l-map>
         </div>
       </CardBox>
