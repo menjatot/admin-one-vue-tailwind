@@ -2,12 +2,11 @@ import { usePlantasStore } from "@/stores/plantas";
 
 export const getTipoInfrastructuraByPunto = (infraId) => {
   if (!infraId) return null
-  
+
   const plantaStore = usePlantasStore()
   const infraestructuras = plantaStore.getInfraestructuras
-  
+
   if (!infraestructuras || infraestructuras.length === 0) {
-    // console.log('DEBUG: Infraestructuras vacías en el store. ID buscado:', infraId)
     return null
   }
 

@@ -68,6 +68,8 @@ const mapLoaded = ref(false)
 const buildClusterGroup = () => {
   const leafletMap = map.value?.leafletObject
   if (!leafletMap || !mapLoaded.value) return
+  // Wait until infraestructuras are available — icons depend on them
+  if (!plantasStore.getInfraestructuras.length) return
 
   // Clean up previous cluster and its event listener
   if (clusterGroup) {
@@ -78,6 +80,8 @@ const buildClusterGroup = () => {
     leafletMap.off('popupopen', popupOpenHandler)
     popupOpenHandler = null
   }
+  // Clear icon cache so stale icons (built before infras loaded) are discarded
+  Object.keys(iconCache).forEach((k) => delete iconCache[k])
 
   clusterGroup = L.markerClusterGroup({
     chunkedLoading: true,
@@ -272,15 +276,20 @@ const centerOnUserLocation = () => {
   getUserLocation()
 }
 
-// Rebuild cluster when puntos data becomes available or changes (only after map has valid bounds)
-watch(puntosMuestreo, () => {
-  if (mapLoaded.value) buildClusterGroup()
-})
+// Rebuild cluster when puntos or infraestructuras data changes (icons depend on both)
+watch(
+  [puntosMuestreo, () => plantasStore.getInfraestructuras.length],
+  () => { if (mapLoaded.value) buildClusterGroup() }
+)
 
 onMounted(async () => {
-  if (!plantasStore.getInfraestructuras || plantasStore.getInfraestructuras.length === 0) {
-    await plantasStore.loadInfraestructuras()
-  }
+  // Always reload infras and puntos so the map reflects current DB state.
+  // Stale store data (e.g. infras with null type before fix, or puntos added
+  // by another session) would cause the wrong icon (faucet default) on markers.
+  await Promise.all([
+    plantasStore.loadInfraestructuras(),
+    plantasStore.loadPuntosMuestreo(),
+  ])
 
   setTimeout(() => {
     getUserLocation()

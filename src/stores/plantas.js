@@ -232,8 +232,23 @@ const loadOperarios = async () => {
   }
 
   const loadZonasInfraestructuras = async () => {
-    const { data } = await supabase.from('zonas_infraestructuras').select('*')
-    zonas_infraestructuras.value = data
+    const PAGE_SIZE = 1000
+    let allData = []
+    let from = 0
+
+    while (true) {
+      const { data, error } = await supabase
+        .from('zonas_infraestructuras')
+        .select('*')
+        .range(from, from + PAGE_SIZE - 1)
+
+      if (error || !data || data.length === 0) break
+      allData = allData.concat(data)
+      if (data.length < PAGE_SIZE) break
+      from += PAGE_SIZE
+    }
+
+    zonas_infraestructuras.value = allData
   }
   const loadTipoInfraestructura = async () => {
     const { data } = await supabase.from('tipo_infraestructura').select('*')

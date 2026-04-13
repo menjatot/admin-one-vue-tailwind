@@ -21,7 +21,7 @@ import BaseLevel from './BaseLevel.vue'
 // import { anularUO as anularZona, createUO, updateUO } from '@/services/uo'
 import FormZona from './FormZona.vue'
 import { createZona, anularZona, updateZona } from '@/services/zonas'
-import { createInfraestructura, anularInfraestructura, updateInfraestructura } from '@/services/infraestructuras'
+import { createInfraestructura, anularInfraestructura, updateInfraestructura, syncZonasInfraestructura } from '@/services/infraestructuras'
 import FormInfraestructura from './FormInfraestructura.vue'
 import { useNotifications } from '@/composables/useNotifications'
 
@@ -154,16 +154,21 @@ const handleDeleteData = async () => {
 }
 
 const saveForm = async (form) => {
-  //  console.log("ESCRITO Y HECHO", form);
+  let infraId = form.id
+
   if (form.esNuevo) {
-    console.log('Formulario Nuevo:', form.id);
-    await createInfraestructura(form)
-    // form.value=null
-  
+    const created = await createInfraestructura(form)
+    infraId = created?.id
   } else {
-    console.log('Formulario Editado:', form);
-   await updateInfraestructura(form)
+    await updateInfraestructura(form)
   }
+
+  // Sync zone assignments in zonas_infraestructuras
+  if (infraId != null) {
+    await syncZonasInfraestructura(infraId, form.zonas ?? [])
+    await plantaStore.loadZonasInfraestructuras()
+  }
+
   await plantaStore.loadInfraestructuras()
   closeModal()
   notifySuccess('La infraestructura se ha guardado correctamente.', {

@@ -40,6 +40,37 @@ export const anularInfraestructura = async (id) => {
 
 }
 
+export const getZonasDeInfraestructura = async (infraId) => {
+  const { data, error } = await supabase
+    .from('zonas_infraestructuras')
+    .select('zonas_fk')
+    .eq('infraestructuras_fk', Number(infraId))
+  if (error) throw error
+  return data?.map((row) => row.zonas_fk) ?? []
+}
+
+export const syncZonasInfraestructura = async (infraId, zonaIds) => {
+  try {
+    await supabase
+      .from('zonas_infraestructuras')
+      .delete()
+      .eq('infraestructuras_fk', Number(infraId))
+
+    if (zonaIds.length > 0) {
+      const { error } = await supabase
+        .from('zonas_infraestructuras')
+        .insert(zonaIds.map((zonaId) => ({
+          infraestructuras_fk: Number(infraId),
+          zonas_fk: Number(zonaId)
+        })))
+      if (error) throw error
+    }
+  } catch (error) {
+    console.error('Error sincronizando zonas de infraestructura:', error)
+    throw error
+  }
+}
+
 export const updateInfraestructura = async (id) => {
     console.log(id);
     try {

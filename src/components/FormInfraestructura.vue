@@ -1,28 +1,12 @@
 <script setup>
-import { computed, reactive, ref, toValue, watch } from 'vue'
-import { mdiBallotOutline, mdiAccount, mdiMail } from '@mdi/js'
+import { computed, reactive, ref, watch } from 'vue'
 import SectionMain from '@/components/SectionMain.vue'
 import CardBox from '@/components/CardBox.vue'
-import FormCheckRadioGroup from '@/components/FormCheckRadioGroup.vue'
-// import FormFilePicker from '@/components/FormFilePicker.vue'
-import FormField from '@/components/FormField.vue'
-import FormControl from '@/components/FormControl.vue'
-import BaseDivider from '@/components/BaseDivider.vue'
 import BaseButton from '@/components/BaseButton.vue'
 import BaseButtons from '@/components/BaseButtons.vue'
-import SectionTitle from '@/components/SectionTitle.vue'
-import LayoutAuthenticated from '@/layouts/LayoutAuthenticated.vue'
-import SectionTitleLineWithButton from '@/components/SectionTitleLineWithButton.vue'
-// import NotificationBarInCard from '@/components/NotificationBarInCard.vue'
 import { usePlantasStore } from '@/stores/plantas'
-import { searchZonasOperarios } from '@/services/supabase'
-import { setOperarios } from '@/services/operarios'
-import OperariosView from '@/views/OperariosView.vue'
+import { getZonasDeInfraestructura } from '@/services/infraestructuras'
 import { FormKit } from '@formkit/vue'
-
-// const zonasUoOperario = ref([]);
-
-// const emits = defineEmits(['cancelModal', 'closeModal'])
 
 const emit = defineEmits(['submit', 'closeModal'])
 
@@ -46,24 +30,14 @@ const form = reactive({
   zonas: []
 })
 
-const submitHandler = () => {
-  console.log('submitHandler')
-  // Validar formulario
-  if (!form.name || !form.com_autonoma_fk || !form.unidades_operativas_fk) {
-    console.error('Faltan campos requeridos')
-    return false
-  }
+const zonaSearch = ref('')
 
-  const uoData = {
-    id: form.id,
-    sinac_id: form.sinac_id,
-    name: form.name,
-    type: form.type,
-    operador: form.operador,
-  }
-  emit('submit', uoData)
-  // return uoData
-}
+const filteredZonasForInfra = computed(() => {
+  const q = zonaSearch.value.toLowerCase()
+  return plantasStore.getZonas
+    .map((z) => ({ value: z.id, label: z.name }))
+    .filter((z) => !q || z.label.toLowerCase().includes(q))
+})
 
 const selectTipoInfraestructura = computed(() => {
   return plantasStore.getTipoInfraestructura.map((tipo) => {
@@ -72,65 +46,30 @@ const selectTipoInfraestructura = computed(() => {
 })
 
 
-const zonasPorComunidadAutonoma = (ca) => {
-  const comAut = plantasStore.getZonas
-    .filter((zona) => zona.com_autonoma_fk === ca)
-    .map((zona) => {
-      return { value: zona.id, label: zona.name }
-    })
-  // console.log('comAut: ', comAut)
-  return comAut
-}
-
-const getZonas = computed(() => {
-  const zonas = plantasStore.getZonas.map((zona) => {
-    return { value: zona.id, label: zona.name }
-  })
-  console.log('ZONAS: ', zonas)
-  return zonas
-})
 
 watch(
   () => props.uo,
-  (newUO) => {
+  async (newUO) => {
     form.esNuevo = newUO?.esNuevo
     form.id = newUO?.id
     form.sinac_id = newUO?.sinac_id || null
     form.name = newUO?.name
     form.type = newUO?.type
     form.operador = newUO?.operador
-    // zonasUOSeleccionadas(newUO?.id)
+    zonaSearch.value = ''
+    // Load zone assignments directly from DB — avoids reading from the
+    // truncated store (Supabase default cap of 1000 rows).
+    form.zonas = newUO?.id ? await getZonasDeInfraestructura(newUO.id) : []
   },
-  { inmediate: true }
+  { immediate: true }
 )
 
-const zonasUOSeleccionadas = async (id) => {
-  if (!id) {
-    console.warn('El valor de id es undefined o null')
-    return []
-  }
-
-  const zonas = plantasStore.getZonas
-    .filter((zona) => zona.unidades_operativas_fk === id)
-    .map((zona) => {
-      return zona.id
-    })
-  // console.log('ZONAS SELECCIONADAS: ', zonas)
-  form.zonas = zonas
-}
-
-zonasUOSeleccionadas(form.id)
-
-defineExpose({
-  submitHandler
-})
 </script>
 
 <template>
   <SectionMain>
-    <!-- <CardBox form @submit.prevent="submit"> -->
     <CardBox is-form>
-      <form class="w-full" @submit.prevent="submitHandler">
+      <form class="w-full" @submit.prevent="emit('submit', form)">
         <div class="grid grid-cols-1 lg:grid-cols-6 mb-6 gap-4 w-full">
           <div class="col-span-1 w-full">
             <FormKit
@@ -181,25 +120,38 @@ defineExpose({
           /> -->
         </div>
 
-        <!-- <div v-if="form.comunidadAutonoma" class="grid md-grid-cols-1 md:grid-cols-4 gap-4 mb-6"> -->
-        <!-- <div class="w-full" v-for="zona in zonasPorComunidadAutonoma(form.comunidadAutonoma)" :key="zona.id"> -->
-
-        <div v-if="form.comunidadAutonoma" class="grid md-grid-cols-1 md:grid-cols-1 gap-4 mb-6">
-          <FormKit
-            v-model="form.zonas"
-            :options="
-              form.comunidadAutonoma ? zonasPorComunidadAutonoma(form.comunidadAutonoma) : getZonas
-            "
-            label="Zonas"
-            type="checkbox"
-            name="zonas"
-            options-class="w-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-2 space-y-2 p-4 rounded-md"
-            option-class="flex items-center"
+        <!-- Zonas asignadas -->
+        <div class="mb-6">
+          <label class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+            Zonas asignadas
+            <span
+              v-if="form.zonas.length"
+              class="ml-2 px-2 py-0.5 text-xs bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 rounded-full"
+            >{{ form.zonas.length }} seleccionadas</span>
+          </label>
+          <input
+            v-model="zonaSearch"
+            type="text"
+            placeholder="Buscar zona..."
+            class="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm bg-white dark:bg-gray-800 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 mb-2"
           />
+          <div class="border border-gray-200 dark:border-gray-600 rounded-md max-h-52 overflow-y-auto p-1">
+            <p v-if="filteredZonasForInfra.length === 0" class="text-sm text-gray-400 px-3 py-2">Sin resultados</p>
+            <label
+              v-for="zona in filteredZonasForInfra"
+              :key="zona.value"
+              class="flex items-center gap-2 px-3 py-1.5 rounded cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700"
+            >
+              <input
+                type="checkbox"
+                :value="zona.value"
+                v-model="form.zonas"
+                class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span class="text-sm text-gray-700 dark:text-gray-300">{{ zona.label }}</span>
+            </label>
+          </div>
         </div>
-        <!-- </div> -->
-        <!-- </div> -->
-        <!-- </div> -->
       </form>
       <template #footer>
         <BaseButtons>

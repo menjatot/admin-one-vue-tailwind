@@ -5,8 +5,6 @@ import { initOfflineSync } from '@/services/offlineSync'
 import PrimeVue from 'primevue/config'
 
 import config from '../formkit.config'
-import Vueform from '@vueform/vueform'
-import vueformConfig from '../vueform.config'
 import '@formkit/themes/genesis'
 
 import App from './App.vue'
@@ -25,7 +23,6 @@ createApp(App)
   .use(router)
   .use(PrimeVue, { theme: 'none' })
   .use(plugin, defaultConfig(config))
-  .use(Vueform, vueformConfig)
   .mount('#app')
 
 // Init main store
