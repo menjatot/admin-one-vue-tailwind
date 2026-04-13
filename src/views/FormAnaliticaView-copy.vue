@@ -161,7 +161,7 @@ onMounted(async() => {
               v-model="form.zona"
               type="select"
               :options="form.uo ? selectZona : []"
-              placeholder="Zona de Muestra"
+              placeholder="Zona de Abastecimiento"
               label="Zona"
             />
             <FormKit

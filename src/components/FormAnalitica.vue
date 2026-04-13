@@ -187,9 +187,9 @@ const submitHandler = async () => {
       resetForm()
       emit('closeModal')
       notifyWarning(
-        'Sin cobertura. La analitica se ha guardado en el dispositivo y se enviara automaticamente cuando recuperes la señal.',
+        'Sin cobertura. La analítica se ha guardado en el dispositivo y se enviará automáticamente cuando recuperes la señal.',
         {
-          title: 'Modo sin conexion',
+          title: 'Modo sin conexión',
           life: 7000
         }
       )
@@ -202,7 +202,7 @@ const submitHandler = async () => {
     if (error) {
       console.error('Error al insertar datos:', error)
       notifyError(`Error al insertar datos: ${error.message}`, {
-        title: 'No se ha podido guardar la analitica'
+        title: 'No se ha podido guardar la analítica'
       })
     } else {
       plantaStore.loadAnaliticas()
@@ -212,7 +212,7 @@ const submitHandler = async () => {
       // fiestaConfetti()
 
       notifySuccess('Los datos se han insertado correctamente.', {
-        title: 'Analitica guardada'
+        title: 'Analítica guardada'
       })
     }
   } catch (error) {
@@ -471,7 +471,7 @@ watch(
             v-model="form.zona"
             type="select"
             :options="form.uo ? selectZona : []"
-            placeholder="Zona de Muestra"
+            placeholder="Zona de Abastecimiento"
             label="Zona"
           />
           <FormKit

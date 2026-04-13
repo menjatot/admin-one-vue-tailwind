@@ -533,11 +533,11 @@ onMounted(async () => {
   </div>
   <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
     <div class="flex flex-col">
-      <label class="font-bold mb-1 text-sm text-gray-700 dark:text-gray-300">Zona de Muestra</label>
+      <label class="font-bold mb-1 text-sm text-gray-700 dark:text-gray-300">Zona de Abastecimiento</label>
       <AutocompleteSelect
         v-model="filters.zona"
         :options="selectZona"
-        placeholder="Zona de Muestra"
+        placeholder="Zona de Abastecimiento"
         class="w-full"
       />
     </div>

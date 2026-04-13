@@ -121,15 +121,15 @@ const submit = () => {
               v-model="form.uo"
               type="text"
               :options="selectUO"
-              placeholder="Zona de muestra"
+              placeholder="Zona de abastecimiento"
             />
           </FormField>
-          <FormField label="Zona de la Muestra" help="Zona de la muestra">
+          <FormField label="Zona de Abastecimiento" help="Zona de abastecimiento">
             <FormControl
               v-model="form.zonaMuestra"
               type="text"
               :options="selectZona"
-              placeholder="Zona de muestra"
+              placeholder="Zona de abastecimiento"
             />
           </FormField>
         </FormField>
