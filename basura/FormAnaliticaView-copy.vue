@@ -17,9 +17,9 @@ import useLoginStore from '@/stores/login'
 // import NotificationBarInCard from '@/components/NotificationBarInCard.vue'
 import { usePlantasStore } from '@/stores/plantas'
 import { FormKit } from '@formkit/vue'
-import { supabase } from '../services/supabase'
+import { supabase } from '../src/services/supabase'
 
-import useFormSelectData from '../composables/useFormSelectData'
+import useFormSelectData from '../src/composables/useFormSelectData'
 
 const {
   form,

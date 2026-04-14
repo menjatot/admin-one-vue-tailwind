@@ -32,6 +32,10 @@ export default [
         to: {name: "mapa"},
       },
       // {
+      //   label: 'Video',
+      //   to: { name: "video" },
+      // },
+      // {
       //   label: 'Prime Table Example',
       //   to: {name: "prime-table"},
       //   icon: mdiSquareEditOutline

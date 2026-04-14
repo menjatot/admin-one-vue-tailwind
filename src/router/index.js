@@ -141,6 +141,15 @@ const routes = [
   },
   {
     meta: {
+      title: 'Video',
+      requiresAuth: true
+    },
+    path: '/video',
+    name: 'video',
+    component: () => import('@/views/videoView.vue')
+  },
+  {
+    meta: {
       title: 'Profile'
     },
     path: '/profile',

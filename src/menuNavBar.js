@@ -11,6 +11,7 @@ import {
   mdiSetCenter,
   mdiPipeDisconnected,
   mdiTune,
+  mdiHelpCircleOutline,
   
 } from '@mdi/js'
 
@@ -91,6 +92,12 @@ export default [
     label: 'Light/Dark',
     isDesktopNoLabel: true,
     isToggleLightDark: true
+  },
+  {
+    icon: mdiHelpCircleOutline,
+    label: 'Ayuda',
+    isDesktopNoLabel: true,
+    to: '/video'
   },
   
   
