@@ -1,6 +1,6 @@
 <script setup>
 import { defineProps, toRefs } from 'vue';
-import BaseButton from '@/components/BaseButton.vue';
+import BaseIcon from '@/components/BaseIcon.vue';
 import { mdiPrinter, mdiFileExcel } from '@mdi/js';
 import { usePlantasStore } from '@/stores/plantas';
 import * as XLSX from 'xlsx';
@@ -97,13 +97,13 @@ const getM3PerDia = (analitica) => {
   return dias > 0 ? Math.round((volumen / dias) * 100) / 100 : null
 }
 
+const { warning: notifyWarning } = useNotifications()
+
 const getAnaliticasParaExportar = () => {
   if (selectedRows.value.length === 0) {
     notifyWarning('Selecciona al menos una analitica para definir el rango de fechas.', {
       title: 'Seleccion requerida'
     })
-
-    const { warning: notifyWarning } = useNotifications()
     return null;
   }
 
@@ -130,7 +130,6 @@ const getAnaliticasParaExportar = () => {
 // ...existing code...
 
 const handlePrintHTML = async () => {
-  // Llamar a la función de callback antes de exportar (si existe)
   if (props.onBeforeExport) {
     await props.onBeforeExport()
   }
@@ -139,22 +138,13 @@ const handlePrintHTML = async () => {
   if (!exportData) return;
   let { analiticas, minDate, maxDate } = exportData;
 
-  // Ordenar las analíticas primero por punto de muestreo y luego por fecha
   analiticas = [...analiticas].sort((a, b) => {
-    // Primero comparamos por punto de muestreo
     if (a.punto_muestreo_fk !== b.punto_muestreo_fk) {
-      // Si los puntos de muestreo son diferentes, ordenamos por su ID
       return a.punto_muestreo_fk - b.punto_muestreo_fk;
     }
-    
-    // Si los puntos de muestreo son iguales, ordenamos por fecha
-    // Convertimos las fechas a objetos Date para compararlas correctamente
-    const fechaA = new Date(a.fecha);
-    const fechaB = new Date(b.fecha);
-    return fechaA - fechaB; // Orden ascendente por fecha (más antigua primero)
+    return new Date(a.fecha) - new Date(b.fecha);
   });
 
-  // Construir el título con la zona si está seleccionada
   let tituloInforme = `Informe de Analíticas (${formatDateForDisplay(minDate)} - ${formatDateForDisplay(maxDate)})`;
   if (selectedZona.value) {
     const nombreZona = getZonaNombre(selectedZona.value);
@@ -163,28 +153,81 @@ const handlePrintHTML = async () => {
     }
   }
 
-  let htmlContent = `
+  // Definición centralizada de columnas
+  const columns = [
+    { label: 'Fecha',              value: a => formatDateForDisplay(a.fecha) },
+    { label: 'Punto de Muestreo',  value: a => getPuntoMuestreoNombre(a.punto_muestreo_fk) },
+    { label: 'Código SINAC',       value: a => a.punto_muestreo_fk },
+    { label: 'Cloro (mg/l)',       value: a => a.cloro != null ? a.cloro : '' },
+    { label: 'pH',                 value: a => a.ph != null ? a.ph : '' },
+    { label: 'Turbidez (NTU)',     value: a => a.turbidez != null ? a.turbidez : '' },
+    { label: 'Olor',               value: a => formatOrganoleptico(a.olor) },
+    { label: 'Sabor',              value: a => formatOrganoleptico(a.sabor) },
+    { label: 'Color',              value: a => formatOrganoleptico(a.color) },
+    { label: 'Totalizador (m³)',   value: a => a.totalizador != null ? a.totalizador : '' },
+    { label: 'Volumen (m³)',       value: a => getVolumen(a) != null ? getVolumen(a) : '' },
+    { label: 'Consumo (m³/día)',   value: a => getM3PerDia(a) != null ? getM3PerDia(a) : '' },
+    { label: 'Observaciones',      value: a => a.observaciones ?? '' }
+  ]
+
+  // Resolver zona para cada analítica (con fallback a búsqueda en store)
+  const getZonaFromAnalitica = (a) => {
+    if (a.zona_name) return { id: a.zona_id, name: a.zona_name }
+    const punto = plantasStore.getPuntosMuestreo.find(p => p.id === a.punto_muestreo_fk)
+    if (!punto) return { id: null, name: 'Sin zona' }
+    const zona = plantasStore.getZonas.find(z => z.id === punto.zona_fk)
+    return { id: zona?.id ?? null, name: zona?.name ?? 'Sin zona' }
+  }
+
+  // Pre-computar todos los valores de celda + metadata de zona para el JS del HTML
+  const serializedData = analiticas.map(a => {
+    const zona = getZonaFromAnalitica(a)
+    return {
+      zona_id: zona.id,
+      zona_name: zona.name,
+      punto_muestreo_fk: a.punto_muestreo_fk,
+      fecha: a.fecha,
+      cells: columns.map(col => String(col.value(a) ?? ''))
+    }
+  })
+
+  const columnSelectorHtml = columns.map((col, i) =>
+    `<label class="col-check-label"><input type="checkbox" checked onchange="toggleColumn(${i}, this.checked)" />${col.label}</label>`
+  ).join('')
+
+  const htmlContent = `
     <html>
       <head>
         <title>${fileNameBase.value} - ${companyName.value}</title>
         <style>
           body { font-family: Arial, sans-serif; margin: 20px; }
-          .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #00447C;}
+          .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #00447C; }
           .logo-container { flex-shrink: 0; }
           .logo { max-height: 60px; }
-          .header-text { text-align: right; flex-grow: 1;}
-          .company-name-html { font-size: 20px; font-weight: bold; color: #00447C; margin-bottom: 5px;}
+          .header-text { text-align: right; flex-grow: 1; }
+          .company-name-html { font-size: 20px; font-weight: bold; color: #00447C; margin-bottom: 5px; }
           .report-title-html { font-size: 16px; }
           table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 10px; }
           th, td { border: 1px solid #ddd; padding: 6px; text-align: left; }
           th { background-color: #00447C; color: white; }
-          /* Estilo para resaltar visualmente grupos de puntos de muestreo */
           tr.grupo-nuevo td { border-top: 2px solid #00447C; }
+          tr.zone-header-row td { background: #dce8f4; font-weight: bold; color: #00447C; font-size: 11px; border-top: 3px solid #00447C; border-bottom: 1px solid #9ab8d8; letter-spacing: 0.02em; }
+          .controls-panel { margin: 14px 0 4px; padding: 10px 14px; background: #f0f4f8; border: 1px solid #c0cfe0; border-radius: 6px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+          .controls-panel strong { color: #00447C; font-size: 13px; }
+          .controls-divider { align-self: stretch; width: 1px; background: #aac4e0; margin: 0 4px; }
+          .col-check-label { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; cursor: pointer; user-select: none; }
+          .col-check-label input { cursor: pointer; }
+          .group-check-label { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: #00447C; cursor: pointer; user-select: none; }
+          .print-btn { margin-top: 16px; padding: 8px 22px; background: #00447C; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; }
+          .print-btn:hover { background: #003060; }
+          @page { size: A4 landscape; margin: 0.8cm; }
           @media print {
-            body { margin: 0.5cm; }
+            body { margin: 0; }
             .no-print { display: none; }
             .page-header { justify-content: flex-start; }
             .header-text { text-align: center; margin-left: 20px; }
+            table { font-size: 8px; }
+            th, td { padding: 4px; }
           }
         </style>
       </head>
@@ -198,62 +241,96 @@ const handlePrintHTML = async () => {
             <div class="report-title-html">${tituloInforme}</div>
           </div>
         </div>
+
+        <div class="no-print controls-panel">
+          <label class="group-check-label">
+            <input type="checkbox" onchange="toggleGroupByZona(this.checked)" />
+            &#128205; Agrupar por zona de abastecimiento
+          </label>
+          <div class="controls-divider"></div>
+          <strong>Columnas:</strong>
+          ${columnSelectorHtml}
+        </div>
+
         <table>
-          <thead>
-            <tr>
-              <th>Fecha</th>
-              <th>Punto de Muestreo</th>
-              <th>Código SINAC</th>
-              <th>Cloro (mg/l)</th>
-              <th>pH</th>
-              <th>Turbidez (NTU)</th>
-              <th>Olor</th>
-              <th>Sabor</th>
-              <th>Color</th>
-              <th>Totalizador (m³)</th>
-              <th>Volumen (m³)</th>
-              <th>Consumo (m³/día)</th>
-            </tr>
-          </thead>
-          <tbody>
-  `;
-
-  // Variable para rastrear cambios de punto de muestreo
-  let puntoMuestreoAnterior = null;
-
-  analiticas.forEach(a => {
-    // Determinar si es un nuevo grupo de punto de muestreo
-    const esNuevoGrupo = puntoMuestreoAnterior !== a.punto_muestreo_fk;
-    puntoMuestreoAnterior = a.punto_muestreo_fk;
-
-    // Añadir clase para resaltar visualmente cuando cambia el punto de muestreo
-    const claseGrupo = esNuevoGrupo ? 'class="grupo-nuevo"' : '';
-
-    htmlContent += `
-            <tr ${claseGrupo}>
-              <td>${formatDateForDisplay(a.fecha)}</td>
-              <td>${getPuntoMuestreoNombre(a.punto_muestreo_fk)}</td>
-              <td>${a.punto_muestreo_fk}</td>
-              <td>${a.cloro !== null && a.cloro !== undefined ? a.cloro : ''}</td>
-              <td>${a.ph !== null && a.ph !== undefined ? a.ph : ''}</td>
-              <td>${a.turbidez !== null && a.turbidez !== undefined ? a.turbidez : ''}</td>
-              <td>${formatOrganoleptico(a.olor)}</td>
-              <td>${formatOrganoleptico(a.sabor)}</td>
-              <td>${formatOrganoleptico(a.color)}</td>
-              <td>${a.totalizador != null ? a.totalizador : ''}</td>
-              <td>${getVolumen(a) != null ? getVolumen(a) : ''}</td>
-              <td>${getM3PerDia(a) != null ? getM3PerDia(a) : ''}</td>
-            </tr>
-    `;
-  });
-
-  htmlContent += `
-          </tbody>
+          <thead><tr></tr></thead>
+          <tbody></tbody>
         </table>
-        <button class="no-print" onclick="window.print()" style="margin-top: 20px;">Imprimir</button>
+        <button class="no-print print-btn" onclick="window.print()">Imprimir</button>
+
+        <script>
+          var REPORT_DATA = ${JSON.stringify(serializedData)};
+          var COLUMN_LABELS = ${JSON.stringify(columns.map(c => c.label))};
+          var visibleCols = COLUMN_LABELS.map(function(_, i) { return i; });
+          var groupByZona = false;
+
+          function renderHeader() {
+            var tr = document.querySelector('thead tr');
+            tr.innerHTML = visibleCols
+              .map(function(i) { return '<th>' + COLUMN_LABELS[i] + '</th>'; })
+              .join('');
+          }
+
+          function renderBody() {
+            var sorted = REPORT_DATA.slice().sort(function(a, b) {
+              if (groupByZona) {
+                var zc = (a.zona_name || '').localeCompare(b.zona_name || '', 'es');
+                if (zc !== 0) return zc;
+              }
+              if (a.punto_muestreo_fk !== b.punto_muestreo_fk) return a.punto_muestreo_fk - b.punto_muestreo_fk;
+              return new Date(a.fecha) - new Date(b.fecha);
+            });
+
+            var html = '';
+            var prevZona = null;
+            var prevPunto = null;
+
+            sorted.forEach(function(row) {
+              if (groupByZona && row.zona_id !== prevZona) {
+                html += '<tr class="zone-header-row"><td colspan="' + visibleCols.length + '">' +
+                  '&#9670; ' + (row.zona_name || 'Sin zona') +
+                  '</td></tr>';
+                prevZona = row.zona_id;
+                prevPunto = null;
+              }
+              var isNewGroup = row.punto_muestreo_fk !== prevPunto;
+              prevPunto = row.punto_muestreo_fk;
+              var cls = isNewGroup ? ' class="grupo-nuevo"' : '';
+              html += '<tr' + cls + '>' +
+                visibleCols.map(function(i) { return '<td>' + (row.cells[i] || '') + '</td>'; }).join('') +
+                '</tr>';
+            });
+
+            document.querySelector('tbody').innerHTML = html;
+          }
+
+          function renderAll() {
+            renderHeader();
+            renderBody();
+          }
+
+          function toggleColumn(colIndex, visible) {
+            if (visible) {
+              if (visibleCols.indexOf(colIndex) === -1) {
+                visibleCols.push(colIndex);
+                visibleCols.sort(function(a, b) { return a - b; });
+              }
+            } else {
+              visibleCols = visibleCols.filter(function(i) { return i !== colIndex; });
+            }
+            renderAll();
+          }
+
+          function toggleGroupByZona(enabled) {
+            groupByZona = enabled;
+            renderBody();
+          }
+
+          window.onload = renderAll;
+        <\/script>
       </body>
     </html>
-  `;
+  `
 
   const printWindow = window.open('', '_blank');
   printWindow.document.open();
@@ -311,7 +388,8 @@ const handleExportExcel = async () => {
     'Color',
     'Totalizador (m³)',
     'Volumen (m³)',
-    'Consumo (m³/día)'
+    'Consumo (m³/día)',
+    'Observaciones'
   ]);
 
   // Datos de las analíticas
@@ -328,7 +406,8 @@ const handleExportExcel = async () => {
       formatOrganoleptico(a.color),
       a.totalizador != null ? a.totalizador : '',
       getVolumen(a) != null ? getVolumen(a) : '',
-      getM3PerDia(a) != null ? getM3PerDia(a) : ''
+      getM3PerDia(a) != null ? getM3PerDia(a) : '',
+      a.observaciones ?? ''
     ]);
   });
 
@@ -349,7 +428,8 @@ const handleExportExcel = async () => {
     { wch: 15 },  // Color
     { wch: 16 },  // Totalizador
     { wch: 14 },  // Volumen
-    { wch: 16 }   // Consumo m³/día
+    { wch: 16 },  // Consumo m³/día
+    { wch: 40 }   // Observaciones
   ];
 
   // Aplicar estilos a las celdas de título y encabezado
@@ -385,8 +465,8 @@ const handleExportExcel = async () => {
 
   // Combinar celdas para el título (primera fila)
   ws['!merges'] = [
-    { s: { r: 0, c: 0 }, e: { r: 0, c: 11 } }, // Título
-    { s: { r: 1, c: 0 }, e: { r: 1, c: 11 } }  // Subtítulo
+    { s: { r: 0, c: 0 }, e: { r: 0, c: 12 } }, // Título
+    { s: { r: 1, c: 0 }, e: { r: 1, c: 12 } }  // Subtítulo
   ];
 
   // Agregar la hoja al libro
@@ -489,25 +569,23 @@ const handleExportExcel = async () => {
 
 <template>
   <div class="flex flex-wrap gap-2">
-    <BaseButton
+    <button
       v-if="props.enableHtmlPrint"
-      class="bg-gray-300 hover:bg-gray-400 text-gray-800 py-2 px-4 rounded"
-      label="Imprimir"
-      :icon="mdiPrinter"
-      rounded-full
-      small
+      class="inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-medium text-white bg-gradient-to-r from-slate-500 to-slate-700 shadow-md shadow-slate-300/50 dark:shadow-slate-900/40 transition-all duration-200 hover:from-slate-600 hover:to-slate-800 hover:-translate-y-0.5 hover:shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-md"
       :disabled="selectedRows.length === 0"
       @click="handlePrintHTML"
-    />
+    >
+      <BaseIcon :path="mdiPrinter" size="16" />
+      <span>Imprimir</span>
+    </button>
 
-    <BaseButton
-      label="Exportar Excel"
-      color="success"
-      :icon="mdiFileExcel"
-      rounded-full
-      small
+    <button
+      class="inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-medium text-white bg-gradient-to-r from-green-500 to-emerald-600 shadow-md shadow-green-300/50 dark:shadow-green-900/40 transition-all duration-200 hover:from-green-600 hover:to-emerald-700 hover:-translate-y-0.5 hover:shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-md"
       :disabled="selectedRows.length === 0"
       @click="handleExportExcel"
-    />
+    >
+      <BaseIcon :path="mdiFileExcel" size="16" />
+      <span>Excel</span>
+    </button>
   </div>
 </template>

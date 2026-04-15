@@ -448,7 +448,14 @@ watch(
     </div>
 
     <CardBox v-if="!props.historyOnly">
-      <FormKit type="form" submit-label="Enviar" @submit="submitHandler">
+      <FormKit
+          type="form"
+          submit-label="Enviar"
+          :submit-attrs="{
+            class: 'w-full cursor-pointer rounded-lg bg-blue-600 px-6 py-2.5 font-medium text-white transition-colors hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600'
+          }"
+          @submit="submitHandler"
+        >
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
           <FormKit
             v-model.number="form.operario"

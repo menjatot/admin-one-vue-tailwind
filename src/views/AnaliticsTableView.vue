@@ -7,7 +7,6 @@ import useLoginStore from '@/stores/login';
 import CardBox from '@/components/CardBox.vue';
 import LayoutAuthenticated from '@/layouts/LayoutAuthenticated.vue';
 import SectionTitleLineWithButton from '@/components/SectionTitleLineWithButton.vue';
-import BaseButton from '@/components/BaseButton.vue';
 import AnaliticsTable from '@/components/AnaliticsTable.vue';
 import AnaliticsTableServerSide from '@/components/AnaliticsTableServerSide.vue';
 import useExtractdata from '@/composables/useUploadFormData';
@@ -120,27 +119,31 @@ const loadAllAnalyticsForExport = async () => {
     <SectionMain>
       <SectionTitleLineWithButton :icon="mdiFlaskEmptyOutline" title="Analíticas" main>
         <div class="flex flex-wrap gap-2">
-          <BaseButton
+          <!-- Toggle Server/Client-Side -->
+          <button
             v-if="isAdminRole"
-            :icon="mdiRocket"
-            :label="useServerSide ? 'Usar Client-Side' : 'Usar Server-Side'"
-            :color="useServerSide ? 'success' : 'warning'"
-            rounded-full
-            small
+            class="inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-medium text-white shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg active:scale-95"
+            :class="useServerSide
+              ? 'bg-gradient-to-r from-emerald-500 to-teal-600 shadow-emerald-300/50 dark:shadow-emerald-900/40 hover:from-emerald-600 hover:to-teal-700'
+              : 'bg-gradient-to-r from-amber-400 to-orange-500 shadow-amber-300/50 dark:shadow-amber-900/40 hover:from-amber-500 hover:to-orange-600'"
             @click="toggleTableMode"
-          />
+          >
+            <BaseIcon :path="mdiRocket" size="16" />
+            <span>{{ useServerSide ? 'Client-Side' : 'Server-Side' }}</span>
+          </button>
 
-          <BaseButton
+          <!-- Download XML -->
+          <button
             v-if="isAdminRole && exportXMLData"
-            :icon="mdiDownload"
-            label="Download XML"
-            color="info"
-            rounded-full
-            small
+            class="inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-medium text-white bg-gradient-to-r from-sky-500 to-blue-600 shadow-md shadow-sky-300/50 dark:shadow-sky-900/40 transition-all duration-200 hover:from-sky-600 hover:to-blue-700 hover:-translate-y-0.5 hover:shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-md"
             :disabled="selectedAnaliticasFromTable.length === 0"
-            @click='downloadXML'
-          />
+            @click="downloadXML"
+          >
+            <BaseIcon :path="mdiDownload" size="16" />
+            <span>XML</span>
+          </button>
 
+          <!-- Imprimir + Excel -->
           <AdvancedExportControls
             v-if="canExportAndPrint"
             :selected-rows="selectedAnaliticasFromTable"
@@ -153,15 +156,14 @@ const loadAllAnalyticsForExport = async () => {
             :on-before-export="loadAllAnalyticsForExport"
           />
 
-          <BaseButton
-          class="bg-slate-600 hover:bg-slate-700 text-white  py-2 px-4 rounded"
-            :icon="mdiFilter"
-            label="Limpiar filtros"
-            color=""
-            rounded-full
-            small
-            @click='limpiarFiltros'
-          />
+          <!-- Limpiar filtros -->
+          <button
+            class="inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-medium text-white bg-gradient-to-r from-slate-500 to-slate-700 shadow-md shadow-slate-300/50 dark:shadow-slate-900/40 transition-all duration-200 hover:from-slate-600 hover:to-slate-800 hover:-translate-y-0.5 hover:shadow-lg active:scale-95"
+            @click="limpiarFiltros"
+          >
+            <BaseIcon :path="mdiFilter" size="16" />
+            <span>Limpiar filtros</span>
+          </button>
         </div>
       </SectionTitleLineWithButton>
 

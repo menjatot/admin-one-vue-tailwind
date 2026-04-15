@@ -1,7 +1,5 @@
 <script setup>
-import { ref, watch } from 'vue'
-
-const props=defineProps({
+defineProps({
   type: {
     type: String,
     default: 'td'
@@ -9,36 +7,31 @@ const props=defineProps({
   modelValue: {
     type: Boolean,
     default: false
+  },
+  disabled: {
+    type: Boolean,
+    default: false
+  },
+  label: {
+    type: String,
+    default: null
   }
 })
 
-// const emit = defineEmits(['checked'])
 const emit = defineEmits(['update:modelValue'])
-
-const checked = ref(props.modelValue)
-
-
-
-// watch(checked, (newVal) => {
-//   emit('checked', newVal)
-// })
-watch(checked, (newVal) => {
-  emit('update:modelValue', newVal)
-})
-
-watch(
-  () => props.modelValue,
-  (newVal) => {
-    checked.value = newVal
-  }
-)
 </script>
 
 <template>
   <component :is="type" class="lg:w-1">
     <label class="checkbox">
-      <input v-model="checked" type="checkbox" />
+      <input
+        :checked="modelValue"
+        :disabled="disabled"
+        type="checkbox"
+        @change="emit('update:modelValue', $event.target.checked)"
+      />
       <span class="check" />
+      <span v-if="label" class="ml-1 text-xs">{{ label }}</span>
     </label>
   </component>
 </template>
