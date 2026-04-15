@@ -73,16 +73,40 @@ export const usePlantasStore = defineStore('plantasStore', () => {
   }
 
   const loadZonas = async () => {
-    const { data } = await supabase.from('zonas_abastecimiento').select('*')
-    zonas.value = data
+    const PAGE_SIZE = 1000
+    let allData = []
+    let from = 0
+    while (true) {
+      const { data, error } = await supabase
+        .from('zonas_abastecimiento')
+        .select('*')
+        .range(from, from + PAGE_SIZE - 1)
+      if (error || !data || data.length === 0) break
+      allData = allData.concat(data)
+      if (data.length < PAGE_SIZE) break
+      from += PAGE_SIZE
+    }
+    zonas.value = allData
   }
   // const loadOperarios = async () => {
   //   const { data } = await supabase.from('personal').select('*')
   //   operarios.value = data
   // }
   const loadZonasOperarios = async () => {
-    const { data } = await supabase.from('zonas_personal').select('*')
-    zonas_personal.value = data
+    const PAGE_SIZE = 1000
+    let allData = []
+    let from = 0
+    while (true) {
+      const { data, error } = await supabase
+        .from('zonas_personal')
+        .select('*')
+        .range(from, from + PAGE_SIZE - 1)
+      if (error || !data || data.length === 0) break
+      allData = allData.concat(data)
+      if (data.length < PAGE_SIZE) break
+      from += PAGE_SIZE
+    }
+    zonas_personal.value = allData
   }
   // const loadAnaliticas = async () => {
   //   const { data } = await supabase.from('analiticas').select('*')
@@ -159,32 +183,25 @@ const loadOperarios = async () => {
     
     if (error) throw error
 
-    const {data:zonasPersonal } = await supabase.from('zonas_personal').select('*')
-    
+    const PAGE_SIZE = 1000
+    let allZonasPersonal = []
+    let from = 0
+    while (true) {
+      const { data, error: zpError } = await supabase
+        .from('zonas_personal')
+        .select('*')
+        .range(from, from + PAGE_SIZE - 1)
+      if (zpError || !data || data.length === 0) break
+      allZonasPersonal = allZonasPersonal.concat(data)
+      if (data.length < PAGE_SIZE) break
+      from += PAGE_SIZE
+    }
+
     // Enriquecer cada operario con sus zonas asignadas
     operarios.value = operariosData.map(operario => {
-      // Filtrar las relaciones de zonas_personal para este operario
-
-
-
-      const relacionesZonas = zonasPersonal.filter(
-        relacion => relacion.personal_fk === operario.id).map(relacion => relacion.zonas_fk)
-    
-
-      // console.log('relacionesZonas: ',relacionesZonas);
-      
-      // Obtener los IDs de las zonas asignadas a este operario
-      // const zonasIds = relacionesZonas.map(relacion => relacion.zonas_fk)
-
-      // console.log('zonasIds: ',zonasIds);
-      
-      // Buscar los datos completos de cada zona
-      // const zonasOperario = zonas.value.filter(zona => 
-      //   zonasIds.includes(zona.id)
-      // )
-      
-     // console.log('zonasOperario:',zonasOperario)
-      // Añadir las zonas al objeto operario
+      const relacionesZonas = allZonasPersonal
+        .filter(relacion => relacion.personal_fk === operario.id)
+        .map(relacion => relacion.zonas_fk)
       return {
         ...operario,
         zonas: relacionesZonas || []
