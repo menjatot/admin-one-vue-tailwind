@@ -332,10 +332,12 @@ const handlePrintHTML = async () => {
     </html>
   `
 
-  const printWindow = window.open('', '_blank');
-  printWindow.document.open();
-  printWindow.document.write(htmlContent);
-  printWindow.document.close();
+  const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+  const blobUrl = URL.createObjectURL(blob);
+  const printWindow = window.open(blobUrl, '_blank');
+  if (printWindow) {
+    printWindow.addEventListener('unload', () => URL.revokeObjectURL(blobUrl), { once: true });
+  }
 };
 
 const handleExportExcel = async () => {

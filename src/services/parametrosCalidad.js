@@ -1,4 +1,5 @@
 import { supabase, assertAdminPermission } from './supabase'
+import { logAudit } from './auditLog'
 
 export const getAllParametrosCalidad = async () => {
   const { data, error } = await supabase
@@ -11,6 +12,13 @@ export const getAllParametrosCalidad = async () => {
 
 export const upsertParametroCalidad = async (payload) => {
   assertAdminPermission('modificar parámetros de calidad')
+
+  // Fetch before state if exists
+  const { data: existingData } = await supabase
+    .from('parametros_calidad')
+    .select('*')
+    .eq('comunidades_autonomas_fk', payload.comunidades_autonomas_fk)
+    .single()
 
   const upsertPayload = {
     comunidades_autonomas_fk: payload.comunidades_autonomas_fk,
@@ -29,5 +37,9 @@ export const upsertParametroCalidad = async (payload) => {
     .single()
 
   if (error) throw error
+
+  const action = existingData ? 'UPDATE' : 'CREATE'
+  logAudit(action, 'parametros_calidad', data.id, existingData, data)
+
   return data
 }

@@ -10,6 +10,7 @@ import AnaliticsEdit from './AnaliticsEdit.vue'
 import CardBoxModal from './CardBoxModal.vue'
 import { usePlantasStore } from '../stores/plantas'
 import { useLoginStore } from '../stores/login'
+import { usePermissions } from '@/composables/usePermissions'
 import { deleteAnalitica, updateAnaliticabyId, supabase } from '@/services/supabase'
 import { useServerPagination } from '@/composables/useServerPagination'
 import useFormSelectData from '../composables/useFormSelectData'
@@ -25,9 +26,9 @@ const plantaStore = usePlantasStore()
 const loginStore = useLoginStore()
 const { error: notifyError } = useNotifications()
 
-const isViewerRole = computed(() => loginStore.userRole === 10 || loginStore.userRole === '10')
-const canEditAnaliticas = computed(() => !isViewerRole.value)
-const canDeleteAnaliticas = computed(() => !isViewerRole.value)
+const { isVisualizador, canWrite, seeAllZones } = usePermissions()
+const canEditAnaliticas = canWrite
+const canDeleteAnaliticas = canWrite
 
 const ORGANOLEPTIC_CORRECT = 1
 
@@ -172,7 +173,7 @@ const toggleExpand = (id) => {
 
 // Obtener las zonas del usuario logueado (similar a implementación original)
 const userZonas = computed(() => {
-  if (loginStore.userRole === 'admin' || loginStore.userRole === 99 || loginStore.userRole === '99') {
+  if (seeAllZones.value) {
     return null
   }
 

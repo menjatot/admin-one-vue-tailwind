@@ -1,53 +1,38 @@
-// composables/usePermissions.js
-import { ref, computed } from 'vue';
-import { PERMISSIONS, ROLES } from '@/constants/permissions';
+import { computed } from 'vue'
+import { useLoginStore } from '@/stores/login'
 
+// IDs de roles del sistema (tabla `roles`)
+// 1=OPERARIO | 2=GESTOR | 10=VISUALIZADOR | 99=ADMINISTRADOR
 export function usePermissions() {
-  const userPermissions = ref([]);
-  const userRoles = ref([]);
+  const loginStore = useLoginStore()
 
-  // Verificar si tiene un permiso específico
-  const hasPermission = (permission) => {
-    return userPermissions.value.includes(permission);
-  };
+  const role = computed(() => String(loginStore.userRole ?? '').trim())
 
-  // Verificar si tiene un rol específico
-  const hasRole = (role) => {
-    return userRoles.value.includes(role);
-  };
+  const isAdmin        = computed(() => role.value === '99')
+  const isVisualizador = computed(() => role.value === '10')
+  const isGestor       = computed(() => role.value === '2')
+  const isOperario     = computed(() => role.value === '1')
 
-  // Verificar si tiene alguno de los permisos
-  const hasAnyPermission = (permissions) => {
-    return permissions.some(permission => hasPermission(permission));
-  };
+  // Puede escribir analíticas (todos excepto visualizador)
+  const canWrite  = computed(() => role.value !== '' && !isVisualizador.value)
 
-  // Verificar si tiene todos los permisos
-  const hasAllPermissions = (permissions) => {
-    return permissions.every(permission => hasPermission(permission));
-  };
+  // Puede exportar e imprimir informes (todos excepto operario)
+  const canExport = computed(() => role.value !== '' && !isOperario.value)
 
-  // Cargar permisos del usuario
-  const loadUserPermissions = (roles) => {
-    userRoles.value = roles;
-    const permissions = new Set();
-    
-    roles.forEach(roleName => {
-      const role = ROLES[roleName.toUpperCase()];
-      if (role && role.permisos) {
-        role.permisos.forEach(permission => permissions.add(permission));
-      }
-    });
-    
-    userPermissions.value = Array.from(permissions);
-  };
+  // Puede acceder al panel de administración
+  const canAdmin  = computed(() => isAdmin.value)
+
+  // Ve todos los datos sin filtro de zona
+  const seeAllZones = computed(() => isAdmin.value)
 
   return {
-    userPermissions,
-    userRoles,
-    hasPermission,
-    hasRole,
-    hasAnyPermission,
-    hasAllPermissions,
-    loadUserPermissions
-  };
+    isAdmin,
+    isVisualizador,
+    isGestor,
+    isOperario,
+    canWrite,
+    canExport,
+    canAdmin,
+    seeAllZones,
+  }
 }

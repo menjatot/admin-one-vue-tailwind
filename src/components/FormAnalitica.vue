@@ -20,6 +20,7 @@ const {
 } = useNotifications()
 
 const totalizador = ref('')
+const formKey = ref(0)
 
 const esDeposito = computed(() => {
   const puntoId = form.punto_muestreo_fk || props.initialPosition
@@ -67,7 +68,7 @@ const {
 
 const resetForm = () => {
   form.punto_muestreo_fk = ''
-  form.fecha = ''
+  form.fecha = new Date().toISOString().split('T')[0]
   form.color = 1
   form.olor = 1
   form.sabor = 1
@@ -80,7 +81,6 @@ const resetForm = () => {
   form.zona = ''
   form.infraestructura = ''
   form.uo = ''
-  form.type = ''
   totalizador.value = ''
 }
 
@@ -208,6 +208,7 @@ const submitHandler = async () => {
       plantaStore.loadAnaliticas()
       console.log('Datos insertados:', data)
       resetForm()
+      formKey.value++
       emit('closeModal')
       // fiestaConfetti()
 
@@ -449,6 +450,7 @@ watch(
 
     <CardBox v-if="!props.historyOnly">
       <FormKit
+          :key="formKey"
           type="form"
           submit-label="Enviar"
           :submit-attrs="{

@@ -70,8 +70,8 @@ const loginWithMicrosoft = async () => {
       router.push('/unauthorized')
     } else {
       // Usuario existe en la tabla operarios
-      console.log('Usuario autorizado con rol:', operario.type)
-      loginStore.setUserRole(operario.type)
+      console.log('Usuario autorizado con rol:', operario.rol_id)
+      loginStore.setUserRole(operario.rol_id)
       loginStore.setUserId(operario.id)
       router.push('/mapa')
     }

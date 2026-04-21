@@ -11,6 +11,7 @@ import AnaliticsEdit from './AnaliticsEdit.vue'
 // import UserAvatar from '@/components/UserAvatar.vue'
 import { usePlantasStore } from '../stores/plantas'
 import { useLoginStore } from '../stores/login'
+import { usePermissions } from '@/composables/usePermissions'
 // import { getAnaliticas } from '@/services/analiticas'
 import useFormSelectData from '../composables/useFormSelectData'
 import { useAnalyticsLoader } from '../composables/useAnalyticsLoader'
@@ -26,9 +27,9 @@ const plantaStore = usePlantasStore()
 const loginStore = useLoginStore()
 const { loadAnalytics, loading: analyticsLoading } = useAnalyticsLoader()
 
-const isViewerRole = computed(() => loginStore.userRole === 10 || loginStore.userRole === '10')
-const canEditAnaliticas = computed(() => !isViewerRole.value)
-const canDeleteAnaliticas = computed(() => !isViewerRole.value)
+const { canWrite, seeAllZones } = usePermissions()
+const canEditAnaliticas = canWrite
+const canDeleteAnaliticas = canWrite
 
 const ORGANOLEPTIC_CORRECT = 1
 // const ORGANOLEPTIC_WRONG = 0
@@ -161,7 +162,7 @@ const currentPage = ref(0)
 // Obtener las zonas del usuario logueado
 const userZonas = computed(() => {
   // Si el rol del usuario es admin (antes era 99), no filtramos por zona (puede ver todo)
-  if (loginStore.userRole === 'admin' || loginStore.userRole === 99 || loginStore.userRole === '99') {
+  if (seeAllZones.value) {
     return null
   }
 
@@ -214,7 +215,7 @@ const checkAnaliticaUserZonas = (analitica, userZonasArray) => {
 const analiticsFiltered = computed(() =>
   plantaStore.getAnaliticas.filter((analitica) => {
     // Restricción por zona según el rol del usuario
-    const isAdmin = loginStore.userRole === 'admin' || loginStore.userRole === 99 || loginStore.userRole === '99'
+    const isAdmin = seeAllZones.value
     const zonaFilter = 
       isAdmin || // Administrador ve todo
       checkAnaliticaUserZonas(analitica, userZonas.value) // Comprobar array de zonas del operario

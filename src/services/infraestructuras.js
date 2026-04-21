@@ -1,12 +1,13 @@
 import { supabase } from "./supabase";
 import { useNotifications } from '@/composables/useNotifications'
+import { logAudit } from './auditLog'
 
 const { error: notifyError } = useNotifications()
 
 
 export const createInfraestructura = async (infraestructura) => {
   try {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('infraestructuras')
       .insert({
         sinac_id: infraestructura.sinac_id ?? null,
@@ -17,23 +18,36 @@ export const createInfraestructura = async (infraestructura) => {
       .select()
       .single()
 
+    if (error) throw error
+
+    logAudit('CREATE', 'infraestructuras', data.id, null, data)
+
     return data
   } catch (error) {
-    console.error('Error en setZona:', error)
+    console.error('Error en createInfraestructura:', error)
     throw error
   }
 }   
 
 export const anularInfraestructura = async (id) => {
     try {
-    const { data } = await supabase
-    .from('infraestructuras')
-    .update({ activo: false })
-    .eq('id', id)
-    .single()
+        // Fetch before state
+        const { data: beforeData } = await supabase
+          .from('infraestructuras')
+          .select('*')
+          .eq('id', id)
+          .single()
 
-    return data
-} catch (error) {
+        const { data } = await supabase
+        .from('infraestructuras')
+        .update({ activo: false })
+        .eq('id', id)
+        .single()
+
+        logAudit('DELETE', 'infraestructuras', id, beforeData, { ...beforeData, activo: false })
+
+        return data
+    } catch (error) {
     console.error('Error en anularInfraestructura:', error)
     throw error
 }
@@ -74,6 +88,13 @@ export const syncZonasInfraestructura = async (infraId, zonaIds) => {
 export const updateInfraestructura = async (id) => {
     console.log(id);
     try {
+        // Fetch before state
+        const { data: beforeData } = await supabase
+            .from('infraestructuras')
+            .select('*')
+            .eq('id', id.id)
+            .single()
+
         const { data } = await supabase
             .from('infraestructuras')
             .update({
@@ -83,6 +104,8 @@ export const updateInfraestructura = async (id) => {
                 operador: id.operador })
             .eq('id', id.id)
             .single()
+
+        logAudit('UPDATE', 'infraestructuras', id.id, beforeData, data)
 
         return data
 

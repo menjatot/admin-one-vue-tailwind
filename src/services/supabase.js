@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { logAudit } from './auditLog'
 // import {corsHeaders} from '../helpers/cors'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -125,17 +126,33 @@ export const searchZonasOperarios = async (id) => {
 export const deleteAnalitica = async (id) => {
   assertAnaliticaMutationPermission('borrar')
 
+  // Fetch before state
+  const { data: beforeData } = await supabase
+    .from('analiticas')
+    .select('*')
+    .eq('id', id)
+    .single()
+
   const { error } = await supabase
       .from('analiticas')
       .delete()
       .eq('id', id)
 
-     if (error) throw error
+  if (error) throw error
+
+  logAudit('DELETE', 'analiticas', id, beforeData, null)
 }
 
 export const updateAnaliticabyId = async (id, data) => {
   try {
     assertAnaliticaMutationPermission('editar')
+
+    // Fetch before state
+    const { data: beforeData } = await supabase
+      .from('analiticas')
+      .select('*')
+      .eq('id', id)
+      .single()
 
     console.log('updateAnaliticabyId: ',id, data);
     // Limpiar datos antes de actualizar
@@ -162,13 +179,15 @@ export const updateAnaliticabyId = async (id, data) => {
 
     if (error) throw error
 
+    logAudit('UPDATE', 'analiticas', id, beforeData, updateData?.[0])
+
     return updateData
   } catch (error) {
     console.error('Error en updateAnaliticabyId:', error)
     throw error
   }
 
- 
+
 }
 // export const deleteAnalitica = async (id) => {
 //   const { data, error } = await supabase

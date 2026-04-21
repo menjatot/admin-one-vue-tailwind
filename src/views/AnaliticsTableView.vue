@@ -13,6 +13,7 @@ import useExtractdata from '@/composables/useUploadFormData';
 import BaseIcon from '@/components/BaseIcon.vue';
 
 import AdvancedExportControls from '@/components/AdvancedExportControls.vue';
+import { usePermissions } from '@/composables/usePermissions';
 
 const tablaAnaliticas = ref();
 const plantasStore = usePlantasStore();
@@ -21,18 +22,7 @@ const { exportXMLData } = useExtractdata();
 const selectedZona= ref(null);
 const useServerSide = ref(true); // Toggle para alternar entre implementaciones
 
-const isAdminRole = computed(() => {
-  const normalizedRole = String(loginStore.userRole ?? '').trim().toLowerCase();
-  return normalizedRole === '99' || normalizedRole === 'admin';
-});
-
-const isVisualizadorRole = computed(() => {
-  return loginStore.userRole === 10 || loginStore.userRole === '10';
-});
-
-const canExportAndPrint = computed(() => {
-  return isAdminRole.value || isVisualizadorRole.value;
-});
+const { isAdmin: isAdminRole, canExport: canExportAndPrint } = usePermissions();
 
 const limpiarFiltros = () => {
   tablaAnaliticas.value?.resetForm();

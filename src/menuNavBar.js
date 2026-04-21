@@ -12,7 +12,7 @@ import {
   mdiPipeDisconnected,
   mdiTune,
   mdiHelpCircleOutline,
-  
+  mdiFileDocumentOutline
 } from '@mdi/js'
 
 export default [
@@ -51,6 +51,11 @@ export default [
         icon: mdiTune,
         label: 'Parámetros de Calidad',
         to: {name:'parametrosCalidad'}
+      },
+      {
+        icon: mdiFileDocumentOutline,
+        label: 'Registro de Actividad',
+        to: {name:'auditLog'}
       },
       {
         isDivider: true

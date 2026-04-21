@@ -25,23 +25,15 @@ const form = reactive({
   id_zona: props.client?.id_zona,
   ud_operativa_fk: props.client?.ud_operativa_fk || 1,
   type: props.client?.type || 4,
+  rol_id: props.client?.rol_id || 1,
   id: props.client?.id,
   zonas: [],
-  color: '',
-  olor: [],
-  sabor: '',
-  tipo: '',
-  prueba: '5'
 })
 
 
-const returnTipoOperario = (tipoId) => {
-  return plantasStore.getTipoPersonal.find((tipo) => tipo.id === tipoId)
-}
 
 const submitHandler = () => {
-  // Validar formulario
-  if (!form.name || !form.ud_operativa_fk || !form.type) {
+  if (!form.name || !form.ud_operativa_fk || !form.type || !form.rol_id) {
     console.error('Faltan campos requeridos')
     return false
   }
@@ -52,11 +44,27 @@ const submitHandler = () => {
     email: form.email,
     ud_operativa_fk: form.ud_operativa_fk,
     type: form.type,
+    rol_id: form.rol_id,
     zonas: form.zonas,
     phone: form.phone
   }
   return operarioData
 }
+
+// Tipo de puesto laboral: excluye filas 10 y 99 (ahora son roles del sistema)
+const selectTipoPersonal = computed(() =>
+  plantasStore.getTipoPersonal
+    .filter((t) => t.id !== 10 && t.id !== 99)
+    .map((t) => ({ value: t.id, label: t.tipo.trim() }))
+)
+
+// Roles del sistema
+const selectRoles = computed(() => [
+  { value: 1,  label: 'Operario' },
+  { value: 2,  label: 'Gestor' },
+  { value: 10, label: 'Visualizador' },
+  { value: 99, label: 'Administrador' },
+])
 
 const selectUO = computed(() => {
   return plantasStore.getUnidadesOperativas.map((uo) => {
@@ -94,8 +102,9 @@ watch(
     form.email = newClient?.email
     form.phone = newClient?.phone
     form.id_zona = newClient?.id_zona
-    form.type = newClient?.type
-    form.ud_operativa_fk = newClient?.ud_operativa_fk
+    form.type = newClient?.type ?? 4
+    form.rol_id = newClient?.rol_id ?? 1
+    form.ud_operativa_fk = newClient?.ud_operativa_fk ?? 1
     zonasOperarioSeleccionadas(newClient?.id)
   },
   { immediate: true }
@@ -153,14 +162,20 @@ defineExpose({
 
           <FormKit
             v-model="form.type"
-            :value="returnTipoOperario(form.type)"
-            :options="
-              plantasStore.getTipoPersonal.map((tipo) => ({ value: tipo.id, label: tipo.tipo }))
-            "
             type="select"
-            label="Tipo"
+            label="Tipo de puesto"
             validation="required"
             class="w-full"
+            :options="selectTipoPersonal"
+          />
+
+          <FormKit
+            v-model="form.rol_id"
+            type="select"
+            label="Rol del sistema"
+            validation="required"
+            class="w-full"
+            :options="selectRoles"
           />
         </div>
 

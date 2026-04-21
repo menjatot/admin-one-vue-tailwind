@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { logAudit } from './auditLog'
 
 export const createZona = async (zona) => {
   try {
@@ -12,6 +13,8 @@ export const createZona = async (zona) => {
       })
       .select()
       .single()
+
+    logAudit('CREATE', 'zonas', data.id, null, data)
 
     return data
   } catch (error) {
@@ -32,6 +35,9 @@ export const anularZona = async (id) => {
         console.error('Error SQL:', errorZona)
         throw errorZona
       }
+
+      logAudit('DELETE', 'zonas', id, { id, activa: true }, data)
+
       return data
     } catch (error) {
       console.error('Error en anularUO:', error)
@@ -41,6 +47,13 @@ export const anularZona = async (id) => {
   
 export const updateZona = async (data) => {
     try {
+        // Fetch current state before update
+        const { data: beforeUpdate } = await supabase
+            .from('zonas_abastecimiento')
+            .select('*')
+            .eq('id', data.id)
+            .single()
+
         const { data: updatedData, error: errorZona } = await supabase
         .from('zonas_abastecimiento')
             .update({
@@ -52,11 +65,14 @@ export const updateZona = async (data) => {
         .eq('id', data.id)
         .select()
             .single()
-        
+
         if (errorZona) {
             console.error('Error SQL:', errorZona)
             throw errorZona
         }
+
+        logAudit('UPDATE', 'zonas', data.id, beforeUpdate, updatedData)
+
         return updatedData
     } catch(error) {
         console.log('Error en updateZona:', error)

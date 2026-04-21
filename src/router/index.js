@@ -65,6 +65,12 @@ const routes = [
       name: 'parametrosCalidad',
       component: () => import('@/views/ParametrosCalidadAdminView.vue')
       },
+      {
+        title: 'Registro de Actividad',
+      path: '/admin/audit',
+      name: 'auditLog',
+      component: () => import('@/views/AuditLogView.vue')
+      },
 
 
     ],

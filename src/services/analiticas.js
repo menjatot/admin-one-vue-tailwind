@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { logAudit } from './auditLog'
 
 export const getAnaliticas = async() => {
     const { data } = await supabase.from('analiticas').select('*')
@@ -358,6 +359,9 @@ export const getAnaliticasFilteredCount = async (filters = {}) => {
 }
 
 export const setAnaliticas = async(analitica) => {
-  const { data } = await supabase.from('analiticas').insert(analitica)
+  const { data } = await supabase.from('analiticas').insert(analitica).select()
+
+  logAudit('CREATE', 'analiticas', data?.[0]?.id, null, data?.[0])
+
   return data
 }

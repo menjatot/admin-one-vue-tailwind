@@ -3,6 +3,7 @@ import { computed, ref, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { InteractionRequiredAuthError } from '@azure/msal-browser'
 import { mdiOpenInNew, mdiPlayCircleOutline } from '@mdi/js'
 import { useLoginStore } from '@/stores/login'
+import { usePermissions } from '@/composables/usePermissions'
 import msalInstance from '@/services/msalConfig'
 import LayoutAuthenticated from '@/layouts/LayoutAuthenticated.vue'
 import SectionMain from '@/components/SectionMain.vue'
@@ -21,10 +22,7 @@ const rawServerRelativeFilePath =
 
 const loginStore = useLoginStore()
 
-const isAdminUser = computed(() => {
-	const role = loginStore.userRole
-	return role === 99 || role === '99' || role === 'admin'
-})
+const { isAdmin: isAdminUser } = usePermissions()
 
 const toBase64Url = (value) =>
 	btoa(value)

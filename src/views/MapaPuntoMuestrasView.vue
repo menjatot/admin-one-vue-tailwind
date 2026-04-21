@@ -7,6 +7,7 @@ import { mdiCrosshairsGps, mdiDownload, mdiFilter, mdiFlaskEmptyOutline, mdiMap 
 
 import { usePlantasStore } from '@/stores/plantas'
 import {useLoginStore} from '@/stores/login'
+import { usePermissions } from '@/composables/usePermissions'
 
 import 'leaflet/dist/leaflet.css'
 import 'leaflet.markercluster/dist/MarkerCluster.css'
@@ -32,13 +33,7 @@ const loginStore=useLoginStore()
 const isModalActive = ref(false)
 const historyOnly = ref(false)
 
-const isVisualizadorRole = (role) => {
-  const normalizedRole = String(role ?? '').trim().toLowerCase()
-  return normalizedRole === '10' || normalizedRole === 'visualizador' || Number(role) === 10
-}
-
-const isVisualizador = computed(() => isVisualizadorRole(loginStore.userRole))
-const canCreateAnalitica = computed(() => !isVisualizador.value)
+const { isVisualizador, canWrite: canCreateAnalitica, seeAllZones } = usePermissions()
 const selectedPunto = ref(null)
 const isLoading = ref(false)
 const geoLocationError = ref(null)
@@ -183,7 +178,7 @@ const verAnaliticas = (puntoId) => {
 
 const puntosMuestreo = computed(() => {
   // Si es rol 99, mostrar todos los puntos activos
-  if (Number(loginStore.userRole) === 99) {
+  if (seeAllZones.value) {
     return plantasStore.getPuntosMuestreo.filter((punto) => punto.activo)
   }
   

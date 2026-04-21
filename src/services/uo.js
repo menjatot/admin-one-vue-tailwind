@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { logAudit } from './auditLog'
 
 
 export const getUO = async () => {
@@ -19,6 +20,9 @@ export const anularUO = async (id) => {
       console.error('Error SQL:', errorUO)
       throw errorUO
     }
+
+    logAudit('DELETE', 'uo', id, { id, activo: true }, { id, activo: false })
+
     return data
   } catch (error) {
     console.error('Error en anularUO:', error)
@@ -35,6 +39,9 @@ export const createUO = async (uo) => {
         description: uo.description
       })
       .select()
+
+    logAudit('CREATE', 'uo', data?.[0]?.id, null, data?.[0])
+
     return data
   } catch (error) {
     console.error('Error en createUO:', error)
@@ -67,6 +74,11 @@ export const updateUO = async (data) => {
         .single()
 
       if (errorUO) throw errorUO
+
+      logAudit('UPDATE', 'uo', data.id,
+        { id: data.id, name: data.name, description: data.description },
+        updateData
+      )
 
       return updateData
 
