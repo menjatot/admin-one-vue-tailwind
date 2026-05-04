@@ -66,6 +66,12 @@ const routes = [
       component: () => import('@/views/ParametrosCalidadAdminView.vue')
       },
       {
+        title: 'Centros de Coste',
+      path: '/admin/centros_coste',
+      name: 'centrosCoste',
+      component: () => import('@/views/CentrosCosteAdminView.vue')
+      },
+      {
         title: 'Registro de Actividad',
       path: '/admin/audit',
       name: 'auditLog',

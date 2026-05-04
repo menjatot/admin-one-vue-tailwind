@@ -16,6 +16,7 @@ export const usePlantasStore = defineStore('plantasStore', () => {
   const analiticaToUpdate = ref(null)
   const tipoPersonal = ref([])
   const zonas_personal = ref([])
+  const centrosCoste = ref([])
 
   // onMounted(() => {
   //   loadZonas()
@@ -43,7 +44,8 @@ export const usePlantasStore = defineStore('plantasStore', () => {
         loadInfraestructuras(),
         loadTipoInfraestructura(),
         loadZonasInfraestructuras(),
-        loadTipoPersonal()
+        loadTipoPersonal(),
+        loadCentrosCoste()
       ])
       console.log('📊 Store inicializado (sin analíticas)')
     } catch (error) {
@@ -64,7 +66,8 @@ export const usePlantasStore = defineStore('plantasStore', () => {
         loadInfraestructuras(),
         loadTipoInfraestructura(),
         loadZonasInfraestructuras(),
-        loadTipoPersonal()
+        loadTipoPersonal(),
+        loadCentrosCoste()
       ])
       console.log('📊 Store inicializado (con analíticas)')
     } catch (error) {
@@ -115,36 +118,47 @@ export const usePlantasStore = defineStore('plantasStore', () => {
 
   const loadAnaliticas = async () => {
     try {
-      const { data, error } = await supabase
-        .from('analiticas')
-        .select(`
-          *,
-          puntos_muestreo (
-            id,
-            name,
-            infraestructuras (
-              id,
-              name
-            ),
-            zonas_abastecimiento (
+      const PAGE_SIZE = 1000
+      let allData = []
+      let from = 0
+
+      while (true) {
+        const { data, error } = await supabase
+          .from('analiticas')
+          .select(`
+            *,
+            puntos_muestreo (
               id,
               name,
-              unidades_operativas (
+              infraestructuras (
                 id,
                 name
               ),
-              comunidades_autonomas (
+              zonas_abastecimiento (
                 id,
-                name
+                name,
+                unidades_operativas (
+                  id,
+                  name
+                ),
+                comunidades_autonomas (
+                  id,
+                  name
+                )
               )
             )
-          )
-        `)
-  
-      if (error) throw error
-  
-      if (data) {
-        const mappedData = data.map(item => {
+          `)
+          .range(from, from + PAGE_SIZE - 1)
+
+        if (error) throw error
+        if (!data || data.length === 0) break
+        allData = allData.concat(data)
+        if (data.length < PAGE_SIZE) break
+        from += PAGE_SIZE
+      }
+
+      if (allData.length > 0) {
+        const mappedData = allData.map(item => {
           const puntoMuestreo = item.puntos_muestreo
           const infraestructura = puntoMuestreo?.infraestructuras || {}
           const zonaAbastecimiento = puntoMuestreo?.zonas_abastecimiento || {}
@@ -272,6 +286,11 @@ const loadOperarios = async () => {
     tipo_infraestructura.value = data
   }
 
+  const loadCentrosCoste = async () => {
+    const { data } = await supabase.from('centros_coste').select('*')
+    centrosCoste.value = data ?? []
+  }
+
   const loadInfraestructuras = async () => {
     const PAGE_SIZE = 1000
     let allData = []
@@ -337,6 +356,10 @@ const loadOperarios = async () => {
 
   const getTipoPersonal = computed(() => {
     return tipoPersonal.value
+  })
+
+  const getCentrosCoste = computed(() => {
+    return centrosCoste.value
   })
 
   const getPuntosMuestreoTotal = computed(() => {
@@ -435,6 +458,8 @@ const getZonasOperario = computed(() => {
     initializeStoreWithAnalytics,
     zonas_personal,
     loadZonasOperarios,
-    getZonasOperario
+    getZonasOperario,
+    getCentrosCoste,
+    loadCentrosCoste
   }
 })

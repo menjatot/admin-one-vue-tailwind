@@ -42,6 +42,7 @@ const {
   selectPuntosMuestra,
   selectInfraestructura,
   selectUO,
+  selectCentroCosto,
   operarioPorZona,
   resetForm
 } = useFormSelectData()
@@ -344,6 +345,7 @@ const applyLocalFilters = () => {
   if (localFilters.zona) serverFilters.zona_fk = localFilters.zona
   if (localFilters.infraestructura) serverFilters.infraestructura_fk = localFilters.infraestructura
   if (localFilters.uo) serverFilters.uo_fk = localFilters.uo
+  if (localFilters.centro_coste) serverFilters.centro_coste_fk = localFilters.centro_coste
 
   // Siempre inyectar restricción de zonas para usuarios no admin
   const zonaIds = getUserZonaIds()
@@ -451,6 +453,7 @@ const isResetting = ref(false)
 watch(() => localFilters.uo, async () => {
   if (isInitializing.value || isResetting.value) return
   isResetting.value = true
+  localFilters.centro_coste = null
   localFilters.zona = null
   localFilters.infraestructura = null
   localFilters.punto_muestreo_fk = null
@@ -479,7 +482,7 @@ watch(() => localFilters.infraestructura, async () => {
 })
 
 // Watchers para filtros independientes (sin cascada)
-;['fecha_inicio', 'fecha_final', 'punto_muestreo_fk', 'operario', 'type'].forEach(key => {
+;['fecha_inicio', 'fecha_final', 'punto_muestreo_fk', 'operario', 'type', 'centro_coste'].forEach(key => {
   watch(
     () => localFilters[key],
     () => {
@@ -498,6 +501,10 @@ onMounted(async () => {
   // null (operario not found) and loadData() runs without any filter.
   if (!plantaStore.getOperarios.length) {
     await plantaStore.loadOperarios()
+  }
+
+  if (!plantaStore.getCentrosCoste.length) {
+    await plantaStore.loadCentrosCoste()
   }
 
   const zonaIds = getUserZonaIds()
@@ -578,21 +585,21 @@ onMounted(async () => {
   </div>
 
   <!-- Filtros -->
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+  <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
     <div class="flex flex-col">
       <label class="font-bold mb-1 text-sm text-gray-700 dark:text-gray-300">Fecha Inicio</label>
-      <input 
-        type="date" 
-        v-model="localFilters.fecha_inicio" 
+      <input
+        type="date"
+        v-model="localFilters.fecha_inicio"
         :disabled="loading"
         class="w-full border rounded shadow-sm px-3 py-2 text-sm transition-colors bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-200 border-gray-300 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none disabled:bg-gray-100 disabled:dark:bg-slate-800 disabled:text-gray-400 disabled:cursor-not-allowed"
       />
     </div>
     <div class="flex flex-col">
       <label class="font-bold mb-1 text-sm text-gray-700 dark:text-gray-300">Fecha Final</label>
-      <input 
-        type="date" 
-        v-model="localFilters.fecha_final" 
+      <input
+        type="date"
+        v-model="localFilters.fecha_final"
         :disabled="loading"
         class="w-full border rounded shadow-sm px-3 py-2 text-sm transition-colors bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-200 border-gray-300 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none disabled:bg-gray-100 disabled:dark:bg-slate-800 disabled:text-gray-400 disabled:cursor-not-allowed"
       />
@@ -603,6 +610,16 @@ onMounted(async () => {
         v-model="localFilters.uo"
         :options="selectUO"
         placeholder="Unidad Operativa"
+        class="w-full"
+        :disabled="loading"
+      />
+    </div>
+    <div class="flex flex-col">
+      <label class="font-bold mb-1 text-sm text-gray-700 dark:text-gray-300">Proyecto</label>
+      <AutocompleteSelect
+        v-model="localFilters.centro_coste"
+        :options="selectCentroCosto"
+        placeholder="Proyecto"
         class="w-full"
         :disabled="loading"
       />

@@ -12,7 +12,8 @@ import {
   mdiPipeDisconnected,
   mdiTune,
   mdiHelpCircleOutline,
-  mdiFileDocumentOutline
+  mdiFileDocumentOutline,
+  mdiCurrencyEur
 } from '@mdi/js'
 
 export default [
@@ -51,6 +52,11 @@ export default [
         icon: mdiTune,
         label: 'Parámetros de Calidad',
         to: {name:'parametrosCalidad'}
+      },
+      {
+        icon: mdiCurrencyEur,
+        label: 'Centros de Coste',
+        to: {name:'centrosCoste'}
       },
       {
         icon: mdiFileDocumentOutline,

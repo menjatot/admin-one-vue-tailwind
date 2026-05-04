@@ -157,6 +157,7 @@ const handlePrintHTML = async () => {
   const columns = [
     { label: 'Fecha',              value: a => formatDateForDisplay(a.fecha) },
     { label: 'Punto de Muestreo',  value: a => getPuntoMuestreoNombre(a.punto_muestreo_fk) },
+    { label: 'Operario',           value: a => getOperarioNombre(a.personal_fk) },
     { label: 'Código SINAC',       value: a => a.punto_muestreo_fk },
     { label: 'Cloro (mg/l)',       value: a => a.cloro != null ? a.cloro : '' },
     { label: 'pH',                 value: a => a.ph != null ? a.ph : '' },
@@ -381,6 +382,7 @@ const handleExportExcel = async () => {
   excelData.push([
     'Fecha',
     'Punto de Muestreo',
+    'Operario',
     'Código SINAC',
     'Cloro (mg/l)',
     'pH',
@@ -399,6 +401,7 @@ const handleExportExcel = async () => {
     excelData.push([
       formatDateForDisplay(a.fecha),
       getPuntoMuestreoNombre(a.punto_muestreo_fk),
+      getOperarioNombre(a.personal_fk),
       a.punto_muestreo_fk,
       a.cloro !== null && a.cloro !== undefined ? a.cloro : '',
       a.ph !== null && a.ph !== undefined ? a.ph : '',
@@ -421,6 +424,7 @@ const handleExportExcel = async () => {
   ws['!cols'] = [
     { wch: 12 },  // Fecha
     { wch: 30 },  // Punto de Muestreo
+    { wch: 20 },  // Operario
     { wch: 15 },  // Código SINAC
     { wch: 15 },  // Cloro
     { wch: 10 },  // pH
@@ -467,8 +471,8 @@ const handleExportExcel = async () => {
 
   // Combinar celdas para el título (primera fila)
   ws['!merges'] = [
-    { s: { r: 0, c: 0 }, e: { r: 0, c: 12 } }, // Título
-    { s: { r: 1, c: 0 }, e: { r: 1, c: 12 } }  // Subtítulo
+    { s: { r: 0, c: 0 }, e: { r: 0, c: 13 } }, // Título
+    { s: { r: 1, c: 0 }, e: { r: 1, c: 13 } }  // Subtítulo
   ];
 
   // Agregar la hoja al libro

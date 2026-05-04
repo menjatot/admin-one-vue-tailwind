@@ -1,5 +1,5 @@
 <script setup>
-import { computed, reactive, ref, toValue, watch } from 'vue'
+import { computed, onMounted, reactive, ref, toValue, watch } from 'vue'
 import { mdiBallotOutline, mdiAccount, mdiMail } from '@mdi/js'
 import SectionMain from '@/components/SectionMain.vue'
 import CardBox from '@/components/CardBox.vue'
@@ -19,6 +19,7 @@ import { searchZonasOperarios } from '@/services/supabase'
 import { setOperarios } from '@/services/operarios'
 import OperariosView from '@/views/OperariosView.vue'
 import { FormKit } from '@formkit/vue'
+import SelectAutocomplete from '@/components/SelectAutocomplete.vue'
 
 // const zonasUoOperario = ref([]);
 
@@ -42,6 +43,7 @@ const form = reactive({
   name: props.uo?.name,
   com_autonoma_fk: props.uo?.com_autonoma_fk,
   unidades_operativas_fk: props.uo?.unidades_operativas_fk,
+  centro_coste_fk: props.uo?.centro_coste_fk ?? null,
   zonas: []
 })
 
@@ -76,6 +78,23 @@ const selectUnidadOperativa = computed(() => {
   })
 })
 
+const selectCentroCosto = computed(() => {
+  let centros = plantasStore.getCentrosCoste
+  if (form.unidades_operativas_fk) {
+    centros = centros.filter(cc => cc.uo_fk === Number(form.unidades_operativas_fk))
+  }
+  return centros.map(cc => ({
+    value: cc.id,
+    label: cc.code ? `${cc.code} - ${cc.name}` : cc.name
+  }))
+})
+
+onMounted(async () => {
+  if (!plantasStore.getCentrosCoste.length) {
+    await plantasStore.loadCentrosCoste()
+  }
+})
+
 const zonasPorComunidadAutonoma = (ca) => {
   const comAut = plantasStore.getZonas
     .filter((zona) => zona.com_autonoma_fk === ca)
@@ -102,6 +121,7 @@ watch(
     form.name = newUO?.name
     form.com_autonoma_fk = newUO?.com_autonoma_fk
     form.unidades_operativas_fk = newUO?.unidades_operativas_fk
+    form.centro_coste_fk = newUO?.centro_coste_fk ?? null
     zonasUOSeleccionadas(newUO?.id)
   },
   { inmediate: true }
@@ -172,9 +192,17 @@ defineExpose({
             :options="selectUnidadOperativa"
             type="select"
             label="Unidad Operativa"
-            placeholder="Comunidad Autonoma"
+            placeholder="Unidad Operativa"
             class="w-full"
             option-class="w-full"
+          />
+        </div>
+        <div class="flex flex-col w-full mb-6">
+          <SelectAutocomplete
+            v-model="form.centro_coste_fk"
+            :options="selectCentroCosto"
+            label="Centro de Coste"
+            placeholder="Buscar centro de coste..."
           />
         </div>
 

@@ -1,10 +1,27 @@
 import { supabase } from './supabase'
 import { logAudit } from './auditLog'
 
-export const getAnaliticas = async() => {
-    const { data } = await supabase.from('analiticas').select('*')
-      return data
-    }
+const PAGE_SIZE = 1000
+
+// Paginate a Supabase query to fetch all rows (Supabase caps at 1000 by default)
+const fetchAll = async (query) => {
+  let allData = []
+  let from = 0
+  while (true) {
+    const { data, error } = await query.range(from, from + PAGE_SIZE - 1)
+    if (error) throw error
+    if (!data || data.length === 0) break
+    allData = allData.concat(data)
+    if (data.length < PAGE_SIZE) break
+    from += PAGE_SIZE
+  }
+  return allData
+}
+
+export const getAnaliticas = async () => {
+  const data = await fetchAll(supabase.from('analiticas').select('*'))
+  return data
+}
 
 export const getAnaliticasPaginated = async (options = {}) => {
   const {
@@ -21,23 +38,39 @@ export const getAnaliticasPaginated = async (options = {}) => {
   // **PASO 1: Obtener IDs de puntos de muestreo según filtros de UO/infraestructura/zona**
   let puntosMuestreoIds = null
 
-  // Si hay filtro de UO, infraestructura, zona o zonas (array), hacer query previa
-  if (filters.uo_fk || filters.infraestructura_fk || filters.zona_fk || filters.zonas_fk) {
-    console.log('🔍 Filtros de UO/Infraestructura/Zona detectados, obteniendo puntos de muestreo...')
+  // Si hay filtro de UO, infraestructura, zona, zonas (array) o centro_coste, hacer query previa
+  if (filters.uo_fk || filters.infraestructura_fk || filters.zona_fk || filters.zonas_fk || filters.centro_coste_fk) {
+    console.log('🔍 Filtros de UO/Infraestructura/Zona/CC detectados, obteniendo puntos de muestreo...')
 
-    // Sub-paso 1a: Si hay filtro de UO, primero obtener las zonas de esa UO
+    // Sub-paso 1a: Si hay filtro de centro_coste, obtener las zonas que pertenecen a ese CC
+    if (filters.centro_coste_fk && !filters.zona_fk) {
+      console.log('  🔍 Obteniendo zonas de Centro de Coste:', filters.centro_coste_fk)
+      const ccZonasData = await fetchAll(
+        supabase.from('zonas_abastecimiento').select('id').eq('centro_coste_fk', filters.centro_coste_fk)
+      )
+
+      const ccZonaIds = ccZonasData.map(z => z.id)
+      console.log(`  ✓ Encontradas ${ccZonaIds.length} zonas para CC ${filters.centro_coste_fk}`)
+
+      if (ccZonaIds.length === 0) {
+        return { data: [], count: 0, page, pageSize, totalPages: 0, hasNextPage: false, hasPreviousPage: false }
+      }
+
+      // Inyectar como filtro de zonas (se combina con zonas_fk si existe)
+      if (filters.zonas_fk && filters.zonas_fk.length > 0) {
+        filters.zonas_fk = filters.zonas_fk.filter(id => ccZonaIds.includes(id))
+      } else {
+        filters.zonas_fk = ccZonaIds
+      }
+    }
+
+    // Sub-paso 1b: Si hay filtro de UO, primero obtener las zonas de esa UO
     let zonaIds = null
     if (filters.uo_fk) {
       console.log('  🔍 Obteniendo zonas de UO:', filters.uo_fk)
-      const { data: zonasData, error: zonasError } = await supabase
-        .from('zonas_abastecimiento')
-        .select('id')
-        .eq('unidades_operativas_fk', filters.uo_fk)
-
-      if (zonasError) {
-        console.error('❌ Error obteniendo zonas:', zonasError)
-        throw zonasError
-      }
+      const zonasData = await fetchAll(
+        supabase.from('zonas_abastecimiento').select('id').eq('unidades_operativas_fk', filters.uo_fk)
+      )
 
       zonaIds = zonasData.map(z => z.id)
       console.log(`  ✓ Encontradas ${zonaIds.length} zonas para UO ${filters.uo_fk}:`, zonaIds)
@@ -73,15 +106,9 @@ export const getAnaliticasPaginated = async (options = {}) => {
 
     if (targetZonas.length > 0) {
       console.log('  ➜ Buscando infraestructuras vinculadas a zonas:', targetZonas)
-      const { data: infrasData, error: infrasError } = await supabase
-        .from('zonas_infraestructuras')
-        .select('infraestructuras_fk')
-        .in('zonas_fk', targetZonas)
-
-      if (infrasError) {
-        console.error('❌ Error obteniendo infarestructuras de zonas:', infrasError)
-        throw infrasError
-      }
+      const infrasData = await fetchAll(
+        supabase.from('zonas_infraestructuras').select('infraestructuras_fk').in('zonas_fk', targetZonas)
+      )
 
       const infraIdsSet = new Set(infrasData.map(i => i.infraestructuras_fk))
       const infraIdsArray = Array.from(infraIdsSet)
@@ -96,12 +123,7 @@ export const getAnaliticasPaginated = async (options = {}) => {
       }
     }
 
-    const { data: puntosMuestreo, error: pmError } = await pmQuery
-
-    if (pmError) {
-      console.error('❌ Error obteniendo puntos de muestreo:', pmError)
-      throw pmError
-    }
+    const puntosMuestreo = await fetchAll(pmQuery)
 
     puntosMuestreoIds = puntosMuestreo.map(pm => pm.id)
     console.log(`  ✓ Encontrados ${puntosMuestreoIds.length} puntos de muestreo que cumplen condiciones:`, puntosMuestreoIds)
@@ -207,22 +229,35 @@ export const getAnaliticasFiltered = async (options = {}) => {
   // **PASO 1: Obtener IDs de puntos de muestreo según filtros de UO/infraestructura/zona**
   let puntosMuestreoIds = null
 
-  if (filters.uo_fk || filters.infraestructura_fk || filters.zona_fk || filters.zonas_fk) {
-    console.log('🔍 Filtros de UO/Infraestructura/Zona detectados en getAnaliticasFiltered')
+  if (filters.uo_fk || filters.infraestructura_fk || filters.zona_fk || filters.zonas_fk || filters.centro_coste_fk) {
+    console.log('🔍 Filtros de UO/Infraestructura/Zona/CC detectados en getAnaliticasFiltered')
 
-    // Sub-paso 1a: Si hay filtro de UO, primero obtener las zonas de esa UO
+    // Sub-paso 1a: Si hay filtro de centro_coste, obtener las zonas de ese CC
+    if (filters.centro_coste_fk && !filters.zona_fk) {
+      console.log('  🔍 Obteniendo zonas de Centro de Coste:', filters.centro_coste_fk)
+      const ccZonasData = await fetchAll(
+        supabase.from('zonas_abastecimiento').select('id').eq('centro_coste_fk', filters.centro_coste_fk)
+      )
+
+      const ccZonaIds = ccZonasData.map(z => z.id)
+      console.log(`  ✓ Encontradas ${ccZonaIds.length} zonas para CC ${filters.centro_coste_fk}`)
+
+      if (ccZonaIds.length === 0) return []
+
+      if (filters.zonas_fk && filters.zonas_fk.length > 0) {
+        filters.zonas_fk = filters.zonas_fk.filter(id => ccZonaIds.includes(id))
+      } else {
+        filters.zonas_fk = ccZonaIds
+      }
+    }
+
+    // Sub-paso 1b: Si hay filtro de UO, primero obtener las zonas de esa UO
     let zonaIds = null
     if (filters.uo_fk) {
       console.log('  🔍 Obteniendo zonas de UO:', filters.uo_fk)
-      const { data: zonasData, error: zonasError } = await supabase
-        .from('zonas_abastecimiento')
-        .select('id')
-        .eq('unidades_operativas_fk', filters.uo_fk)
-
-      if (zonasError) {
-        console.error('❌ Error obteniendo zonas:', zonasError)
-        throw zonasError
-      }
+      const zonasData = await fetchAll(
+        supabase.from('zonas_abastecimiento').select('id').eq('unidades_operativas_fk', filters.uo_fk)
+      )
 
       zonaIds = zonasData.map(z => z.id)
       console.log(`  ✓ Encontradas ${zonaIds.length} zonas para UO ${filters.uo_fk}:`, zonaIds)
@@ -249,15 +284,9 @@ export const getAnaliticasFiltered = async (options = {}) => {
 
     if (targetZonas.length > 0) {
       console.log('  ➜ Buscando infraestructuras vinculadas a zonas:', targetZonas)
-      const { data: infrasData, error: infrasError } = await supabase
-        .from('zonas_infraestructuras')
-        .select('infraestructuras_fk')
-        .in('zonas_fk', targetZonas)
-
-      if (infrasError) {
-        console.error('❌ Error obteniendo infarestructuras de zonas:', infrasError)
-        throw infrasError
-      }
+      const infrasData = await fetchAll(
+        supabase.from('zonas_infraestructuras').select('infraestructuras_fk').in('zonas_fk', targetZonas)
+      )
 
       const infraIdsSet = new Set(infrasData.map(i => i.infraestructuras_fk))
       const infraIdsArray = Array.from(infraIdsSet)
@@ -272,12 +301,7 @@ export const getAnaliticasFiltered = async (options = {}) => {
       }
     }
 
-    const { data: puntosMuestreo, error: pmError } = await pmQuery
-
-    if (pmError) {
-      console.error('❌ Error obteniendo puntos de muestreo:', pmError)
-      throw pmError
-    }
+    const puntosMuestreo = await fetchAll(pmQuery)
 
     puntosMuestreoIds = puntosMuestreo.map(pm => pm.id)
     console.log(`  ✓ Encontrados ${puntosMuestreoIds.length} puntos de muestreo en getAnaliticasFiltered`)
@@ -328,12 +352,7 @@ export const getAnaliticasFiltered = async (options = {}) => {
   const orderDirection = sortOrder === 'desc' ? false : true
   query = query.order(sortBy, { ascending: orderDirection })
 
-  const { data, error } = await query
-
-  if (error) {
-    console.error('❌ Error fetching filtered analiticas:', error)
-    throw error
-  }
+  const data = await fetchAll(query)
 
   console.log(`✅ getAnaliticasFiltered exitosa: ${data?.length} analíticas encontradas`)
 

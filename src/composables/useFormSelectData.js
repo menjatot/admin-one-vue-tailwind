@@ -7,7 +7,7 @@ import { supabase } from '@/services/supabase'
 export default function useFormSelectData() {
   const loginStore = useLoginStore()
   const plantasStore = usePlantasStore()
-  const { seeAllZones } = usePermissions()
+  const { seeAllZones, isAdmin, isOperario } = usePermissions()
 
   const findOperarioByUser = (usuarioMail) => {
     // Verificar que existe el store y los datos
@@ -54,7 +54,8 @@ export default function useFormSelectData() {
     operario: '',
     infraestructura: null,
     fecha_inicio: null,
-    fecha_final: null
+    fecha_final: null,
+    centro_coste: null
   })
 
   watch(
@@ -224,22 +225,43 @@ export default function useFormSelectData() {
   )
   
 
-  const operarioPorZona = computed(() => {
-    let operariosRaw = plantasStore.getOperarios
-
-    // 1. Filtrado por Rol (Si no es admin, solo puede verse a sí mismo)
-    if (!seeAllZones.value) {
-      const operario = operarioLogueado.value
-      if (!operario) return []
-      return [{ value: operario.id, label: operario.name }]
-    }
-
-    // 2. Filtrado por UO seleccionada para Administradores
+  const selectCentroCosto = computed(() => {
+    let centros = plantasStore.getCentrosCoste
     if (form.uo) {
-      operariosRaw = operariosRaw.filter((operario) => operario.ud_operativa_fk === Number(form.uo))
+      centros = centros.filter(cc => cc.uo_fk === Number(form.uo))
+    }
+    return centros.map(cc => ({
+      value: cc.id,
+      label: cc.code ? `${cc.code} - ${cc.name}` : cc.name
+    }))
+  })
+
+  const operarioPorZona = computed(() => {
+    const allOperarios = plantasStore.getOperarios
+
+    // 1. Operario: solo se ve a sí mismo
+    if (isOperario.value) {
+      const yo = operarioLogueado.value
+      if (!yo) return []
+      return [{ value: yo.id, label: yo.name }]
     }
 
-    return operariosRaw.map((operario) => ({ value: operario.id, label: operario.name }))
+    // 2. Administrador: ve todos, filtrando por UO si hay una seleccionada
+    if (isAdmin.value) {
+      const base = form.uo
+        ? allOperarios.filter((op) => op.ud_operativa_fk === Number(form.uo))
+        : allOperarios
+      return base.map((op) => ({ value: op.id, label: op.name }))
+    }
+
+    // 3. Otros roles (gestor, visualizador, técnico...):
+    //    ve los operarios que comparten zona con el usuario actual
+    const yo = operarioLogueado.value
+    if (!yo?.zonas?.length) return []
+    const misZonas = new Set(yo.zonas.map((z) => (typeof z === 'object' ? z.id : z)))
+    return allOperarios
+      .filter((op) => op.zonas?.some((z) => misZonas.has(typeof z === 'object' ? z.id : z)))
+      .map((op) => ({ value: op.id, label: op.name }))
   })
 
 
@@ -250,6 +272,7 @@ export default function useFormSelectData() {
     selectZona,
     selectInfraestructura,
     selectPuntosMuestra,
+    selectCentroCosto,
     operarioPorZona,
     findOperarioByUser,
     operarioLogueado,

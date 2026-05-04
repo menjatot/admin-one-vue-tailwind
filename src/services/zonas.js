@@ -9,7 +9,8 @@ export const createZona = async (zona) => {
         id: zona.id,
         name: zona.name,
         com_autonoma_fk: zona.com_autonoma_fk,
-        unidades_operativas_fk: zona.unidades_operativas_fk
+        unidades_operativas_fk: zona.unidades_operativas_fk,
+        centro_coste_fk: zona.centro_coste_fk ?? null
       })
       .select()
       .single()
@@ -57,10 +58,10 @@ export const updateZona = async (data) => {
         const { data: updatedData, error: errorZona } = await supabase
         .from('zonas_abastecimiento')
             .update({
-            // id:data.id,
             name: data.name,
             com_autonoma_fk: data.com_autonoma_fk,
-            unidades_operativas_fk: data.unidades_operativas_fk
+            unidades_operativas_fk: data.unidades_operativas_fk,
+            centro_coste_fk: data.centro_coste_fk ?? null
         })
         .eq('id', data.id)
         .select()

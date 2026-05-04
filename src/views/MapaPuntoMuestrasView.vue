@@ -17,7 +17,7 @@ import { computed, ref, watch } from 'vue'
 import CardBoxModal from '@/components/CardBoxModal.vue'
 import FormAnalitica from '@/components/FormAnalitica.vue'
 import SectionMain from '@/components/SectionMain.vue'
-import { getIconByInfraestructura } from '@/helpers/maps'
+import { getIconByInfraestructura, markerDivIcon } from '@/helpers/maps'
 import L from 'leaflet'
 import 'leaflet.markercluster'
 import { onMounted } from 'vue'
@@ -42,20 +42,6 @@ const map=ref(null)
 const center=ref([39.4679255214283, -0.3762874990439122])
 const zoom = ref(13)
 const userLocation = ref(null)
-const API_KEY_ICONS = import.meta.env.VITE_ICONS_API_KEY
-// Memoized icon factory — only 5 distinct types, so we create each L.icon once
-const iconCache = {}
-const markerIcon = (icon) => {
-  if (iconCache[icon]) return iconCache[icon]
-  iconCache[icon] = L.icon({
-    iconUrl: `https://api.geoapify.com/v1/icon/?type=material&color=blue&icon=${icon}&iconType=awesome&apiKey=${API_KEY_ICONS}`,
-    iconSize: [31, 46],
-    iconAnchor: [15.5, 42],
-    popupAnchor: [0, -45]
-  })
-  return iconCache[icon]
-}
-
 let clusterGroup = null
 let popupOpenHandler = null
 const mapLoaded = ref(false)
@@ -75,9 +61,6 @@ const buildClusterGroup = () => {
     leafletMap.off('popupopen', popupOpenHandler)
     popupOpenHandler = null
   }
-  // Clear icon cache so stale icons (built before infras loaded) are discarded
-  Object.keys(iconCache).forEach((k) => delete iconCache[k])
-
   clusterGroup = L.markerClusterGroup({
     chunkedLoading: true,
     maxClusterRadius: 60,
@@ -93,7 +76,7 @@ const buildClusterGroup = () => {
     if (!punto.posicion) return
 
     const marker = L.marker([punto.posicion.lat, punto.posicion.lon], {
-      icon: markerIcon(getIconByInfraestructura(punto.infraestructura_fk)),
+      icon: markerDivIcon(getIconByInfraestructura(punto.infraestructura_fk)),
       draggable: true,
     })
 
