@@ -2,6 +2,7 @@ import { supabase } from './supabase'
 import { logAudit } from './auditLog'
 
 const PAGE_SIZE = 1000
+const MAX_IN_FILTER = 300
 
 // Paginate a Supabase query to fetch all rows (Supabase caps at 1000 by default)
 const fetchAll = async (query) => {
@@ -16,6 +17,63 @@ const fetchAll = async (query) => {
     from += PAGE_SIZE
   }
   return allData
+}
+
+// Fetch all rows matching an ID set via batched .in() queries (avoids URL length limits)
+const fetchByIdsBatched = async (table, selectQuery, idColumn, ids, buildQuery) => {
+  if (ids.length <= MAX_IN_FILTER) {
+    let query = supabase.from(table).select(selectQuery).in(idColumn, ids)
+    if (buildQuery) query = buildQuery(query)
+    return fetchAll(query)
+  }
+
+  let allData = []
+  for (let i = 0; i < ids.length; i += MAX_IN_FILTER) {
+    const batch = ids.slice(i, i + MAX_IN_FILTER)
+    let query = supabase.from(table).select(selectQuery).in(idColumn, batch)
+    if (buildQuery) query = buildQuery(query)
+    const batchData = await fetchAll(query)
+    allData = allData.concat(batchData)
+  }
+  return allData
+}
+
+// Get puntos_muestreo IDs that belong to given zonas, via infraestructuras join table
+// Batches all .in() queries when zona IDs exceed URL length limits
+const getPuntosMuestreoByZonas = async (targetZonas, infraestructuraFk) => {
+  // Get infraestructuras linked to the target zonas (batched)
+  const infrasData = await fetchByIdsBatched(
+    'zonas_infraestructuras', 'infraestructuras_fk', 'zonas_fk', targetZonas
+  )
+
+  let infraIdsArray = Array.from(new Set(infrasData.map(i => i.infraestructuras_fk)))
+
+  // If a specific infraestructura is requested, intersect
+  if (infraestructuraFk) {
+    infraIdsArray = infraIdsArray.filter(id => id === infraestructuraFk)
+  }
+
+  console.log(`  ➜ Encontradas ${infraIdsArray.length} infraestructuras para las zonas seleccionadas.`)
+
+  // Build puntos_muestreo: query by infraestructura OR by direct zona_fk, both batched
+  const pmIdSet = new Set()
+
+  if (infraIdsArray.length > 0) {
+    const byInfra = await fetchByIdsBatched(
+      'puntos_muestreo', 'id', 'infraestructura_fk', infraIdsArray
+    )
+    byInfra.forEach(pm => pmIdSet.add(pm.id))
+  }
+
+  // Always also check direct zona_fk (legacy data that bypasses the join table)
+  // If infraestructuraFk is set, only match puntos in that specific infraestructura
+  const byZona = await fetchByIdsBatched(
+    'puntos_muestreo', 'id', 'zona_fk', targetZonas,
+    infraestructuraFk ? (q) => q.eq('infraestructura_fk', infraestructuraFk) : undefined
+  )
+  byZona.forEach(pm => pmIdSet.add(pm.id))
+
+  return Array.from(pmIdSet)
 }
 
 export const getAnaliticas = async () => {
@@ -89,44 +147,25 @@ export const getAnaliticasPaginated = async (options = {}) => {
       }
     }
 
-    // Sub-paso 1b: Obtener puntos de muestreo con los filtros correspondientes
-    let pmQuery = supabase
-      .from('puntos_muestreo')
-      .select('id')
-
-    if (filters.infraestructura_fk) {
-      console.log('  ➜ Filtrando por infraestructura_fk:', filters.infraestructura_fk)
-      pmQuery = pmQuery.eq('infraestructura_fk', filters.infraestructura_fk)
-    }
-
+    // Sub-paso 1c: Obtener puntos de muestreo con los filtros correspondientes
     const targetZonas = []
     if (filters.zona_fk) targetZonas.push(filters.zona_fk)
     else if (filters.zonas_fk && filters.zonas_fk.length > 0) targetZonas.push(...filters.zonas_fk)
     else if (zonaIds) targetZonas.push(...zonaIds)
 
     if (targetZonas.length > 0) {
-      console.log('  ➜ Buscando infraestructuras vinculadas a zonas:', targetZonas)
-      const infrasData = await fetchAll(
-        supabase.from('zonas_infraestructuras').select('infraestructuras_fk').in('zonas_fk', targetZonas)
+      console.log('  ➜ Buscando puntos de muestreo por zonas:', targetZonas.length, 'zonas')
+      const pmIds = await getPuntosMuestreoByZonas(targetZonas, filters.infraestructura_fk)
+      puntosMuestreoIds = pmIds
+    } else if (filters.infraestructura_fk) {
+      // Solo filtro de infraestructura (sin zonas)
+      const pmData = await fetchAll(
+        supabase.from('puntos_muestreo').select('id').eq('infraestructura_fk', filters.infraestructura_fk)
       )
-
-      const infraIdsSet = new Set(infrasData.map(i => i.infraestructuras_fk))
-      const infraIdsArray = Array.from(infraIdsSet)
-
-      console.log(`  ➜ Encontradas ${infraIdsArray.length} infraestructuras para las zonas seleccionadas.`)
-      
-      // Filtramos puntos que pertenezcan a las infraestructuras encontradas O tengan directamente la zona guardada (legacy)
-      if (infraIdsArray.length > 0) {
-        pmQuery = pmQuery.or(`infraestructura_fk.in.(${infraIdsArray.join(',')}),zona_fk.in.(${targetZonas.join(',')})`)
-      } else {
-        pmQuery = pmQuery.in('zona_fk', targetZonas)
-      }
+      puntosMuestreoIds = pmData.map(pm => pm.id)
     }
 
-    const puntosMuestreo = await fetchAll(pmQuery)
-
-    puntosMuestreoIds = puntosMuestreo.map(pm => pm.id)
-    console.log(`  ✓ Encontrados ${puntosMuestreoIds.length} puntos de muestreo que cumplen condiciones:`, puntosMuestreoIds)
+    console.log(`  ✓ Encontrados ${puntosMuestreoIds.length} puntos de muestreo que cumplen condiciones`)
 
     // Si no hay puntos de muestreo que cumplan, retornar vacío
     if (puntosMuestreoIds.length === 0) {
@@ -144,50 +183,73 @@ export const getAnaliticasPaginated = async (options = {}) => {
   }
 
   // **PASO 2: Query principal de analíticas**
-  let selectQuery = '*,personal:personal_fk(id, name),punto_muestreo:punto_muestreo_fk(id, name, zona_fk)'
+  const selectQuery = '*,personal:personal_fk(id, name),punto_muestreo:punto_muestreo_fk(id, name, zona_fk)'
   console.log('🔗 Select query:', selectQuery)
 
+  // Helper: apply direct filters to a query
+  const applyDirectFilters = (query) => {
+    if (filters.fecha_inicio) query = query.gte('fecha', filters.fecha_inicio)
+    if (filters.fecha_final) query = query.lte('fecha', filters.fecha_final)
+    if (filters.punto_muestreo_fk) query = query.eq('punto_muestreo_fk', filters.punto_muestreo_fk)
+    if (filters.personal_fk) query = query.eq('personal_fk', filters.personal_fk)
+    if (filters.type) query = query.eq('type', filters.type)
+    if (searchText) query = query.ilike('observaciones', `%${searchText}%`)
+    return query
+  }
+
+  const orderDirection = sortOrder === 'desc' ? false : true
+
+  // If we have a large ID set, batch the .in() query to avoid URL length limits
+  if (puntosMuestreoIds !== null && puntosMuestreoIds.length > MAX_IN_FILTER) {
+    console.log(`  ⚡ Batched query: ${puntosMuestreoIds.length} IDs in batches of ${MAX_IN_FILTER}`)
+
+    const allData = await fetchByIdsBatched(
+      'analiticas',
+      selectQuery,
+      'punto_muestreo_fk',
+      puntosMuestreoIds,
+      applyDirectFilters
+    )
+
+    // Sort
+    allData.sort((a, b) => {
+      const aVal = a[sortBy]
+      const bVal = b[sortBy]
+      if (aVal == null) return 1
+      if (bVal == null) return -1
+      const cmp = aVal < bVal ? -1 : aVal > bVal ? 1 : 0
+      return sortOrder === 'desc' ? -cmp : cmp
+    })
+
+    // Paginate
+    const from = (page - 1) * pageSize
+    const data = allData.slice(from, from + pageSize)
+    const count = allData.length
+
+    console.log(`✅ Query exitosa (batched): ${count} analíticas encontradas, mostrando ${data?.length} en esta página`)
+
+    return {
+      data,
+      count,
+      page,
+      pageSize,
+      totalPages: Math.ceil(count / pageSize),
+      hasNextPage: page * pageSize < count,
+      hasPreviousPage: page > 1
+    }
+  }
+
+  // Standard query with server-side pagination
   let query = supabase
     .from('analiticas')
     .select(selectQuery, { count: 'exact' })
 
-  // Si obtuvimos IDs de puntos de muestreo en el PASO 1, aplicar ese filtro
   if (puntosMuestreoIds !== null) {
     console.log('  ✓ Aplicando filtro punto_muestreo_fk con IDs obtenidos en PASO 1:', puntosMuestreoIds.length, 'IDs')
     query = query.in('punto_muestreo_fk', puntosMuestreoIds)
   }
 
-  // Aplicar filtros directos
-  if (filters.fecha_inicio) {
-    console.log('  ✓ Aplicando filtro fecha_inicio:', filters.fecha_inicio)
-    query = query.gte('fecha', filters.fecha_inicio)
-  }
-  if (filters.fecha_final) {
-    console.log('  ✓ Aplicando filtro fecha_final:', filters.fecha_final)
-    query = query.lte('fecha', filters.fecha_final)
-  }
-  if (filters.punto_muestreo_fk) {
-    console.log('  ✓ Aplicando filtro punto_muestreo_fk directo:', filters.punto_muestreo_fk)
-    query = query.eq('punto_muestreo_fk', filters.punto_muestreo_fk)
-  }
-  if (filters.personal_fk) {
-    console.log('  ✓ Aplicando filtro personal_fk:', filters.personal_fk)
-    query = query.eq('personal_fk', filters.personal_fk)
-  }
-  if (filters.type) {
-    console.log('  ✓ Aplicando filtro type:', filters.type)
-    query = query.eq('type', filters.type)
-  }
-
-  // NOTA: uo_fk, zona_fk e infraestructura_fk ya se manejaron en PASO 1
-
-  // Búsqueda de texto en observaciones
-  if (searchText) {
-    query = query.ilike('observaciones', `%${searchText}%`)
-  }
-
-  // Ordenamiento
-  const orderDirection = sortOrder === 'desc' ? false : true
+  query = applyDirectFilters(query)
   query = query.order(sortBy, { ascending: orderDirection })
 
   // Paginación
@@ -268,42 +330,22 @@ export const getAnaliticasFiltered = async (options = {}) => {
       }
     }
 
-    let pmQuery = supabase
-      .from('puntos_muestreo')
-      .select('id')
-
-    if (filters.infraestructura_fk) {
-      console.log('  ➜ Filtrando por infraestructura_fk:', filters.infraestructura_fk)
-      pmQuery = pmQuery.eq('infraestructura_fk', filters.infraestructura_fk)
-    }
-
     const targetZonas = []
     if (filters.zona_fk) targetZonas.push(filters.zona_fk)
     else if (filters.zonas_fk && filters.zonas_fk.length > 0) targetZonas.push(...filters.zonas_fk)
     else if (zonaIds) targetZonas.push(...zonaIds)
 
     if (targetZonas.length > 0) {
-      console.log('  ➜ Buscando infraestructuras vinculadas a zonas:', targetZonas)
-      const infrasData = await fetchAll(
-        supabase.from('zonas_infraestructuras').select('infraestructuras_fk').in('zonas_fk', targetZonas)
+      console.log('  ➜ Buscando puntos de muestreo por zonas:', targetZonas.length, 'zonas')
+      const pmIds = await getPuntosMuestreoByZonas(targetZonas, filters.infraestructura_fk)
+      puntosMuestreoIds = pmIds
+    } else if (filters.infraestructura_fk) {
+      const pmData = await fetchAll(
+        supabase.from('puntos_muestreo').select('id').eq('infraestructura_fk', filters.infraestructura_fk)
       )
-
-      const infraIdsSet = new Set(infrasData.map(i => i.infraestructuras_fk))
-      const infraIdsArray = Array.from(infraIdsSet)
-
-      console.log(`  ➜ Encontradas ${infraIdsArray.length} infraestructuras para las zonas seleccionadas.`)
-      
-      // Filtramos puntos que pertenezcan a las infraestructuras encontradas O tengan directamente la zona guardada (legacy)
-      if (infraIdsArray.length > 0) {
-        pmQuery = pmQuery.or(`infraestructura_fk.in.(${infraIdsArray.join(',')}),zona_fk.in.(${targetZonas.join(',')})`)
-      } else {
-        pmQuery = pmQuery.in('zona_fk', targetZonas)
-      }
+      puntosMuestreoIds = pmData.map(pm => pm.id)
     }
 
-    const puntosMuestreo = await fetchAll(pmQuery)
-
-    puntosMuestreoIds = puntosMuestreo.map(pm => pm.id)
     console.log(`  ✓ Encontrados ${puntosMuestreoIds.length} puntos de muestreo en getAnaliticasFiltered`)
 
     if (puntosMuestreoIds.length === 0) {
@@ -313,43 +355,58 @@ export const getAnaliticasFiltered = async (options = {}) => {
   }
 
   // **PASO 2: Query principal de analíticas**
-  let selectQuery = '*,personal:personal_fk(id, name),punto_muestreo:punto_muestreo_fk(id, name, zona_fk)'
+  const selectQuery = '*,personal:personal_fk(id, name),punto_muestreo:punto_muestreo_fk(id, name, zona_fk)'
+
+  // Helper: apply direct filters to a query
+  const applyDirectFilters = (query) => {
+    if (filters.fecha_inicio) query = query.gte('fecha', filters.fecha_inicio)
+    if (filters.fecha_final) query = query.lte('fecha', filters.fecha_final)
+    if (filters.punto_muestreo_fk) query = query.eq('punto_muestreo_fk', filters.punto_muestreo_fk)
+    if (filters.personal_fk) query = query.eq('personal_fk', filters.personal_fk)
+    if (filters.type) query = query.eq('type', filters.type)
+    if (searchText) query = query.ilike('observaciones', `%${searchText}%`)
+    return query
+  }
+
+  const orderDirection = sortOrder === 'desc' ? false : true
+
+  // If we have a large ID set, batch the .in() query to avoid URL length limits
+  if (puntosMuestreoIds !== null && puntosMuestreoIds.length > MAX_IN_FILTER) {
+    console.log(`  ⚡ Batched query: ${puntosMuestreoIds.length} IDs in batches of ${MAX_IN_FILTER}`)
+
+    const allData = await fetchByIdsBatched(
+      'analiticas',
+      selectQuery,
+      'punto_muestreo_fk',
+      puntosMuestreoIds,
+      applyDirectFilters
+    )
+
+    // Sort
+    allData.sort((a, b) => {
+      const aVal = a[sortBy]
+      const bVal = b[sortBy]
+      if (aVal == null) return 1
+      if (bVal == null) return -1
+      const cmp = aVal < bVal ? -1 : aVal > bVal ? 1 : 0
+      return sortOrder === 'desc' ? -cmp : cmp
+    })
+
+    console.log(`✅ getAnaliticasFiltered exitosa (batched): ${allData.length} analíticas encontradas`)
+    return allData
+  }
+
+  // Standard query
   let query = supabase
     .from('analiticas')
     .select(selectQuery)
 
-  // Si obtuvimos IDs de puntos de muestreo en el PASO 1, aplicar ese filtro
   if (puntosMuestreoIds !== null) {
     console.log('  ✓ Aplicando filtro punto_muestreo_fk con IDs obtenidos:', puntosMuestreoIds.length, 'IDs')
     query = query.in('punto_muestreo_fk', puntosMuestreoIds)
   }
 
-  // Aplicar filtros directos
-  if (filters.fecha_inicio) {
-    query = query.gte('fecha', filters.fecha_inicio)
-  }
-  if (filters.fecha_final) {
-    query = query.lte('fecha', filters.fecha_final)
-  }
-  if (filters.punto_muestreo_fk) {
-    query = query.eq('punto_muestreo_fk', filters.punto_muestreo_fk)
-  }
-  if (filters.personal_fk) {
-    query = query.eq('personal_fk', filters.personal_fk)
-  }
-  if (filters.type) {
-    query = query.eq('type', filters.type)
-  }
-
-  // NOTA: uo_fk, zona_fk e infraestructura_fk ya se manejaron en PASO 1
-
-  // Búsqueda de texto en observaciones
-  if (searchText) {
-    query = query.ilike('observaciones', `%${searchText}%`)
-  }
-
-  // Ordenamiento
-  const orderDirection = sortOrder === 'desc' ? false : true
+  query = applyDirectFilters(query)
   query = query.order(sortBy, { ascending: orderDirection })
 
   const data = await fetchAll(query)
