@@ -27,7 +27,9 @@ export const upsertParametroCalidad = async (payload) => {
     ph_min: payload.ph_min,
     ph_max: payload.ph_max,
     turbidez_min: payload.turbidez_min,
-    turbidez_max: payload.turbidez_max
+    turbidez_max: payload.turbidez_max,
+    turbidez_min_dc: payload.turbidez_min_dc,
+    turbidez_max_dc: payload.turbidez_max_dc
   }
 
   const { data, error } = await supabase

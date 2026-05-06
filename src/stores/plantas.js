@@ -132,7 +132,8 @@ export const usePlantasStore = defineStore('plantasStore', () => {
               name,
               infraestructuras (
                 id,
-                name
+                name,
+                type
               ),
               zonas_abastecimiento (
                 id,
@@ -171,6 +172,7 @@ export const usePlantasStore = defineStore('plantasStore', () => {
             punto_muestreo_name: puntoMuestreo?.name,
             infraestructura_id: infraestructura?.id,
             infraestructura_name: infraestructura?.name,
+            infraestructura_type: infraestructura?.type,
             zona_id: zonaAbastecimiento?.id,
             zona_name: zonaAbastecimiento?.name,
             unidad_id: unidadOperativa?.id,

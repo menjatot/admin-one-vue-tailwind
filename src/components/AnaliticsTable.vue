@@ -22,6 +22,7 @@ import CardBoxModal from './CardBoxModal.vue'
 import AutocompleteSelect from './AutocompleteSelect.vue'
 import { getAllParametrosCalidad } from '@/services/parametrosCalidad'
 import { DEFAULT_ANALITICA_RANGES, normalizeParametrosCalidad, formatRangeLabel } from '@/constants/parametrosCalidad'
+import { getInfraPinSvg } from '@/helpers/maps'
 
 const plantaStore = usePlantasStore()
 const loginStore = useLoginStore()
@@ -56,7 +57,24 @@ const getRangesForAnalitica = (analitica) => {
 
 const getCloroRangeLabel = (analitica) => formatRangeLabel(getRangesForAnalitica(analitica).cloro)
 const getPhRangeLabel = (analitica) => formatRangeLabel(getRangesForAnalitica(analitica).ph)
-const getTurbidezRangeLabel = (analitica) => formatRangeLabel(getRangesForAnalitica(analitica).turbidez)
+const getTurbidezRangeLabel = (analitica) => {
+  const ranges = getRangesForAnalitica(analitica)
+  const isDC = getInfraTypeFromAnalitica(analitica) === 5
+  return formatRangeLabel({
+    min: isDC ? ranges.turbidez.dcMin : ranges.turbidez.min,
+    max: isDC ? ranges.turbidez.dcMax : ranges.turbidez.max
+  })
+}
+
+const getInfraTypeFromAnalitica = (analitica) => {
+  if (analitica?.infraestructura_type != null) return analitica.infraestructura_type
+  const pmId = analitica?.punto_muestreo_fk
+  if (!pmId) return null
+  const pm = plantaStore.getPuntosMuestreo.find((p) => p.id === pmId)
+  if (!pm?.infraestructura_fk) return null
+  const infra = plantaStore.getInfraestructuras.find((i) => i.id === pm.infraestructura_fk)
+  return infra?.type ?? null
+}
 
 const loadParametrosCalidad = async () => {
   try {
@@ -325,7 +343,10 @@ const isPhWrong = (analitica) => {
 const isTurbidezWrong = (analitica) => {
   if (analitica.turbidez === null || analitica.turbidez === undefined) return false
   const range = getRangesForAnalitica(analitica).turbidez
-  return analitica.turbidez < range.min || analitica.turbidez > range.max
+  const isDC = getInfraTypeFromAnalitica(analitica) === 5
+  const min = isDC ? range.dcMin : range.min
+  const max = isDC ? range.dcMax : range.max
+  return analitica.turbidez < min || analitica.turbidez > max
 }
 const isOrganolepticWrong = (organolepticValue) => {
   if (organolepticValue === null || organolepticValue === undefined) return false
@@ -509,16 +530,16 @@ onMounted(async () => {
     <div class="flex flex-col">
       <label class="font-bold mb-1 text-sm text-gray-700 dark:text-gray-300">Fecha Inicio</label>
       <input 
-        type="date" 
         v-model="filters.fecha_inicio" 
+        type="date" 
         class="w-full border rounded shadow-sm px-3 py-2 text-sm transition-colors bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-200 border-gray-300 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
       />
     </div>
     <div class="flex flex-col">
       <label class="font-bold mb-1 text-sm text-gray-700 dark:text-gray-300">Fecha Final</label>
       <input 
-        type="date" 
         v-model="filters.fecha_final" 
+        type="date" 
         class="w-full border rounded shadow-sm px-3 py-2 text-sm transition-colors bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-200 border-gray-300 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
       />
     </div>
@@ -583,11 +604,12 @@ onMounted(async () => {
         /> -->
           <!-- <input type="checkbox" class="rounded"   @change="allRowsChecked($event)" /> -->
         </th>
+        <th class="w-10 text-center">Infra</th>
         <th class="cursor-pointer" @click="handleSort('fecha')" >Fecha <span v-if="sortKey === 'fecha'">{{ sortDir === 'asc' ? '↑' : '↓' }}</span></th>
         <th class="cursor-pointer" @click="handleSort('punto_muestreo_fk')">Punto Muestreo <span v-if="sortKey === 'punto_muestreo_fk'">{{ sortDir === 'asc' ? '↑' : '↓' }}</span></th>
         <th class="cursor-pointer" @click="handleSort('personal_fk')">Operario<span v-if="sortKey === 'personal_fk'">{{ sortDir === 'asc' ? '↑' : '↓' }}</span></th>
         <th class="cursor-pointer" @click="handleSort('type')">Tipo<span v-if="sortKey === 'type'">{{ sortDir === 'asc' ? '↑' : '↓' }}</span></th>
-        <th class="text-center">
+        <th class="text-center w-10">
           <TableCheckboxCell
             :model-value="showOnlyWrongValues"
             label="Solo valores incorrectos"
@@ -606,6 +628,14 @@ onMounted(async () => {
             @update:model-value="(isChecked) => addAnalitica(analitica, isChecked)"
           />
 
+          <td data-label="Infra" class="text-center">
+            <span
+              v-if="getInfraTypeFromAnalitica(analitica) != null"
+              class="inline-flex items-center justify-center shrink-0"
+              v-html="getInfraPinSvg(getInfraTypeFromAnalitica(analitica), 28)"
+            />
+          </td>
+
           <td data-label="Fecha">
             <!-- <td data-label="Fecha" :class="{'bg-red-400': isWrongValues(analitica)}"> -->
             {{ analitica.fecha }}
@@ -620,7 +650,7 @@ onMounted(async () => {
             {{ getTipoAnalitica(analitica.type) }}
           </td>
 
-          <td>
+          <td class="text-right w-10">
             <BaseButton
               :icon="expandedRows.includes(analitica.id) ? mdiChevronDown : mdiChevronLeft"
               :color="isWrongValues(analitica) ? 'danger' : 'info'"
@@ -629,8 +659,8 @@ onMounted(async () => {
           </td>
         </tr>
         <tr v-if="expandedRows.includes(analitica.id)" :key="`expanded-${analitica.id}`">
-          <td colspan="6" class="p-0 border-b border-gray-200 dark:border-slate-700">
-            <div class="bg-gray-50 dark:bg-slate-800/50 px-5 py-4">
+          <td colspan="7" class="p-0 border-b border-gray-200 dark:border-slate-700 overflow-x-auto">
+            <div class="bg-gray-50 dark:bg-slate-800/50 px-5 py-4 w-full max-w-full min-w-0">
 
               <!-- Header -->
               <div class="flex items-center justify-between mb-4">
@@ -656,7 +686,7 @@ onMounted(async () => {
               </div>
 
               <!-- Metric cards -->
-              <div class="grid grid-cols-3 gap-3 mb-4" :class="{ 'lg:grid-cols-4': analitica.totalizador != null }">
+              <div class="grid grid-cols-3 gap-3 mb-4 min-w-0" :class="{ 'lg:grid-cols-4': analitica.totalizador != null }">
                 <!-- Cloro -->
                 <div
                   :class="[

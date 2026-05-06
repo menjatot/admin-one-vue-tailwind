@@ -1,7 +1,7 @@
 export const DEFAULT_ANALITICA_RANGES = {
   cloro: { min: 0.4, max: 1 },
   ph: { min: 6.5, max: 9.5 },
-  turbidez: { min: 0, max: 4 }
+  turbidez: { min: 0, max: 4, dcMin: 0.8, dcMax: 2 }
 }
 
 const toNumberOrFallback = (value, fallback) => {
@@ -29,7 +29,9 @@ export const normalizeParametrosCalidad = (record) => {
     },
     turbidez: {
       min: toNumberOrFallback(record.turbidez_min, DEFAULT_ANALITICA_RANGES.turbidez.min),
-      max: toNumberOrFallback(record.turbidez_max, DEFAULT_ANALITICA_RANGES.turbidez.max)
+      max: toNumberOrFallback(record.turbidez_max, DEFAULT_ANALITICA_RANGES.turbidez.max),
+      dcMin: toNumberOrFallback(record.turbidez_min_dc, DEFAULT_ANALITICA_RANGES.turbidez.dcMin),
+      dcMax: toNumberOrFallback(record.turbidez_max_dc, DEFAULT_ANALITICA_RANGES.turbidez.dcMax)
     }
   }
 }

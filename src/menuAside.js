@@ -10,9 +10,7 @@ export default [
       {
         label: 'Excel uploader',
         to: '/sinaq',
-        maxRole: 1,
-        minRole: 90
-        // icon: mdiWaterCircle
+        blockedFor: [10, '10']
       },
       {
         label: 'Formulario Analítica',

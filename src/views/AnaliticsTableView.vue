@@ -1,6 +1,5 @@
 <script setup>
 import { mdiFlaskEmptyOutline, mdiFilter, mdiDownload, mdiRocket } from '@mdi/js';
-import SectionMain from '@/components/SectionMain.vue';
 import { computed, ref, watch } from 'vue';
 import { usePlantasStore } from '@/stores/plantas';
 import useLoginStore from '@/stores/login';
@@ -106,7 +105,7 @@ const loadAllAnalyticsForExport = async () => {
 
 <template>
   <LayoutAuthenticated>
-    <SectionMain>
+    <section class="p-6">
       <SectionTitleLineWithButton :icon="mdiFlaskEmptyOutline" title="Analíticas" main>
         <div class="flex flex-wrap gap-2">
           <!-- Toggle Server/Client-Side -->
@@ -157,7 +156,7 @@ const loadAllAnalyticsForExport = async () => {
         </div>
       </SectionTitleLineWithButton>
 
-      <CardBox class="mb-6" has-table>
+      <CardBox class="mb-6 mx-10" has-table>
         <!-- Modo Server-Side (Optimizado) -->
         <AnaliticsTableServerSide 
           v-if="useServerSide"
@@ -200,6 +199,6 @@ const loadAllAnalyticsForExport = async () => {
           </div>
         </div>
       </CardBox>
-    </SectionMain>
+    </section>
   </LayoutAuthenticated>
 </template>

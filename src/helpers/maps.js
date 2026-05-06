@@ -27,6 +27,7 @@ export const getIconByInfraestructura = (infId) => {
     case 2: return 'ring'
     case 3: return 'flask'
     case 4: return 'route'
+    case 5: return 'ring_dc'
     default: return 'faucet'
   }
 }
@@ -37,9 +38,45 @@ export const getIconByInfraestructura = (infId) => {
 const PIN_CONFIG = {
   water:  { path: mdiWaves,        g1: '#42a5f5', g2: '#1565c0', gid: 'pg_water'  },
   ring:   { path: mdiHockeyPuck,      g1: '#26c6da', g2: '#00838f', gid: 'pg_ring'   },
+  ring_dc: { path: mdiHockeyPuck,      g1: '#ffca28', g2: '#f57f17', gid: 'pg_ringdc' },
   flask:  { path: mdiFlask,            g1: '#ab47bc', g2: '#6a1b9a', gid: 'pg_flask'  },
   route:  { path: mdiFaucet,             g1: '#ffa726', g2: '#bf360c', gid: 'pg_route'  },
   faucet: { path: mdiFaucet,           g1: '#78909c', g2: '#263238', gid: 'pg_faucet' },
+}
+
+const ICON_NAME_BY_TYPE = {
+  1: 'water',
+  2: 'ring',
+  3: 'flask',
+  4: 'route',
+  5: 'ring_dc',
+}
+
+export const getInfraPinColors = (typeId) => {
+  const name = ICON_NAME_BY_TYPE[typeId] ?? 'faucet'
+  const config = PIN_CONFIG[name] ?? PIN_CONFIG.faucet
+  return { g1: config.g1, g2: config.g2 }
+}
+
+export const getInfraPinSvg = (typeId, size = 28) => {
+  if (typeId == null) return ''
+  const name = ICON_NAME_BY_TYPE[typeId] ?? 'faucet'
+  const config = PIN_CONFIG[name] ?? PIN_CONFIG.faucet
+  const s = size
+  const pad = s * 0.18
+  const vs = `0 0 ${s} ${s}`
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vs}" width="${s}" height="${s}">
+    <defs>
+      <linearGradient id="tbl_${config.gid}" x1="20%" y1="0%" x2="80%" y2="100%">
+        <stop offset="0%" stop-color="${config.g1}"/>
+        <stop offset="100%" stop-color="${config.g2}"/>
+      </linearGradient>
+    </defs>
+    <circle cx="${s/2}" cy="${s/2}" r="${s/2}" fill="url(#tbl_${config.gid})"/>
+    <g transform="translate(${pad},${pad}) scale(${(s - pad*2)/24})" fill="white" opacity="0.95">
+      <path d="${config.path}"/>
+    </g>
+  </svg>`
 }
 
 const pinSvg = ({ path, g1, g2, gid }) => `

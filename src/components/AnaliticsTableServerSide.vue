@@ -19,6 +19,7 @@ import AutocompleteSelect from './AutocompleteSelect.vue'
 import { useNotifications } from '@/composables/useNotifications'
 import { getAllParametrosCalidad } from '@/services/parametrosCalidad'
 import { DEFAULT_ANALITICA_RANGES, normalizeParametrosCalidad, formatRangeLabel } from '@/constants/parametrosCalidad'
+import { getInfraPinSvg } from '@/helpers/maps'
 
 const checkedRows = ref([])
 const fetchingAll = ref(false)
@@ -85,6 +86,25 @@ defineExpose({
 })
 
 const showOnlyWrongValues = ref(false)
+const wrongAnaliticas = ref([])
+const loadingWrongValues = ref(false)
+
+watch(showOnlyWrongValues, async (show) => {
+  if (show) {
+    loadingWrongValues.value = true
+    try {
+      const allData = await loadAllFilteredData()
+      wrongAnaliticas.value = allData.filter((a) => isWrongValues(a))
+    } catch (e) {
+      console.error('Error fetching all data for wrong values filter:', e)
+      wrongAnaliticas.value = []
+    } finally {
+      loadingWrongValues.value = false
+    }
+  } else {
+    wrongAnaliticas.value = []
+  }
+})
 const expandedRows = ref([])
 const isModalDeleteAnaliticsActive = ref(false)
 const isModalActive = ref(false)
@@ -94,6 +114,21 @@ const refreshing = ref(false)
 
 const volumenCache = ref({})
 const parametrosByComunidad = ref({})
+
+const getInfraTypeFromAnalitica = (analitica) => {
+  if (analitica?.infraestructura_type != null) return analitica.infraestructura_type
+
+  const pmId = analitica?.punto_muestreo_fk
+  if (!pmId) return null
+
+  const pm = plantaStore.getPuntosMuestreo.find((p) => p.id === pmId)
+  if (!pm?.infraestructura_fk) return null
+
+  const infra = plantaStore.getInfraestructuras.find((i) => i.id === pm.infraestructura_fk)
+  return infra?.type ?? null
+}
+
+const isDepositoCabecera = (analitica) => getInfraTypeFromAnalitica(analitica) === 5
 
 const getComunidadIdFromAnalitica = (analitica) => {
   if (analitica?.comunidad_id) return analitica.comunidad_id
@@ -118,7 +153,14 @@ const getRangesForAnalitica = (analitica) => {
 
 const getCloroRangeLabel = (analitica) => formatRangeLabel(getRangesForAnalitica(analitica).cloro)
 const getPhRangeLabel = (analitica) => formatRangeLabel(getRangesForAnalitica(analitica).ph)
-const getTurbidezRangeLabel = (analitica) => formatRangeLabel(getRangesForAnalitica(analitica).turbidez)
+const getTurbidezRangeLabel = (analitica) => {
+  const ranges = getRangesForAnalitica(analitica)
+  const isDC = isDepositoCabecera(analitica)
+  return formatRangeLabel({
+    min: isDC ? ranges.turbidez.dcMin : ranges.turbidez.min,
+    max: isDC ? ranges.turbidez.dcMax : ranges.turbidez.max
+  })
+}
 
 const loadParametrosCalidad = async () => {
   try {
@@ -247,10 +289,10 @@ const getTipoAnalitica = (id) => {
 
 // Computed para filtrar analíticas según el checkbox
 const filteredAnalitics = computed(() => {
-  if (!showOnlyWrongValues.value) {
-    return analitics.value
+  if (showOnlyWrongValues.value) {
+    return wrongAnaliticas.value
   }
-  return analitics.value.filter(analitica => isWrongValues(analitica))
+  return analitics.value
 })
 
 const allRowsChecked = computed(() => {
@@ -276,7 +318,10 @@ const isPhWrong = (analitica) => {
 const isTurbidezWrong = (analitica) => {
   if (analitica.turbidez === null || analitica.turbidez === undefined) return false
   const range = getRangesForAnalitica(analitica).turbidez
-  return analitica.turbidez < range.min || analitica.turbidez > range.max
+  const isDC = isDepositoCabecera(analitica)
+  const min = isDC ? range.dcMin : range.min
+  const max = isDC ? range.dcMax : range.max
+  return analitica.turbidez < min || analitica.turbidez > max
 }
 
 const isOrganolepticWrong = (organolepticValue) => {
@@ -591,8 +636,8 @@ onMounted(async () => {
     <div class="flex flex-col">
       <label class="font-bold mb-1 text-sm text-gray-700 dark:text-gray-300">Fecha Inicio</label>
       <input
-        type="date"
         v-model="localFilters.fecha_inicio"
+        type="date"
         :disabled="loading"
         class="w-full border rounded shadow-sm px-3 py-2 text-sm transition-colors bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-200 border-gray-300 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none disabled:bg-gray-100 disabled:dark:bg-slate-800 disabled:text-gray-400 disabled:cursor-not-allowed"
       />
@@ -600,8 +645,8 @@ onMounted(async () => {
     <div class="flex flex-col">
       <label class="font-bold mb-1 text-sm text-gray-700 dark:text-gray-300">Fecha Final</label>
       <input
-        type="date"
         v-model="localFilters.fecha_final"
+        type="date"
         :disabled="loading"
         class="w-full border rounded shadow-sm px-3 py-2 text-sm transition-colors bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-200 border-gray-300 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none disabled:bg-gray-100 disabled:dark:bg-slate-800 disabled:text-gray-400 disabled:cursor-not-allowed"
       />
@@ -687,19 +732,20 @@ onMounted(async () => {
       <BaseIcon :path="mdiRocket" size="18" />
       <span>Has seleccionado <strong>{{ checkedRows.length }}</strong> analíticas filtradas (en todas las páginas).</span>
     </div>
-    <button @click="checkedRows = []" class="text-xs font-bold hover:underline">Deseleccionar todas</button>
+    <button class="text-xs font-bold hover:underline" @click="checkedRows = []">Deseleccionar todas</button>
   </div>
   <!-- Loading overlay para la tabla -->
   <div class="relative">
-    <div v-if="loading || fetchingAll" class="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10 rounded">
+    <div v-if="loading || fetchingAll || loadingWrongValues" class="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10 rounded">
       <div class="flex items-center gap-2">
         <BaseIcon :path="mdiLoading" class="animate-spin" />
         <span v-if="fetchingAll">Seleccionando todas las analíticas...</span>
+        <span v-else-if="loadingWrongValues">Cargando todas las analíticas para filtrar...</span>
         <span v-else>Cargando datos...</span>
       </div>
     </div>
 
-    <table class="w-full" :class="{ 'opacity-50': loading || fetchingAll }">
+    <table class="w-full" :class="{ 'opacity-50': loading || fetchingAll || loadingWrongValues }">
       <thead>
         <tr>
           <th v-if="checkable" class="text-center w-12" title="Seleccionar todas las analíticas de todas las páginas que cumplan los filtros actuales">
@@ -713,6 +759,7 @@ onMounted(async () => {
               @update:model-value="toggleAllRows"
             />
           </th>
+          <th class="w-10 text-center">Infra</th>
           <th class="cursor-pointer" @click="!loading && handleSort('fecha')">
             Fecha 
             <span v-if="sorting.sortBy === 'fecha'">
@@ -737,7 +784,7 @@ onMounted(async () => {
               {{ sorting.sortOrder === 'asc' ? '↑' : '↓' }}
             </span>
           </th>
-          <th class="text-center">
+          <th class="text-center w-10">
             <TableCheckboxCell
               :model-value="showOnlyWrongValues"
               label="Solo valores incorrectos"
@@ -757,6 +804,14 @@ onMounted(async () => {
               @update:model-value="(isChecked) => addAnalitica(analitica, isChecked)"
             />
 
+            <td data-label="Infra" class="text-center">
+              <span
+                v-if="getInfraTypeFromAnalitica(analitica) != null"
+                class="inline-flex items-center justify-center shrink-0"
+                v-html="getInfraPinSvg(getInfraTypeFromAnalitica(analitica), 28)"
+              />
+            </td>
+
             <td data-label="Fecha">
               {{ analitica.fecha }}
             </td>
@@ -770,7 +825,7 @@ onMounted(async () => {
               {{ getTipoAnalitica(analitica.type) }}
             </td>
 
-            <td>
+            <td class="text-right w-10">
               <BaseButton
                 :icon="expandedRows.includes(analitica.id) ? mdiChevronDown : mdiChevronLeft"
                 :color="isWrongValues(analitica) ? 'danger' : 'info'"
@@ -780,8 +835,8 @@ onMounted(async () => {
             </td>
           </tr>
           <tr v-if="expandedRows.includes(analitica.id)" :key="`expanded-${analitica.id}`">
-            <td colspan="6" class="p-0 border-b border-gray-200 dark:border-slate-700">
-              <div class="bg-gray-50 dark:bg-slate-800/50 px-5 py-4">
+            <td colspan="7" class="p-0 border-b border-gray-200 dark:border-slate-700 overflow-x-auto">
+              <div class="bg-gray-50 dark:bg-slate-800/50 px-5 py-4 w-full max-w-full min-w-0">
 
                 <!-- Header -->
                 <div class="flex items-center justify-between mb-4">
@@ -809,7 +864,7 @@ onMounted(async () => {
                 </div>
 
                 <!-- Metric cards -->
-                <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3 mb-4" :class="{ 'lg:grid-cols-4': analitica.totalizador != null }">
+                <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3 mb-4 min-w-0" :class="{ 'lg:grid-cols-4': analitica.totalizador != null }">
                   <!-- Cloro -->
                   <div
                     :class="[
@@ -979,7 +1034,7 @@ onMounted(async () => {
 
         <!-- Empty state -->
         <tr v-if="!loading && filteredAnalitics.length === 0">
-          <td :colspan="checkable ? 6 : 5" class="text-center py-8 text-gray-500">
+          <td :colspan="checkable ? 7 : 6" class="text-center py-8 text-gray-500">
             {{ showOnlyWrongValues ? 'No hay analíticas con valores incorrectos' : 'No se encontraron analíticas con los filtros aplicados' }}
           </td>
         </tr>
@@ -988,7 +1043,7 @@ onMounted(async () => {
   </div>
 
   <!-- Paginación -->
-  <div class="p-3 lg:px-6 border-t border-gray-100 dark:border-slate-800">
+  <div v-if="!showOnlyWrongValues" class="p-3 lg:px-6 border-t border-gray-100 dark:border-slate-800">
     <BaseLevel>
       <BaseButtons>
         <BaseButton
@@ -1023,6 +1078,9 @@ onMounted(async () => {
         <div>Página {{ paginationInfo.currentPage }} de {{ paginationInfo.totalPages }}</div>
       </div>
     </BaseLevel>
+  </div>
+  <div v-else class="p-3 lg:px-6 border-t border-gray-100 dark:border-slate-800 text-sm text-gray-600">
+    {{ loadingWrongValues ? 'Buscando valores incorrectos...' : `${wrongAnaliticas.length} analítica${wrongAnaliticas.length !== 1 ? 's' : ''} con valores fuera de rango` }}
   </div>
 </template>
 

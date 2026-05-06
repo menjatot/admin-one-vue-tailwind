@@ -16,7 +16,6 @@ import { LMap, LTileLayer, LMarker, LTooltip } from '@vue-leaflet/vue-leaflet'
 import { computed, ref, watch } from 'vue'
 import CardBoxModal from '@/components/CardBoxModal.vue'
 import FormAnalitica from '@/components/FormAnalitica.vue'
-import SectionMain from '@/components/SectionMain.vue'
 import { getIconByInfraestructura, markerDivIcon } from '@/helpers/maps'
 import L from 'leaflet'
 import 'leaflet.markercluster'
@@ -302,7 +301,7 @@ onMounted(async () => {
   </CardBoxModal>
 
   <LayoutAuthenticated>
-    <SectionMain class="pb-0">
+    <section class="p-6 pb-0">
       <SectionTitleLineWithButton :icon="mdiMap" title="Mapa Puntos Muestreo" main>
         <div class="flex gap-2">
           <!-- <BaseButton
@@ -328,7 +327,7 @@ onMounted(async () => {
         <b>Responsive table.</b> Collapses on mobile
       </NotificationBar> -->
 
-      <CardBox has-table class="overflow-hidden -mx-4 sm:-mx-6">
+      <CardBox has-table class="overflow-hidden">
         <div class="relative w-full" style="height: calc(100dvh - 13rem); min-height: 400px;">
 
           <!-- Botón superpuesto sobre el mapa -->
@@ -422,7 +421,7 @@ onMounted(async () => {
       <!-- <CardBox>
         <CardBoxComponentEmpty />
       </CardBox> -->
-    </SectionMain>
+    </section>
   </LayoutAuthenticated>
 </template>
 

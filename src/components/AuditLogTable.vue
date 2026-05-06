@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import {
   mdiChevronLeft,
   mdiChevronRight,
@@ -42,6 +42,20 @@ const filterDateTo = ref('')
 // Expanded rows
 const expandedRows = ref(new Set())
 
+// Debounced user filter
+let userFilterTimer = null
+
+watch(filterUserId, () => {
+  if (userFilterTimer) clearTimeout(userFilterTimer)
+  userFilterTimer = setTimeout(() => {
+    applyFilters()
+  }, 400)
+})
+
+onUnmounted(() => {
+  if (userFilterTimer) clearTimeout(userFilterTimer)
+})
+
 // Entity display names
 const entityNames = {
   operarios: 'Operario',
@@ -50,7 +64,8 @@ const entityNames = {
   infraestructuras: 'Infraestructura',
   puntos_muestreo: 'Punto Muestreo',
   parametros_calidad: 'Parámetro Calidad',
-  analiticas: 'Analítica'
+  analiticas: 'Analítica',
+  centros_coste: 'Centro Coste'
 }
 
 const actionNames = {
@@ -72,7 +87,8 @@ const entityColors = {
   infraestructuras: 'info',
   puntos_muestreo: 'success',
   parametros_calidad: 'danger',
-  analiticas: 'warning'
+  analiticas: 'warning',
+  centros_coste: 'info'
 }
 
 // Computed
@@ -232,6 +248,7 @@ onMounted(() => {
         <select
           v-model="filterEntity"
           class="border border-gray-300 dark:border-gray-600 rounded px-3 py-1.5 text-sm bg-white dark:bg-gray-800 dark:text-gray-100"
+          @change="applyFilters"
         >
           <option value="">Todas</option>
           <option v-for="(name, key) in entityNames" :key="key" :value="key">{{ name }}</option>
@@ -243,6 +260,7 @@ onMounted(() => {
         <select
           v-model="filterAction"
           class="border border-gray-300 dark:border-gray-600 rounded px-3 py-1.5 text-sm bg-white dark:bg-gray-800 dark:text-gray-100"
+          @change="applyFilters"
         >
           <option value="">Todas</option>
           <option v-for="(name, key) in actionNames" :key="key" :value="key">{{ name }}</option>
@@ -265,6 +283,7 @@ onMounted(() => {
           v-model="filterDateFrom"
           type="date"
           class="border border-gray-300 dark:border-gray-600 rounded px-3 py-1.5 text-sm bg-white dark:bg-gray-800 dark:text-gray-100"
+          @change="applyFilters"
         />
       </div>
 
@@ -274,6 +293,7 @@ onMounted(() => {
           v-model="filterDateTo"
           type="date"
           class="border border-gray-300 dark:border-gray-600 rounded px-3 py-1.5 text-sm bg-white dark:bg-gray-800 dark:text-gray-100"
+          @change="applyFilters"
         />
       </div>
 

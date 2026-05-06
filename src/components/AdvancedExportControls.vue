@@ -214,6 +214,8 @@ const handlePrintHTML = async () => {
           table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 10px; }
           th, td { border: 1px solid #ddd; padding: 6px; text-align: left; }
           th { background-color: #00447C; color: white; }
+          th.sortable { cursor: pointer; user-select: none; }
+          th.sortable:hover { background-color: #003060; }
           tr.grupo-nuevo td { border-top: 2px solid #00447C; }
           tr.zone-header-row td { background: #dce8f4; font-weight: bold; color: #00447C; font-size: 11px; border-top: 3px solid #00447C; border-bottom: 1px solid #9ab8d8; letter-spacing: 0.02em; }
           .controls-panel { margin: 14px 0 4px; padding: 10px 14px; background: #f0f4f8; border: 1px solid #c0cfe0; border-radius: 6px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
@@ -267,12 +269,45 @@ const handlePrintHTML = async () => {
           var COLUMN_LABELS = ${JSON.stringify(columns.map(c => c.label))};
           var visibleCols = COLUMN_LABELS.map(function(_, i) { return i; });
           var groupByZona = false;
+          var sortCol = -1;
+          var sortAsc = true;
 
           function renderHeader() {
             var tr = document.querySelector('thead tr');
             tr.innerHTML = visibleCols
-              .map(function(i) { return '<th>' + COLUMN_LABELS[i] + '</th>'; })
+              .map(function(i) {
+                var arrow = '';
+                if (sortCol === i) {
+                  arrow = sortAsc ? ' \u2191' : ' \u2193';
+                }
+                return '<th class="sortable" data-col="' + i + '">' + COLUMN_LABELS[i] + arrow + '</th>';
+              })
               .join('');
+            document.querySelectorAll('thead th.sortable').forEach(function(th) {
+              th.style.cursor = 'pointer';
+              th.style.userSelect = 'none';
+              th.addEventListener('click', function() { handleSort(Number(th.dataset.col)); });
+            });
+          }
+
+          function handleSort(colIndex) {
+            if (sortCol === colIndex) {
+              sortAsc = !sortAsc;
+            } else {
+              sortCol = colIndex;
+              sortAsc = true;
+            }
+            renderBody();
+            renderHeader();
+          }
+
+          function sortValue(row, colIdx) {
+            var v = row.cells[colIdx];
+            if (v === '' || v == null) return -Infinity;
+            if (colIdx === 0) return new Date(row.fecha).getTime();
+            var n = parseFloat(v);
+            if (!isNaN(n) && v.indexOf('/') === -1) return n;
+            return v;
           }
 
           function renderBody() {
@@ -280,6 +315,15 @@ const handlePrintHTML = async () => {
               if (groupByZona) {
                 var zc = (a.zona_name || '').localeCompare(b.zona_name || '', 'es');
                 if (zc !== 0) return zc;
+              }
+              if (sortCol >= 0) {
+                var av = sortValue(a, sortCol);
+                var bv = sortValue(b, sortCol);
+                if (av !== bv) {
+                  if (typeof av === 'number' && typeof bv === 'number') return sortAsc ? av - bv : bv - av;
+                  var sc = String(av).localeCompare(String(bv), 'es', { numeric: true });
+                  return sortAsc ? sc : -sc;
+                }
               }
               if (a.punto_muestreo_fk !== b.punto_muestreo_fk) return a.punto_muestreo_fk - b.punto_muestreo_fk;
               return new Date(a.fecha) - new Date(b.fecha);
