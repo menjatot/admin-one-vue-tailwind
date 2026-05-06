@@ -1,7 +1,7 @@
 <script setup>
-import { defineProps, toRefs } from 'vue';
+import { defineProps, toRefs, ref } from 'vue';
 import BaseIcon from '@/components/BaseIcon.vue';
-import { mdiPrinter, mdiFileExcel } from '@mdi/js';
+import { mdiPrinter, mdiFileExcel, mdiLoading } from '@mdi/js';
 import { usePlantasStore } from '@/stores/plantas';
 import * as XLSX from 'xlsx';
 import { useNotifications } from '@/composables/useNotifications'
@@ -43,6 +43,7 @@ const props = defineProps({
 
 const { selectedRows, allAnaliticasForDateRange, fileNameBase, logoUrl, companyName, selectedZona } = toRefs(props);
 const plantasStore = usePlantasStore();
+const exporting = ref(false)
 
 const getZonaNombre = (zonaId) => {
   if (!zonaId) return '';
@@ -130,13 +131,15 @@ const getAnaliticasParaExportar = () => {
 // ...existing code...
 
 const handlePrintHTML = async () => {
-  if (props.onBeforeExport) {
-    await props.onBeforeExport()
-  }
+  exporting.value = true
+  try {
+    if (props.onBeforeExport) {
+      await props.onBeforeExport()
+    }
 
-  const exportData = getAnaliticasParaExportar();
-  if (!exportData) return;
-  let { analiticas, minDate, maxDate } = exportData;
+    const exportData = getAnaliticasParaExportar();
+    if (!exportData) return;
+    let { analiticas, minDate, maxDate } = exportData;
 
   analiticas = [...analiticas].sort((a, b) => {
     if (a.punto_muestreo_fk !== b.punto_muestreo_fk) {
@@ -339,11 +342,16 @@ const handlePrintHTML = async () => {
   if (printWindow) {
     printWindow.addEventListener('unload', () => URL.revokeObjectURL(blobUrl), { once: true });
   }
+  } finally {
+    exporting.value = false
+  }
 };
 
 const handleExportExcel = async () => {
-  // Llamar a la función de callback antes de exportar (si existe)
-  if (props.onBeforeExport) {
+  exporting.value = true
+  try {
+    // Llamar a la función de callback antes de exportar (si existe)
+    if (props.onBeforeExport) {
     await props.onBeforeExport()
   }
 
@@ -484,6 +492,9 @@ const handleExportExcel = async () => {
 
   // Descargar el archivo
   XLSX.writeFile(wb, fileName);
+  } finally {
+    exporting.value = false
+  }
 };
 
 // const handlePrintHTML = () => {
@@ -578,20 +589,20 @@ const handleExportExcel = async () => {
     <button
       v-if="props.enableHtmlPrint"
       class="inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-medium text-white bg-gradient-to-r from-slate-500 to-slate-700 shadow-md shadow-slate-300/50 dark:shadow-slate-900/40 transition-all duration-200 hover:from-slate-600 hover:to-slate-800 hover:-translate-y-0.5 hover:shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-md"
-      :disabled="selectedRows.length === 0"
+      :disabled="selectedRows.length === 0 || exporting"
       @click="handlePrintHTML"
     >
-      <BaseIcon :path="mdiPrinter" size="16" />
-      <span>Imprimir</span>
+      <BaseIcon :path="exporting ? mdiLoading : mdiPrinter" size="16" :class="{ 'animate-spin': exporting }" />
+      <span>{{ exporting ? 'Exportando...' : 'Imprimir' }}</span>
     </button>
 
     <button
       class="inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-medium text-white bg-gradient-to-r from-green-500 to-emerald-600 shadow-md shadow-green-300/50 dark:shadow-green-900/40 transition-all duration-200 hover:from-green-600 hover:to-emerald-700 hover:-translate-y-0.5 hover:shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-md"
-      :disabled="selectedRows.length === 0"
+      :disabled="selectedRows.length === 0 || exporting"
       @click="handleExportExcel"
     >
-      <BaseIcon :path="mdiFileExcel" size="16" />
-      <span>Excel</span>
+      <BaseIcon :path="exporting ? mdiLoading : mdiFileExcel" size="16" :class="{ 'animate-spin': exporting }" />
+      <span>{{ exporting ? 'Exportando...' : 'Excel' }}</span>
     </button>
   </div>
 </template>

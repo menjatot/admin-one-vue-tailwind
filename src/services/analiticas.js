@@ -38,42 +38,20 @@ const fetchByIdsBatched = async (table, selectQuery, idColumn, ids, buildQuery) 
   return allData
 }
 
-// Get puntos_muestreo IDs that belong to given zonas, via infraestructuras join table
-// Batches all .in() queries when zona IDs exceed URL length limits
+// Get puntos_muestreo IDs that belong to given zonas
+// Uses Supabase RPC to do the join server-side (1 request instead of 30+)
 const getPuntosMuestreoByZonas = async (targetZonas, infraestructuraFk) => {
-  // Get infraestructuras linked to the target zonas (batched)
-  const infrasData = await fetchByIdsBatched(
-    'zonas_infraestructuras', 'infraestructuras_fk', 'zonas_fk', targetZonas
-  )
+  const { data, error } = await supabase.rpc('get_puntos_by_zonas', {
+    zona_ids: targetZonas,
+    infra_id: infraestructuraFk || null
+  })
 
-  let infraIdsArray = Array.from(new Set(infrasData.map(i => i.infraestructuras_fk)))
-
-  // If a specific infraestructura is requested, intersect
-  if (infraestructuraFk) {
-    infraIdsArray = infraIdsArray.filter(id => id === infraestructuraFk)
+  if (error) {
+    console.error('❌ Error en RPC get_puntos_by_zonas:', error)
+    throw error
   }
 
-  console.log(`  ➜ Encontradas ${infraIdsArray.length} infraestructuras para las zonas seleccionadas.`)
-
-  // Build puntos_muestreo: query by infraestructura OR by direct zona_fk, both batched
-  const pmIdSet = new Set()
-
-  if (infraIdsArray.length > 0) {
-    const byInfra = await fetchByIdsBatched(
-      'puntos_muestreo', 'id', 'infraestructura_fk', infraIdsArray
-    )
-    byInfra.forEach(pm => pmIdSet.add(pm.id))
-  }
-
-  // Always also check direct zona_fk (legacy data that bypasses the join table)
-  // If infraestructuraFk is set, only match puntos in that specific infraestructura
-  const byZona = await fetchByIdsBatched(
-    'puntos_muestreo', 'id', 'zona_fk', targetZonas,
-    infraestructuraFk ? (q) => q.eq('infraestructura_fk', infraestructuraFk) : undefined
-  )
-  byZona.forEach(pm => pmIdSet.add(pm.id))
-
-  return Array.from(pmIdSet)
+  return data.map(r => r.punto_id)
 }
 
 export const getAnaliticas = async () => {

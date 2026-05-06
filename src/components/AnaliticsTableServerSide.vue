@@ -306,6 +306,7 @@ const toggleAllRows = async (isChecked) => {
       }
     } catch (error) {
       console.error('Error fetching all filtered data for selection:', error)
+      alert('Error al seleccionar todas las analíticas. Se seleccionaron solo las de la página actual.')
       // Fallback: select only current page if total fetch fails
       checkedRows.value = [...filteredAnalitics.value]
     } finally {
@@ -510,9 +511,10 @@ onMounted(async () => {
   const zonaIds = getUserZonaIds()
   if (zonaIds !== null) {
     applyFilters({ zonas_fk: zonaIds })
-  } else {
-    loadData()
   }
+
+  // Load initial data (applies filters if set above, or loads unfiltered)
+  loadData()
 
   nextTick(() => {
     isInitializing.value = false
@@ -689,14 +691,15 @@ onMounted(async () => {
   </div>
   <!-- Loading overlay para la tabla -->
   <div class="relative">
-    <div v-if="loading" class="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10 rounded">
+    <div v-if="loading || fetchingAll" class="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10 rounded">
       <div class="flex items-center gap-2">
         <BaseIcon :path="mdiLoading" class="animate-spin" />
-        <span>Cargando datos...</span>
+        <span v-if="fetchingAll">Seleccionando todas las analíticas...</span>
+        <span v-else>Cargando datos...</span>
       </div>
     </div>
 
-    <table class="w-full" :class="{ 'opacity-50': loading }">
+    <table class="w-full" :class="{ 'opacity-50': loading || fetchingAll }">
       <thead>
         <tr>
           <th v-if="checkable" class="text-center w-12" title="Seleccionar todas las analíticas de todas las páginas que cumplan los filtros actuales">
