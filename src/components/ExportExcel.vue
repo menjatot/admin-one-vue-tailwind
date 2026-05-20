@@ -98,7 +98,7 @@ const handleDownloadXML = () => {
 const handleDownloadExcel = () => {
   if (selectedRows.value.length === 0) {
     notifyWarning(
-      'Selecciona al menos una analitica para definir el rango de fechas de exportacion a Excel.',
+      'Selecciona al menos una analitica para exportar a Excel.',
       {
         title: 'Seleccion requerida'
       }
@@ -106,6 +106,7 @@ const handleDownloadExcel = () => {
     return;
   }
 
+  // Exportar solo las analíticas seleccionadas (marcadas con checkbox), no todas las filtradas
   let minDate = selectedRows.value[0].fecha;
   let maxDate = selectedRows.value[0].fecha;
 
@@ -114,18 +115,7 @@ const handleDownloadExcel = () => {
     if (row.fecha > maxDate) maxDate = row.fecha;
   });
 
-  const analiticasEnRango = allAnaliticasForDateRange.value.filter(analitica => {
-    return analitica.fecha >= minDate && analitica.fecha <= maxDate;
-  });
-
-  if (analiticasEnRango.length === 0) {
-    notifyWarning('No se han encontrado analiticas en el rango de fechas seleccionado.', {
-      title: 'Sin datos para exportar'
-    })
-    return;
-  }
-
-  const dataForSheet = analiticasEnRango.map(a => ({
+  const dataForSheet = selectedRows.value.map(a => ({
     'Fecha': formatDateForDisplay(a.fecha),
     'Punto de Muestreo': getPuntoMuestreoNombre(a.punto_muestreo_fk),
     'Operario': getOperarioNombre(a),

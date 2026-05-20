@@ -107,12 +107,13 @@ const { warning: notifyWarning } = useNotifications()
 
 const getAnaliticasParaExportar = () => {
   if (selectedRows.value.length === 0) {
-    notifyWarning('Selecciona al menos una analitica para definir el rango de fechas.', {
+    notifyWarning('Selecciona al menos una analitica para exportar.', {
       title: 'Seleccion requerida'
     })
     return null;
   }
 
+  // Exportar solo las analíticas seleccionadas (marcadas con checkbox), no todas las filtradas
   let minDate = selectedRows.value[0].fecha;
   let maxDate = selectedRows.value[0].fecha;
   selectedRows.value.forEach(row => {
@@ -120,17 +121,7 @@ const getAnaliticasParaExportar = () => {
     if (row.fecha > maxDate) maxDate = row.fecha;
   });
 
-  const analiticasFiltradas = allAnaliticasForDateRange.value.filter(analitica => {
-    return analitica.fecha >= minDate && analitica.fecha <= maxDate;
-  });
-
-  if (analiticasFiltradas.length === 0) {
-    notifyWarning('No se han encontrado analiticas en el rango de fechas seleccionado.', {
-      title: 'Sin datos para exportar'
-    })
-    return null;
-  }
-  return { analiticas: analiticasFiltradas, minDate, maxDate };
+  return { analiticas: [...selectedRows.value], minDate, maxDate };
 };
 
 // ...existing code...

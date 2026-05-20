@@ -38,3 +38,4 @@ doppler.yaml
 /sql/
 /.qwen/
 settings.json
+.agents
