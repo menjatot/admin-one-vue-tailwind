@@ -262,8 +262,9 @@ const pagesList = computed(() => {
   return pages
 })
 
-const getNameOperario = (id) => {
-  const operario = plantaStore.getOperarios.find((operario) => operario.id === id)
+const getNameOperario = (analitica) => {
+  if (analitica?.personal?.name) return analitica.personal.name
+  const operario = plantaStore.getOperarios.find((operario) => operario.id === analitica?.personal_fk)
   return operario ? operario.name : 'No asignado'
 }
 
@@ -638,6 +639,7 @@ onMounted(async () => {
       <input
         v-model="localFilters.fecha_inicio"
         type="date"
+        :max="localFilters.fecha_final || undefined"
         :disabled="loading"
         class="w-full border rounded shadow-sm px-3 py-2 text-sm transition-colors bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-200 border-gray-300 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none disabled:bg-gray-100 disabled:dark:bg-slate-800 disabled:text-gray-400 disabled:cursor-not-allowed"
       />
@@ -647,6 +649,7 @@ onMounted(async () => {
       <input
         v-model="localFilters.fecha_final"
         type="date"
+        :min="localFilters.fecha_inicio || undefined"
         :disabled="loading"
         class="w-full border rounded shadow-sm px-3 py-2 text-sm transition-colors bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-200 border-gray-300 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none disabled:bg-gray-100 disabled:dark:bg-slate-800 disabled:text-gray-400 disabled:cursor-not-allowed"
       />
@@ -819,7 +822,7 @@ onMounted(async () => {
               {{ getPuntoMuestreo(analitica.punto_muestreo_fk) }}
             </td>
             <td data-label="Persona">
-              {{ getNameOperario(analitica.personal_fk) }}
+              {{ getNameOperario(analitica) }}
             </td>
             <td data-label="Tipo Analítica" class="lg:w-32">
               {{ getTipoAnalitica(analitica.type) }}

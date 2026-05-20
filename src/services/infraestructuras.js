@@ -1,4 +1,4 @@
-import { supabase } from "./supabase";
+import { supabase, assertAuthenticated } from "./supabase";
 import { useNotifications } from '@/composables/useNotifications'
 import { logAudit } from './auditLog'
 
@@ -6,6 +6,7 @@ const { error: notifyError } = useNotifications()
 
 
 export const createInfraestructura = async (infraestructura) => {
+  assertAuthenticated('crear infraestructuras')
   try {
     const { data, error } = await supabase
       .from('infraestructuras')
@@ -30,6 +31,7 @@ export const createInfraestructura = async (infraestructura) => {
 }   
 
 export const anularInfraestructura = async (id) => {
+    assertAuthenticated('anular infraestructuras')
     try {
         // Fetch before state
         const { data: beforeData } = await supabase
@@ -64,6 +66,7 @@ export const getZonasDeInfraestructura = async (infraId) => {
 }
 
 export const syncZonasInfraestructura = async (infraId, zonaIds) => {
+  assertAuthenticated('sincronizar zonas de infraestructura')
   try {
     await supabase
       .from('zonas_infraestructuras')
@@ -86,6 +89,7 @@ export const syncZonasInfraestructura = async (infraId, zonaIds) => {
 }
 
 export const updateInfraestructura = async (id) => {
+    assertAuthenticated('actualizar infraestructuras')
     console.log(id);
     try {
         // Fetch before state

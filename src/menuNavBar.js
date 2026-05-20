@@ -55,7 +55,7 @@ export default [
       },
       {
         icon: mdiCurrencyEur,
-        label: 'Centros de Coste',
+        label: 'Proyectos',
         to: {name:'centrosCoste'}
       },
       {

@@ -1,4 +1,4 @@
-import { supabase } from './supabase'
+import { supabase, assertAuthenticated } from './supabase'
 import { logAudit } from './auditLog'
 
 const PAGE_SIZE = 1000
@@ -38,20 +38,39 @@ const fetchByIdsBatched = async (table, selectQuery, idColumn, ids, buildQuery) 
   return allData
 }
 
-// Get puntos_muestreo IDs that belong to given zonas
-// Uses Supabase RPC to do the join server-side (1 request instead of 30+)
+// Find all puntos_muestreo IDs linked to the given zonas.
+// Matches both direct (puntos_muestreo.zona_fk) and indirect
+// (via zonas_infraestructuras junction table) relationships.
 const getPuntosMuestreoByZonas = async (targetZonas, infraestructuraFk) => {
-  const { data, error } = await supabase.rpc('get_puntos_by_zonas', {
-    zona_ids: targetZonas,
-    infra_id: infraestructuraFk || null
-  })
-
-  if (error) {
-    console.error('❌ Error en RPC get_puntos_by_zonas:', error)
-    throw error
+  // When a specific infrastructure is selected, match by it directly
+  if (infraestructuraFk) {
+    const data = await fetchAll(
+      supabase.from('puntos_muestreo').select('id').eq('infraestructura_fk', infraestructuraFk)
+    )
+    return data.map(pm => pm.id)
   }
 
-  return data.map(r => r.punto_id)
+  // No specific infra: find puntos linked directly OR indirectly
+  // 1. Get infra IDs linked to target zonas via the junction table
+  const ziData = await fetchAll(
+    supabase.from('zonas_infraestructuras').select('infraestructuras_fk').in('zonas_fk', targetZonas)
+  )
+
+  const infraIds = [...new Set((ziData ?? []).map(r => r.infraestructuras_fk))]
+
+  // 2. Query puntos_muestreo with OR condition matching the frontend logic
+  let query = supabase.from('puntos_muestreo').select('id')
+
+  if (infraIds.length > 0) {
+    const zonaStr = targetZonas.join(',')
+    const infraStr = infraIds.join(',')
+    query = query.or(`zona_fk.in.(${zonaStr}),infraestructura_fk.in.(${infraStr})`)
+  } else {
+    query = query.in('zona_fk', targetZonas)
+  }
+
+  const data = await fetchAll(query)
+  return data.map(pm => pm.id)
 }
 
 export const getAnaliticas = async () => {
@@ -413,6 +432,7 @@ export const getAnaliticasFilteredCount = async (filters = {}) => {
 }
 
 export const setAnaliticas = async(analitica) => {
+  assertAuthenticated('crear analíticas')
   const { data } = await supabase.from('analiticas').insert(analitica).select()
 
   logAudit('CREATE', 'analiticas', data?.[0]?.id, null, data?.[0])

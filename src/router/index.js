@@ -66,7 +66,7 @@ const routes = [
       component: () => import('@/views/ParametrosCalidadAdminView.vue')
       },
       {
-        title: 'Centros de Coste',
+        title: 'Proyectos',
       path: '/admin/centros_coste',
       name: 'centrosCoste',
       component: () => import('@/views/CentrosCosteAdminView.vue')
@@ -85,7 +85,7 @@ const routes = [
     meta: {
       title: 'Aqlara Home',
       requiresAuth: true,
-      blockedRoles: [10, '10']
+      blockedRoles: [1, '1', 10, '10']
     },
     path: '/',
     name: 'home',
@@ -126,7 +126,8 @@ const routes = [
   
   {
     meta: {
-      title: 'Tables'
+      title: 'Tables',
+      requiresAuth: true
     },
     path: '/tables',
     name: 'tables',
@@ -162,7 +163,8 @@ const routes = [
   },
   {
     meta: {
-      title: 'Profile'
+      title: 'Profile',
+      requiresAuth: true
     },
     path: '/profile',
     name: 'profile',
@@ -170,7 +172,8 @@ const routes = [
   },
   {
     meta: {
-      title: 'Ui'
+      title: 'Ui',
+      requiresAuth: true
     },
     path: '/ui',
     name: 'ui',
@@ -178,7 +181,8 @@ const routes = [
   },
   {
     meta: {
-      title: 'Responsive layout'
+      title: 'Responsive layout',
+      requiresAuth: true
     },
     path: '/responsive',
     name: 'responsive',
@@ -204,7 +208,7 @@ const routes = [
     meta: {
       title: 'Sinaq',
       requiresAuth: true,
-      blockedRoles: [10, '10']
+      blockedRoles: [1, '1', 10, '10']
     },
     path: '/sinaq',
     name: 'sinaq',

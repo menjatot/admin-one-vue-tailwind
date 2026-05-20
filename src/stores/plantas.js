@@ -196,7 +196,7 @@ export const usePlantasStore = defineStore('plantasStore', () => {
 const loadOperarios = async () => {
   try {
     const { data: operariosData, error } = await supabase.from('personal').select('*')
-    
+
     if (error) throw error
 
     const PAGE_SIZE = 1000
@@ -213,8 +213,8 @@ const loadOperarios = async () => {
       from += PAGE_SIZE
     }
 
-    // Enriquecer cada operario con sus zonas asignadas
-    operarios.value = operariosData.map(operario => {
+    // Enriquecer cada operario del query normal con sus zonas
+    const enrichedOperarios = (operariosData || []).map(operario => {
       const relacionesZonas = allZonasPersonal
         .filter(relacion => relacion.personal_fk === operario.id)
         .map(relacion => relacion.zonas_fk)
@@ -223,10 +223,40 @@ const loadOperarios = async () => {
         zonas: relacionesZonas || []
       }
     })
-    
+
+    // Suplementar con RPC (solo id+name) para operarios bloqueados por RLS
+    // La RPC es SECURITY DEFINER: expone datos minimos sin comprometer seguridad
+    try {
+      const { data: rpcData, error: rpcError } = await supabase.rpc('get_operarios_basic')
+      if (!rpcError && rpcData && rpcData.length > 0) {
+        const existingIds = new Set(enrichedOperarios.map(o => o.id))
+        const missingOperarios = rpcData
+          .filter(r => !existingIds.has(r.id))
+          .map(r => ({ id: r.id, name: r.name, zonas: [] }))
+
+        operarios.value = [...enrichedOperarios, ...missingOperarios]
+        console.log(`📊 Operarios: ${enrichedOperarios.length} directos + ${missingOperarios.length} via RPC`)
+        return operarios.value
+      }
+    } catch (rpcErr) {
+      console.warn('RPC suplementaria fallo:', rpcErr)
+    }
+
+    operarios.value = enrichedOperarios
     return operarios.value
   } catch (error) {
     console.error('Error cargando operarios:', error)
+    // Fallback completo a RPC
+    try {
+      const { data: rpcData, error: rpcError } = await supabase.rpc('get_operarios_basic')
+      if (!rpcError && rpcData && rpcData.length > 0) {
+        operarios.value = rpcData.map(op => ({ id: op.id, name: op.name, zonas: [] }))
+        console.log(`✅ Cargados ${operarios.value.length} operarios via RPC (fallback)`)
+        return operarios.value
+      }
+    } catch (rpcErr) {
+      console.warn('RPC fallback no disponible:', rpcErr)
+    }
     return []
   }
 }

@@ -1,7 +1,8 @@
-import { supabase } from './supabase'
+import { supabase, assertAuthenticated } from './supabase'
 import { logAudit } from './auditLog'
 
 export const createPuntoMuestreo = async (data) => {
+    assertAuthenticated('crear puntos de muestreo')
     const { data: puntoMuestreo, error } = await supabase
         .from('puntos_muestreo')
         .insert({
@@ -23,6 +24,7 @@ export const createPuntoMuestreo = async (data) => {
 }
 
 export const anularPuntoMuestreo = async (id) => {
+    assertAuthenticated('anular puntos de muestreo')
     const { data: beforeData } = await supabase
         .from('puntos_muestreo')
         .select('*')
@@ -43,6 +45,7 @@ export const anularPuntoMuestreo = async (id) => {
 }
 
 export const updatePuntoMuestreo = async (data) => {
+    assertAuthenticated('actualizar puntos de muestreo')
     const { data: beforeData } = await supabase
         .from('puntos_muestreo')
         .select('*')

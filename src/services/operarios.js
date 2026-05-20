@@ -1,4 +1,4 @@
-import { supabase } from './supabase'
+import { supabase, assertAuthenticated } from './supabase'
 import { logAudit } from './auditLog'
 
 export const getOperarios = async () => {
@@ -12,6 +12,7 @@ export const getOperarios = async () => {
 // }
 
 export const setOperarios = async (operario) => {
+  assertAuthenticated('crear operarios')
   try {
     // 1. Insertar operario y obtener ID
     const { data: newOperario, error: errorOperario } = await supabase
@@ -68,6 +69,7 @@ export const setOperarios = async (operario) => {
 // }
 
 export const deleteOperario = async (id) => {
+  assertAuthenticated('eliminar operarios')
   try {
     // 0. Fetch operario data before deletion for audit
     const { data: operarioToDelete } = await supabase
@@ -105,6 +107,7 @@ export const deleteOperario = async (id) => {
 
 
 export const updateOperariobyId = async (data) => {
+  assertAuthenticated('actualizar operarios')
   try {
     // 0. Fetch current state before update for audit
     const { data: beforeUpdate } = await supabase

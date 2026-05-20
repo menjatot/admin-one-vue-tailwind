@@ -190,7 +190,7 @@ defineExpose({ openModal })
       <tbody>
         <tr v-if="centrosCosteActivos.length === 0">
           <td colspan="4" class="text-center text-gray-500 py-6 italic">
-            No hay centros de coste disponibles
+            No hay proyectos disponibles
           </td>
         </tr>
         <tr v-for="cc in centrosCosteActivos" :key="cc.id">

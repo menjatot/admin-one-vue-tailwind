@@ -1,4 +1,4 @@
-import { supabase } from './supabase'
+import { supabase, assertAdminPermission } from './supabase'
 import { useLoginStore } from '@/stores/login'
 
 /**
@@ -63,6 +63,7 @@ export const getAuditLogs = async ({
   sortBy = 'created_at',
   sortOrder = 'desc'
 } = {}) => {
+  assertAdminPermission('consultar el registro de actividad')
   let query = supabase.from('audit_log').select('*', { count: 'exact' })
 
   // Apply filters

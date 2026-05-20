@@ -296,8 +296,9 @@ const pagesList = computed(() => {
   return pagesList
 })
 
-const getNameOperario = (id) => {
-  const operario = plantasStore.getOperarios.find((operario) => operario.id === id)
+const getNameOperario = (analitica) => {
+  if (analitica?.personal?.name) return analitica.personal.name
+  const operario = plantasStore.getOperarios.find((operario) => operario.id === analitica?.personal_fk)
   return operario ? operario.name : 'No asignado'
 }
 
@@ -644,7 +645,7 @@ onMounted(async () => {
             {{ getPuntoMuestreo(analitica.punto_muestreo_fk) }}
           </td>
           <td data-label="Persona">
-            {{ getNameOperario(analitica.personal_fk) }}
+            {{ getNameOperario(analitica) }}
           </td>
           <td data-label="Tipo Analítica" class="lg:w-32">
             {{ getTipoAnalitica(analitica.type) }}

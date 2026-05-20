@@ -10,39 +10,39 @@ import LayoutGuest from '@/layouts/LayoutGuest.vue'
 import msalInstance from '@/services/msalConfig'
 import useLoginStore from '@/stores/login'
 import AqlaraLogo from '@/components/AqlaraLogo.vue'
-import { usePlantasStore } from '@/stores/plantas'
+import { supabase } from '@/services/supabase'
 
 const router = useRouter()
 const loginStore = useLoginStore()
-const plantaStore = usePlantasStore()
 
 const isAuthenticating = ref(false)
 const errorMessage = ref('')
 const accessToken = ref('')
 
-const submit = () => {
-  router.push('/')
-}
+const submit = () => {}
 
-// Función para determinar el rol según el email (puedes modificar el criterio)
 const determineRoleFromAccount = async (userEmail) => {
   const email = userEmail.toLowerCase()
-  const operario = await plantaStore.getOperarios.find((operario) => operario.email === email)
 
-  if (!operario) {
+  // Usar RPC SECURITY DEFINER que salta el RLS (el rol aun no esta seteado)
+  const { data, error } = await supabase.rpc('get_operario_by_email', { p_email: email })
+
+  if (error) {
+    console.warn('Error en RPC get_operario_by_email:', error)
+    return null
+  }
+
+  if (!data || data.length === 0) {
     console.log('No se encontró el operario', email)
     return null
   }
 
-  console.log('Operario encontrado', operario)
-
-  return operario
+  console.log('Operario encontrado via RPC:', data[0])
+  return data[0]
 }
 
 const loginWithMicrosoft = async () => {
-  if (isAuthenticating.value) {
-    return
-  }
+  if (isAuthenticating.value) return
   isAuthenticating.value = true
   errorMessage.value = ''
 
@@ -54,25 +54,25 @@ const loginWithMicrosoft = async () => {
     accessToken.value = loginResponse.accessToken
     console.log('Login RESPONSE: ', loginResponse)
 
-    // Guardar datos básicos en el store
-    console.log('Login successful:', loginResponse)
-    loginStore.login(loginResponse.account)
     loginStore.setIsAuthenticated(true)
     loginStore.setAccount(loginResponse.account)
     loginStore.setUser(loginResponse.account)
 
-    // Verificar si el usuario existe en la tabla operarios
+    // Esperar a que login() complete (carga perfil MS, establece contexto auth basico)
+    await loginStore.login(loginResponse.account)
+    console.log('Login successful:', loginResponse)
+
+    // Ahora determinar el rol usando RPC que salta el RLS
     const operario = await determineRoleFromAccount(loginResponse.account.username)
 
     if (!operario) {
-      // Usuario no existe en la tabla operarios
       console.log('Usuario no autorizado: no existe en tabla operarios')
       router.push('/unauthorized')
     } else {
-      // Usuario existe en la tabla operarios
       console.log('Usuario autorizado con rol:', operario.rol_id)
       loginStore.setUserRole(operario.rol_id)
       loginStore.setUserId(operario.id)
+      // setUserRole ya llama a initializeStore() con el rol correcto
       router.push('/mapa')
     }
   } catch (error) {
@@ -80,7 +80,6 @@ const loginWithMicrosoft = async () => {
     errorMessage.value = `LOGIN FAILED ${error.message}`
 
     if (error.name === 'BrowserAuthError' && error.message.includes('interaction_in_progress')) {
-      // Intentar limpiar el estado de interacción pendiente
       msalInstance.handleRedirectPromise().then(() => {
         errorMessage.value = 'Sesión en progreso, por favor intente nuevamente'
       })

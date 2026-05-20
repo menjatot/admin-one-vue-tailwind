@@ -121,9 +121,8 @@ export const useLoginStore = defineStore('loginStore', () => {
         // Enviar analíticas guardadas offline (auth context ya está listo)
         syncOfflineAnaliticas()
 
-        // Re-inicializar el store de plantas para cargar solo los datos autorizados
-        const plantasStore = usePlantasStore()
-        await plantasStore.initializeStore()
+        // NOTA: initializeStore() se pospone hasta que setUserRole() determine el rol
+        // para evitar cargar datos con contexto de rol vacio
       }
     } catch (error) {
       console.error('Error en login:', error)

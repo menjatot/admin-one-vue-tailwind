@@ -37,7 +37,12 @@ const { warning: notifyWarning, info: notifyInfo } = useNotifications()
 
 // --- Lógica para formatear datos para Excel (similar a la propuesta anterior) ---
 const getPuntoMuestreoNombre = (id) => plantasStore.getPuntosMuestreo.find(p => p.id === id)?.name || 'N/A';
-const getOperarioNombre = (id) => plantasStore.getOperarios.find(o => o.id === id)?.name || 'N/A';
+const getOperarioNombre = (analitica) => {
+  // Primero intentar usar los datos ya cargados desde el servidor (personal.name)
+  if (analitica?.personal?.name) return analitica.personal.name;
+  // Fallback: buscar en el store de operarios
+  return plantasStore.getOperarios.find(o => o.id === analitica?.personal_fk)?.name || 'N/A';
+};
 const getTipoAnaliticaNombre = (id) => {
   if (id === 28) return 'Operacional';
   if (id === 29) return 'Rutina';
@@ -123,7 +128,7 @@ const handleDownloadExcel = () => {
   const dataForSheet = analiticasEnRango.map(a => ({
     'Fecha': formatDateForDisplay(a.fecha),
     'Punto de Muestreo': getPuntoMuestreoNombre(a.punto_muestreo_fk),
-    'Operario': getOperarioNombre(a.personal_fk),
+    'Operario': getOperarioNombre(a),
     'Tipo Analítica': getTipoAnaliticaNombre(a.type),
     'Cloro (mg/l)': a.cloro,
     'pH': a.ph,

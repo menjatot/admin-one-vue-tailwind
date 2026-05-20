@@ -10,7 +10,7 @@ export default [
       {
         label: 'Excel uploader',
         to: '/sinaq',
-        blockedFor: [10, '10']
+        blockedFor: [1, '1', 10, '10']
       },
       {
         label: 'Formulario Analítica',

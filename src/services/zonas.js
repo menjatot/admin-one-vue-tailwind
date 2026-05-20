@@ -1,7 +1,8 @@
-import { supabase } from './supabase'
+import { supabase, assertAuthenticated } from './supabase'
 import { logAudit } from './auditLog'
 
 export const createZona = async (zona) => {
+  assertAuthenticated('crear zonas')
   try {
     const { data } = await supabase
       .from('zonas_abastecimiento')
@@ -25,6 +26,7 @@ export const createZona = async (zona) => {
 }
 
 export const anularZona = async (id) => {
+    assertAuthenticated('anular zonas')
     console.log('ID: ',id)
     try {
       const { data, error: errorZona } = await supabase
@@ -47,6 +49,7 @@ export const anularZona = async (id) => {
 }
   
 export const updateZona = async (data) => {
+    assertAuthenticated('actualizar zonas')
     try {
         // Fetch current state before update
         const { data: beforeUpdate } = await supabase

@@ -18,10 +18,10 @@ const crearCentroCoste = () => {
 <template>
   <LayoutAuthenticated>
     <SectionMain>
-      <SectionTitleLineWithButton :icon="mdiCurrencyEur" title="Centros de Coste" main>
+      <SectionTitleLineWithButton :icon="mdiCurrencyEur" title="Proyectos" main>
         <BaseButton
           :icon="mdiPlusBox"
-          label="Nuevo Centro de Coste"
+          label="Nuevo Proyecto"
           color="info"
           outline
           rounded-full

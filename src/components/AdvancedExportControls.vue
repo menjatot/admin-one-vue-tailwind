@@ -53,7 +53,12 @@ const getZonaNombre = (zonaId) => {
 
 // --- Funciones auxiliares de formato ---
 const getPuntoMuestreoNombre = (id) => plantasStore.getPuntosMuestreo.find(p => p.id === id)?.name || 'N/A';
-const getOperarioNombre = (id) => plantasStore.getOperarios.find(o => o.id === id)?.name || 'N/A';
+const getOperarioNombre = (analitica) => {
+  // Primero intentar usar los datos ya cargados desde el servidor (personal.name)
+  if (analitica?.personal?.name) return analitica.personal.name;
+  // Fallback: buscar en el store de operarios
+  return plantasStore.getOperarios.find(o => o.id === analitica?.personal_fk)?.name || 'N/A';
+};
 const getTipoAnaliticaNombre = (id) => {
   if (id === 28) return 'Operacional';
   if (id === 29) return 'Rutina';
@@ -160,7 +165,7 @@ const handlePrintHTML = async () => {
   const columns = [
     { label: 'Fecha',              value: a => formatDateForDisplay(a.fecha) },
     { label: 'Punto de Muestreo',  value: a => getPuntoMuestreoNombre(a.punto_muestreo_fk) },
-    { label: 'Operario',           value: a => getOperarioNombre(a.personal_fk) },
+    { label: 'Operario',           value: a => getOperarioNombre(a) },
     { label: 'Código SINAC',       value: a => a.punto_muestreo_fk },
     { label: 'Cloro (mg/l)',       value: a => a.cloro != null ? a.cloro : '' },
     { label: 'pH',                 value: a => a.ph != null ? a.ph : '' },
@@ -453,7 +458,7 @@ const handleExportExcel = async () => {
     excelData.push([
       formatDateForDisplay(a.fecha),
       getPuntoMuestreoNombre(a.punto_muestreo_fk),
-      getOperarioNombre(a.personal_fk),
+      getOperarioNombre(a),
       a.punto_muestreo_fk,
       a.cloro !== null && a.cloro !== undefined ? a.cloro : '',
       a.ph !== null && a.ph !== undefined ? a.ph : '',

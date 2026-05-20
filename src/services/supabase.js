@@ -39,9 +39,15 @@ let currentEmail = null;
 let currentRole = null;
 
 const isViewerRole = (role) => {
-  if (role === null || role === undefined) return false
+  if (role === null || role === undefined) return true
   const normalizedRole = String(role).trim().toLowerCase()
   return normalizedRole === '10' || normalizedRole === 'visualizador'
+}
+
+export const assertAuthenticated = (action = 'realizar esta operación') => {
+  if (!currentEmail && !currentRole) {
+    throw new Error(`Debe iniciar sesión para ${action}`)
+  }
 }
 
 const assertAnaliticaMutationPermission = (action) => {

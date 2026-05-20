@@ -7,7 +7,7 @@ import { supabase } from '@/services/supabase'
 export default function useFormSelectData() {
   const loginStore = useLoginStore()
   const plantasStore = usePlantasStore()
-  const { seeAllZones, isAdmin, isOperario } = usePermissions()
+  const { seeAllZones, isAdmin, isOperario, isVisualizador } = usePermissions()
 
   const findOperarioByUser = (usuarioMail) => {
     // Verificar que existe el store y los datos
@@ -254,7 +254,12 @@ export default function useFormSelectData() {
       return base.map((op) => ({ value: op.id, label: op.name }))
     }
 
-    // 3. Otros roles (gestor, visualizador, técnico...):
+    // 3. Visualizador: ve todos (las analiticas ya estan filtradas por zona via RLS)
+    if (isVisualizador.value) {
+      return allOperarios.map((op) => ({ value: op.id, label: op.name }))
+    }
+
+    // 4. Otros roles (gestor, técnico...):
     //    ve los operarios que comparten zona con el usuario actual
     const yo = operarioLogueado.value
     if (!yo?.zonas?.length) return []
