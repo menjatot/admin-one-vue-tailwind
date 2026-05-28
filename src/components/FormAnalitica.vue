@@ -5,10 +5,12 @@ import { useLoginStore } from '@/stores/login'
 import useFormSelectData from '@/composables/useFormSelectData'
 import { supabase, assertAnaliticaWritePermission } from '@/services/supabase'
 import { saveAnaliticaOffline } from '@/services/offlineSync'
+import { getAnaliticasPunto } from '@/services/analiticas'
 import { useNotifications } from '@/composables/useNotifications'
 import CardBox from './CardBox.vue'
 import { confetti } from '@tsparticles/confetti'
 import { mdiHistory, mdiAlertCircle, mdiCheckCircle } from '@mdi/js'
+import { CATALUNA_COMUNIDAD_ID } from '@/constants/comunidades'
 import BaseIcon from './BaseIcon.vue'
 
 const plantaStore = usePlantasStore()
@@ -21,6 +23,20 @@ const {
 
 const totalizador = ref('')
 const formKey = ref(0)
+const analiticasPunto = ref([])
+
+const cargarHistorial = async (puntoId) => {
+  if (!puntoId) {
+    analiticasPunto.value = []
+    return
+  }
+  try {
+    analiticasPunto.value = await getAnaliticasPunto(puntoId, 50)
+  } catch (e) {
+    console.error('Error cargando histórico del punto:', e)
+    analiticasPunto.value = []
+  }
+}
 
 const esDeposito = computed(() => {
   const puntoId = form.punto_muestreo_fk || props.initialPosition
@@ -33,6 +49,41 @@ const esDeposito = computed(() => {
 
   const infra = plantaStore.getInfraestructuras.find((i) => i.id === punto.infraestructura_fk)
   return infra?.type === 2
+})
+
+const esCataluna = computed(() => {
+  // Caso 1: zona seleccionada directamente en el formulario
+  if (form.zona) {
+    const zona = plantaStore.getZonas.find((z) => z.id === Number(form.zona))
+    return zona?.com_autonoma_fk === CATALUNA_COMUNIDAD_ID
+  }
+
+  // Caso 2: punto de muestreo preseleccionado (initialPosition, mapa)
+  const puntoId = form.punto_muestreo_fk
+  if (puntoId) {
+    const punto =
+      puntosCargados.value.find((p) => p.id === Number(puntoId)) ||
+      plantaStore.getPuntosMuestreo.find((p) => p.id === Number(puntoId))
+    if (punto?.zona_fk) {
+      const zona = plantaStore.getZonas.find((z) => z.id === punto.zona_fk)
+      return zona?.com_autonoma_fk === CATALUNA_COMUNIDAD_ID
+    }
+  }
+
+  return false
+})
+
+const cloroCombinado = computed(() => {
+  if (form.cloro_total == null || form.cloro_total === '' || form.cloro == null || form.cloro === '') return null
+  const total = Number(form.cloro_total)
+  const libre = Number(form.cloro)
+  if (isNaN(total) || isNaN(libre)) return null
+  return (total - libre).toFixed(2)
+})
+
+const cloroCombinadoNegativo = computed(() => {
+  if (cloroCombinado.value === null) return false
+  return Number(cloroCombinado.value) < 0
 })
 
 // Control para mostrar/ocultar el histórico en móvil
@@ -78,6 +129,7 @@ const resetForm = () => {
   form.operario = ''
   form.ph = ''
   form.turbidez = ''
+  form.cloro_total = ''
   form.zona = ''
   form.infraestructura = ''
   form.uo = ''
@@ -110,7 +162,7 @@ const ultimasAnaliticas = computed(() => {
   const puntoId = form.punto_muestreo_fk || props.initialPosition
   if (!puntoId) return []
 
-  return plantaStore.getAnaliticas
+  return analiticasPunto.value
     .filter((a) => a.punto_muestreo_fk === puntoId)
     .sort((a, b) => new Date(b.fecha) - new Date(a.fecha))
     .slice(0, 5)
@@ -144,7 +196,7 @@ const getErroresOrganolepticos = (analitica) => {
 const getVolumenData = (analitica) => {
   if (analitica.totalizador == null) return null
 
-  const prevAnalitica = plantaStore.getAnaliticas
+  const prevAnalitica = analiticasPunto.value
     .filter(a =>
       a.punto_muestreo_fk === analitica.punto_muestreo_fk &&
       a.totalizador != null &&
@@ -178,6 +230,10 @@ const submitHandler = async () => {
       personal_fk: form.operario,
       ph: form.ph ? Number(form.ph) : null,
       turbidez: form.turbidez ? Number(form.turbidez) : null,
+      cloro_total: esCataluna.value && form.cloro_total !== '' ? Number(form.cloro_total) : null,
+      cloro_combinado: esCataluna.value && cloroCombinado.value !== null
+        ? Number(cloroCombinado.value)
+        : null,
       totalizador: esDeposito.value && totalizador.value !== '' ? Number(totalizador.value) : null
     }
 
@@ -205,7 +261,7 @@ const submitHandler = async () => {
         title: 'No se ha podido guardar la analítica'
       })
     } else {
-      plantaStore.loadAnaliticas()
+      cargarHistorial(newAnalitica.punto_muestreo_fk)
       console.log('Datos insertados:', data)
       resetForm()
       formKey.value++
@@ -265,16 +321,13 @@ const fiestaConfetti =  async() => {
 
 onMounted(async () => {
   await plantaStore.loadOperarios()
-  // Cargar analíticas si no están cargadas para mostrar el histórico
-  if (!plantaStore.isAnalyticasLoaded) {
-    await plantaStore.loadAnaliticas()
-  }
   findOperarioByUser(loginStore.userEmail)
   form.operario = loginStore.isAuthenticated ? operarioLogueado.value?.id : null
   form.uo = loginStore.isAuthenticated ? operarioLogueado.value?.ud_operativa_fk : null
   if (props.initialPosition) {
     form.punto_muestreo_fk = props.initialPosition
     console.log('Punto de muestreo:', props.initialPosition)
+    cargarHistorial(props.initialPosition)
   }
 })
 
@@ -297,6 +350,13 @@ watch(
     form.zona = null
     form.infraestructura = null
     form.punto_muestreo_fk = null
+  }
+)
+
+watch(
+  () => form.punto_muestreo_fk,
+  (nuevoPunto) => {
+    if (nuevoPunto) cargarHistorial(nuevoPunto)
   }
 )
 </script>
@@ -372,7 +432,7 @@ watch(
               </div>
 
               <!-- Valores principales -->
-              <div class="grid grid-cols-3 gap-2 text-center mb-2">
+              <div :class="['grid gap-2 text-center mb-2', analitica.comunidad_id === 10 ? 'grid-cols-5' : 'grid-cols-3']">
                 <div class="bg-gray-50 dark:bg-slate-700 rounded p-2">
                   <p class="text-xs text-gray-500 dark:text-gray-400">Cloro</p>
                   <p class="text-sm font-bold text-gray-800 dark:text-gray-100">
@@ -391,6 +451,26 @@ watch(
                   <p class="text-sm font-bold text-gray-800 dark:text-gray-100">
                     {{ analitica.turbidez ?? '-' }}
                     <span v-if="analitica.turbidez" class="text-xs font-normal">UNF</span>
+                  </p>
+                </div>
+                <div
+                  v-if="analitica.comunidad_id === 10"
+                  class="bg-yellow-50 dark:bg-yellow-900/30 rounded p-2"
+                >
+                  <p class="text-xs text-gray-500 dark:text-gray-400">Cloro Total</p>
+                  <p class="text-sm font-bold text-gray-800 dark:text-gray-100">
+                    {{ analitica.cloro_total ?? '-' }}
+                    <span v-if="analitica.cloro_total" class="text-xs font-normal">mg/l</span>
+                  </p>
+                </div>
+                <div
+                  v-if="analitica.comunidad_id === 10"
+                  class="bg-yellow-50 dark:bg-yellow-900/30 rounded p-2"
+                >
+                  <p class="text-xs text-gray-500 dark:text-gray-400">Cloro Comb.</p>
+                  <p class="text-sm font-bold text-gray-800 dark:text-gray-100">
+                    {{ analitica.cloro_combinado ?? '-' }}
+                    <span v-if="analitica.cloro_combinado" class="text-xs font-normal">mg/l</span>
                   </p>
                 </div>
               </div>
@@ -612,6 +692,58 @@ watch(
                 min: 'El valor mínimo es 0'
               }"
             />
+          </div>
+          <div
+            v-if="esCataluna"
+            class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 border border-yellow-300 dark:border-yellow-600 rounded-xl p-4 bg-yellow-50 dark:bg-yellow-900/20"
+          >
+            <FormKit
+              v-model.number="form.cloro_total"
+              type="number"
+              placeholder="Cloro Total"
+              label="Cloro Total"
+              help="mg/l"
+              :step="0.01"
+              :validation="
+                form.type === 29 || form.type === 28
+                  ? 'required|number|min:0|max:99'
+                  : 'number|min:0|max:99'
+              "
+              :validation-messages="{
+                required: 'Este campo es obligatorio',
+                number: 'Introduce un número',
+                min: 'El valor mínimo es 0',
+                max: 'El valor máximo es 99'
+              }"
+            />
+            <div class="flex flex-col justify-end">
+              <label class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Cloro Combinado</label>
+              <div
+                :class="[
+                  'flex items-center gap-2 h-[42px] px-3 rounded-md border',
+                  cloroCombinadoNegativo
+                    ? 'border-red-400 bg-red-50 dark:border-red-600 dark:bg-red-900/20'
+                    : 'border-gray-300 bg-gray-100 dark:border-slate-600 dark:bg-slate-700'
+                ]"
+              >
+                <span
+                  :class="[
+                    'text-lg font-bold',
+                    cloroCombinadoNegativo ? 'text-red-600 dark:text-red-400' : 'text-gray-700 dark:text-gray-200'
+                  ]"
+                >
+                  {{ cloroCombinado !== null ? cloroCombinado : '—' }}
+                </span>
+                <span class="text-sm text-gray-500 dark:text-gray-400">mg/l</span>
+              </div>
+              <span
+                v-if="cloroCombinadoNegativo"
+                class="text-xs text-red-500 dark:text-red-400 mt-1 font-medium"
+              >
+                ⚠ El Cloro Combinado no puede ser negativo. Revisa Cloro Total y Cloro Libre Residual.
+              </span>
+              <span v-else class="text-xs text-gray-400 mt-1">Cloro Total − Cloro Libre Residual</span>
+            </div>
           </div>
           <div>
             <FormKit

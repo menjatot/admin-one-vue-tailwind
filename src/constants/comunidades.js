@@ -1,0 +1,1 @@
+export const CATALUNA_COMUNIDAD_ID = 10

@@ -6,6 +6,7 @@ import useExtractdata from '@/composables/useUploadFormData'; // Para la lógica
 import * as XLSX from 'xlsx'; // Para la lógica Excel
 import { usePlantasStore } from '@/stores/plantas'; // Para obtener nombres/datos adicionales si es necesario
 import { useNotifications } from '@/composables/useNotifications'
+import { CATALUNA_COMUNIDAD_ID } from '@/constants/comunidades'
 
 const props = defineProps({
   selectedRows: {
@@ -107,26 +108,35 @@ const handleDownloadExcel = () => {
   }
 
   // Exportar solo las analíticas seleccionadas (marcadas con checkbox), no todas las filtradas
-  let minDate = selectedRows.value[0].fecha;
-  let maxDate = selectedRows.value[0].fecha;
+  let minDate = selectedRows.value[0].fecha
+  let maxDate = selectedRows.value[0].fecha
 
   selectedRows.value.forEach(row => {
-    if (row.fecha < minDate) minDate = row.fecha;
-    if (row.fecha > maxDate) maxDate = row.fecha;
-  });
+    if (row.fecha < minDate) minDate = row.fecha
+    if (row.fecha > maxDate) maxDate = row.fecha
+  })
 
-  const dataForSheet = selectedRows.value.map(a => ({
-    'Fecha': formatDateForDisplay(a.fecha),
-    'Punto de Muestreo': getPuntoMuestreoNombre(a.punto_muestreo_fk),
-    'Operario': getOperarioNombre(a),
-    'Tipo Analítica': getTipoAnaliticaNombre(a.type),
-    'Cloro (mg/l)': a.cloro,
-    'pH': a.ph,
-    'Turbidez (NTU)': a.turbidez,
-    'Olor': formatOrganoleptico(a.olor),
-    'Sabor': formatOrganoleptico(a.sabor),
-    'Observaciones': a.observaciones
-  }));
+  const hasCataluna = selectedRows.value.some(a => a.comunidad_id === CATALUNA_COMUNIDAD_ID)
+
+  const dataForSheet = selectedRows.value.map(a => {
+    const row = {
+      'Fecha': formatDateForDisplay(a.fecha),
+      'Punto de Muestreo': getPuntoMuestreoNombre(a.punto_muestreo_fk),
+      'Operario': getOperarioNombre(a),
+      'Tipo Analítica': getTipoAnaliticaNombre(a.type),
+      'Cloro (mg/l)': a.cloro,
+      'pH': a.ph,
+      'Turbidez (NTU)': a.turbidez,
+      'Olor': formatOrganoleptico(a.olor),
+      'Sabor': formatOrganoleptico(a.sabor),
+      'Observaciones': a.observaciones
+    }
+    if (hasCataluna) {
+      row['Cloro Total (mg/l)'] = a.cloro_total != null ? a.cloro_total : ''
+      row['Cloro Combinado (mg/l)'] = a.cloro_combinado != null ? a.cloro_combinado : ''
+    }
+    return row
+  })
 
   const worksheet = XLSX.utils.json_to_sheet(dataForSheet);
   const workbook = XLSX.utils.book_new();

@@ -1,5 +1,6 @@
 import { fileURLToPath, URL } from "node:url";
 import { defineConfig, loadEnv } from "vite";
+/// <reference types="vitest" />
 import vue from "@vitejs/plugin-vue";
 import { VitePWA } from 'vite-plugin-pwa';
 
@@ -129,6 +130,10 @@ export default defineConfig(({ mode }) => {
     server: {
       // Configuración específica para desarrollo
       port: parseInt(env.VITE_DEV_PORT) || 3000,
+    },
+    test: {
+      environment: 'happy-dom',
+      include: ['src/**/*.{test,spec}.{js,ts}']
     }
   };
 });

@@ -1,6 +1,7 @@
 <script setup>
 import { FormKit } from '@formkit/vue'
 import { computed, ref, watch } from 'vue'
+import { CATALUNA_COMUNIDAD_ID } from '@/constants/comunidades'
 
 const props = defineProps({
   analitic: {
@@ -31,6 +32,27 @@ const colorValue = computed({
 const saborValue = computed({
   get: () => +localAnalitic.value.sabor === 0,
   set: (checked) => (localAnalitic.value.sabor = checked ? 0 : 1)
+})
+
+const esCataluna = computed(() => localAnalitic.value.comunidad_id === CATALUNA_COMUNIDAD_ID)
+
+watch(
+  () => [localAnalitic.value.cloro_total, localAnalitic.value.cloro],
+  ([cloroTotal, cloro]) => {
+    if (cloroTotal != null && cloroTotal !== '' && cloro != null && cloro !== '') {
+      const total = Number(cloroTotal)
+      const libre = Number(cloro)
+      if (!isNaN(total) && !isNaN(libre)) {
+        localAnalitic.value.cloro_combinado = parseFloat((total - libre).toFixed(2))
+        return
+      }
+    }
+    localAnalitic.value.cloro_combinado = null
+  }
+)
+
+const cloroCombinadoNegativo = computed(() => {
+  return localAnalitic.value.cloro_combinado != null && localAnalitic.value.cloro_combinado < 0
 })
 
 watch(
@@ -138,6 +160,53 @@ watch(
           max: 'El valor máximo es 999'
         }"
       />
+    </div>
+    <div
+      v-if="esCataluna"
+      class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 border border-amber-300 dark:border-amber-600 rounded-xl p-4 bg-amber-50 dark:bg-amber-900/20"
+    >
+      <FormKit
+        v-model.number="localAnalitic.cloro_total"
+        type="number"
+        placeholder="Cloro Total"
+        label="Cloro Total"
+        help="mg/l"
+        :step="0.01"
+        validation="number|min:0|max:99"
+        :validation-messages="{
+          number: 'Introduce un número',
+          min: 'El valor mínimo es 0',
+          max: 'El valor máximo es 99'
+        }"
+      />
+      <div class="flex flex-col justify-end">
+        <label class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Cloro Combinado</label>
+        <div
+          :class="[
+            'flex items-center gap-2 h-[42px] px-3 rounded-md border',
+            cloroCombinadoNegativo
+              ? 'border-red-400 bg-red-50 dark:border-red-600 dark:bg-red-900/20'
+              : 'border-gray-300 bg-gray-100 dark:border-slate-600 dark:bg-slate-700'
+          ]"
+        >
+          <span
+            :class="[
+              'text-lg font-bold',
+              cloroCombinadoNegativo ? 'text-red-600 dark:text-red-400' : 'text-gray-700 dark:text-gray-200'
+            ]"
+          >
+            {{ localAnalitic.cloro_combinado != null ? localAnalitic.cloro_combinado : '—' }}
+          </span>
+          <span class="text-sm text-gray-500 dark:text-gray-400">mg/l</span>
+        </div>
+        <span
+          v-if="cloroCombinadoNegativo"
+          class="text-xs text-red-500 dark:text-red-400 mt-1 font-medium"
+        >
+          ⚠ El Cloro Combinado no puede ser negativo. Revisa Cloro Total y Cloro Libre Residual.
+        </span>
+        <span v-else class="text-xs text-gray-400 mt-1">Cloro Total − Cloro Libre Residual</span>
+      </div>
     </div>
     <div class="grid grid-cols-2 justify-between mt-6">
       <FormKit

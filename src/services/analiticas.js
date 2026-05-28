@@ -439,3 +439,15 @@ export const setAnaliticas = async(analitica) => {
 
   return data
 }
+
+export const getAnaliticasPunto = async (puntoMuestreoFk, limit = 10) => {
+  const { data, error } = await supabase
+    .from('analiticas')
+    .select('*')
+    .eq('punto_muestreo_fk', puntoMuestreoFk)
+    .order('fecha', { ascending: false })
+    .limit(limit)
+
+  if (error) throw error
+  return data || []
+}

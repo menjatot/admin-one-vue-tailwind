@@ -23,6 +23,7 @@ import AutocompleteSelect from './AutocompleteSelect.vue'
 import { getAllParametrosCalidad } from '@/services/parametrosCalidad'
 import { DEFAULT_ANALITICA_RANGES, normalizeParametrosCalidad, formatRangeLabel } from '@/constants/parametrosCalidad'
 import { getInfraPinSvg } from '@/helpers/maps'
+import { isCloroWrong, isPhWrong, isTurbidezWrong, isOrganolepticWrong } from '@/composables/useRangeCheck'
 
 const plantaStore = usePlantasStore()
 const loginStore = useLoginStore()
@@ -237,7 +238,7 @@ const analiticsFiltered = computed(() =>
     const zonaFilter = 
       isAdmin || // Administrador ve todo
       checkAnaliticaUserZonas(analitica, userZonas.value) // Comprobar array de zonas del operario
-    const wrongValuesFilter = !showOnlyWrongValues.value || isWrongValues(analitica)
+    const wrongValuesFilter = !showOnlyWrongValues.value || checkWrongValues(analitica)
 
     return (
       zonaFilter && // Nueva restricción por zona
@@ -331,44 +332,29 @@ const allRowsChecked = computed(() => {
   )
 })
 
-const isCloroWrong = (analitica) => {
-  if (analitica.cloro === null || analitica.cloro === undefined) return false
-  const range = getRangesForAnalitica(analitica).cloro
-  return analitica.cloro < range.min || analitica.cloro > range.max
-}
-const isPhWrong = (analitica) => {
-  if (analitica.ph === null || analitica.ph === undefined) return false
-  const range = getRangesForAnalitica(analitica).ph
-  return analitica.ph < range.min || analitica.ph > range.max
-}
-const isTurbidezWrong = (analitica) => {
-  if (analitica.turbidez === null || analitica.turbidez === undefined) return false
-  const range = getRangesForAnalitica(analitica).turbidez
-  const isDC = getInfraTypeFromAnalitica(analitica) === 5
-  const min = isDC ? range.dcMin : range.min
-  const max = isDC ? range.dcMax : range.max
-  return analitica.turbidez < min || analitica.turbidez > max
-}
-const isOrganolepticWrong = (organolepticValue) => {
-  if (organolepticValue === null || organolepticValue === undefined) return false
-  return +organolepticValue === 0
-}
+const checkCloroWrong = (analitica) => isCloroWrong(analitica.cloro, getRangesForAnalitica(analitica).cloro)
 
-const isWrongValues = (analitica) => {
-  if (
-    isCloroWrong(analitica) ||
-    isPhWrong(analitica) ||
-    isTurbidezWrong(analitica) ||
-    isOrganolepticWrong(analitica.olor) ||
-    isOrganolepticWrong(analitica.color) ||
-    isOrganolepticWrong(analitica.sabor)
-  ) {
-    {
-      return true
-    }
-  }
-}
+const checkPhWrong = (analitica) => isPhWrong(analitica.ph, getRangesForAnalitica(analitica).ph)
 
+const checkTurbidezWrong = (analitica) =>
+  isTurbidezWrong(
+    analitica.turbidez,
+    getRangesForAnalitica(analitica).turbidez,
+    getInfraTypeFromAnalitica(analitica) === 5
+  )
+
+const checkOrganolepticWrong = isOrganolepticWrong
+
+const checkWrongValues = (analitica) => {
+  return (
+    checkCloroWrong(analitica) ||
+    checkPhWrong(analitica) ||
+    checkTurbidezWrong(analitica) ||
+    checkOrganolepticWrong(analitica.olor) ||
+    checkOrganolepticWrong(analitica.color) ||
+    checkOrganolepticWrong(analitica.sabor)
+  )
+}
 
 const toggleAllRows = (isChecked) => {
   if (isChecked) {
@@ -638,7 +624,7 @@ onMounted(async () => {
           </td>
 
           <td data-label="Fecha">
-            <!-- <td data-label="Fecha" :class="{'bg-red-400': isWrongValues(analitica)}"> -->
+            <!-- <td data-label="Fecha" :class="{'bg-red-400': checkWrongValues(analitica)}"> -->
             {{ analitica.fecha }}
           </td>
           <td data-label="Punto de Muestreo">
@@ -654,7 +640,7 @@ onMounted(async () => {
           <td class="text-right w-10">
             <BaseButton
               :icon="expandedRows.includes(analitica.id) ? mdiChevronDown : mdiChevronLeft"
-              :color="isWrongValues(analitica) ? 'danger' : 'info'"
+              :color="checkWrongValues(analitica) ? 'danger' : 'info'"
               @click="toggleExpand(analitica.id)"
             />
           </td>
@@ -692,7 +678,7 @@ onMounted(async () => {
                 <div
                   :class="[
                     'rounded-xl p-3 flex flex-col gap-1 border',
-                    isCloroWrong(analitica)
+                    checkCloroWrong(analitica)
                       ? 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-700'
                       : 'bg-white border-gray-200 dark:bg-slate-700 dark:border-slate-600'
                   ]"
@@ -701,7 +687,7 @@ onMounted(async () => {
                   <span
                     :class="[
                       'text-2xl font-bold',
-                      isCloroWrong(analitica) ? 'text-red-500' : 'text-gray-800 dark:text-white'
+                      checkCloroWrong(analitica) ? 'text-red-500' : 'text-gray-800 dark:text-white'
                     ]"
                   >
                     {{ analitica.cloro != null ? analitica.cloro : '—' }}
@@ -713,12 +699,12 @@ onMounted(async () => {
                         'text-xs font-semibold px-2 py-0.5 rounded-full',
                         analitica.cloro == null
                           ? 'bg-gray-100 text-gray-400 dark:bg-slate-600 dark:text-gray-400'
-                          : isCloroWrong(analitica)
+                          : checkCloroWrong(analitica)
                             ? 'bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400'
                             : 'bg-green-100 text-green-600 dark:bg-green-900/40 dark:text-green-400'
                       ]"
                     >
-                      {{ analitica.cloro == null ? 'Sin muestra' : isCloroWrong(analitica) ? '⚠ Fuera de rango' : '✓ Correcto' }}
+                      {{ analitica.cloro == null ? 'Sin muestra' : checkCloroWrong(analitica) ? '⚠ Fuera de rango' : '✓ Correcto' }}
                     </span>
                   </div>
                 </div>
@@ -727,7 +713,7 @@ onMounted(async () => {
                 <div
                   :class="[
                     'rounded-xl p-3 flex flex-col gap-1 border',
-                    isPhWrong(analitica)
+                    checkPhWrong(analitica)
                       ? 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-700'
                       : 'bg-white border-gray-200 dark:bg-slate-700 dark:border-slate-600'
                   ]"
@@ -736,7 +722,7 @@ onMounted(async () => {
                   <span
                     :class="[
                       'text-2xl font-bold',
-                      isPhWrong(analitica) ? 'text-red-500' : 'text-gray-800 dark:text-white'
+                      checkPhWrong(analitica) ? 'text-red-500' : 'text-gray-800 dark:text-white'
                     ]"
                   >
                     {{ analitica.ph != null ? analitica.ph : '—' }}
@@ -748,12 +734,12 @@ onMounted(async () => {
                         'text-xs font-semibold px-2 py-0.5 rounded-full',
                         analitica.ph == null
                           ? 'bg-gray-100 text-gray-400 dark:bg-slate-600 dark:text-gray-400'
-                          : isPhWrong(analitica)
+                          : checkPhWrong(analitica)
                             ? 'bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400'
                             : 'bg-green-100 text-green-600 dark:bg-green-900/40 dark:text-green-400'
                       ]"
                     >
-                      {{ analitica.ph == null ? 'Sin muestra' : isPhWrong(analitica) ? '⚠ Fuera de rango' : '✓ Correcto' }}
+                      {{ analitica.ph == null ? 'Sin muestra' : checkPhWrong(analitica) ? '⚠ Fuera de rango' : '✓ Correcto' }}
                     </span>
                   </div>
                 </div>
@@ -762,7 +748,7 @@ onMounted(async () => {
                 <div
                   :class="[
                     'rounded-xl p-3 flex flex-col gap-1 border',
-                    isTurbidezWrong(analitica)
+                    checkTurbidezWrong(analitica)
                       ? 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-700'
                       : 'bg-white border-gray-200 dark:bg-slate-700 dark:border-slate-600'
                   ]"
@@ -771,7 +757,7 @@ onMounted(async () => {
                   <span
                     :class="[
                       'text-2xl font-bold',
-                      isTurbidezWrong(analitica) ? 'text-red-500' : 'text-gray-800 dark:text-white'
+                      checkTurbidezWrong(analitica) ? 'text-red-500' : 'text-gray-800 dark:text-white'
                     ]"
                   >
                     {{ analitica.turbidez != null ? analitica.turbidez : '—' }}
@@ -783,12 +769,12 @@ onMounted(async () => {
                         'text-xs font-semibold px-2 py-0.5 rounded-full',
                         analitica.turbidez == null
                           ? 'bg-gray-100 text-gray-400 dark:bg-slate-600 dark:text-gray-400'
-                          : isTurbidezWrong(analitica)
+                          : checkTurbidezWrong(analitica)
                             ? 'bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400'
                             : 'bg-green-100 text-green-600 dark:bg-green-900/40 dark:text-green-400'
                       ]"
                     >
-                      {{ analitica.turbidez == null ? 'Sin muestra' : isTurbidezWrong(analitica) ? '⚠ Fuera de rango' : '✓ Correcto' }}
+                      {{ analitica.turbidez == null ? 'Sin muestra' : checkTurbidezWrong(analitica) ? '⚠ Fuera de rango' : '✓ Correcto' }}
                     </span>
                   </div>
                 </div>
@@ -812,9 +798,55 @@ onMounted(async () => {
                         class="text-sm font-semibold text-blue-400 dark:text-blue-300 whitespace-nowrap"
                       >
                         · {{ getM3PerDia(analitica) }} m³/día
-                      </span>
-                    </div>
+                    </span>
                   </div>
+                </div>
+                <!-- Cloro Total / Cloro Combinado (solo Cataluña) -->
+                <div
+                  v-if="analitica.comunidad_id === 10"
+                  class="rounded-xl p-3 flex flex-col gap-1 border bg-amber-50 border-amber-200 dark:bg-amber-900/20 dark:border-amber-700"
+                >
+                  <span class="text-xs font-medium uppercase tracking-wide text-amber-600 dark:text-amber-400">Cloro Total</span>
+                  <span class="text-2xl font-bold text-amber-700 dark:text-amber-300">
+                    {{ analitica.cloro_total != null ? analitica.cloro_total : '—' }}
+                  </span>
+                  <span class="text-xs text-amber-500 dark:text-amber-400">mg/l</span>
+                </div>
+                <div
+                  v-if="analitica.comunidad_id === 10"
+                  :class="[
+                    'rounded-xl p-3 flex flex-col gap-1 border',
+                    analitica.cloro_combinado != null && analitica.cloro_combinado < 0
+                      ? 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-700'
+                      : 'bg-amber-50 border-amber-200 dark:bg-amber-900/20 dark:border-amber-700'
+                  ]"
+                >
+                  <span
+                    :class="[
+                      'text-xs font-medium uppercase tracking-wide',
+                      analitica.cloro_combinado != null && analitica.cloro_combinado < 0
+                        ? 'text-red-600 dark:text-red-400'
+                        : 'text-amber-600 dark:text-amber-400'
+                    ]"
+                  >Cloro Combinado</span>
+                  <span
+                    :class="[
+                      'text-2xl font-bold',
+                      analitica.cloro_combinado != null && analitica.cloro_combinado < 0
+                        ? 'text-red-500 dark:text-red-400'
+                        : 'text-amber-700 dark:text-amber-300'
+                    ]"
+                  >
+                    {{ analitica.cloro_combinado != null ? analitica.cloro_combinado : '—' }}
+                  </span>
+                  <div class="flex flex-wrap items-center gap-1">
+                    <span class="text-xs text-gray-400">mg/l</span>
+                    <span
+                      v-if="analitica.cloro_combinado != null && analitica.cloro_combinado < 0"
+                      class="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400"
+                    >⚠ Negativo</span>
+                  </div>
+                </div>
                   <span v-else class="text-xs text-gray-400 italic">Sin analítica anterior para calcular volumen</span>
                 </div>
               </div>
@@ -827,7 +859,7 @@ onMounted(async () => {
                   :key="key"
                   :class="[
                     'inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold',
-                    isOrganolepticWrong(analitica[key])
+                    checkOrganolepticWrong(analitica[key])
                       ? 'bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400'
                       : 'bg-green-100 text-green-600 dark:bg-green-900/40 dark:text-green-400'
                   ]"

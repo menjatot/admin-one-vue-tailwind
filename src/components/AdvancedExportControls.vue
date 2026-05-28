@@ -5,6 +5,7 @@ import { mdiPrinter, mdiFileExcel, mdiLoading } from '@mdi/js';
 import { usePlantasStore } from '@/stores/plantas';
 import * as XLSX from 'xlsx';
 import { useNotifications } from '@/composables/useNotifications'
+import { CATALUNA_COMUNIDAD_ID } from '@/constants/comunidades'
 
 const props = defineProps({
   selectedRows: {
@@ -153,6 +154,8 @@ const handlePrintHTML = async () => {
   }
 
   // Definición centralizada de columnas
+  const hasCataluna = analiticas.some(a => a.comunidad_id === CATALUNA_COMUNIDAD_ID)
+
   const columns = [
     { label: 'Fecha',              value: a => formatDateForDisplay(a.fecha) },
     { label: 'Punto de Muestreo',  value: a => getPuntoMuestreoNombre(a.punto_muestreo_fk) },
@@ -164,6 +167,10 @@ const handlePrintHTML = async () => {
     { label: 'Olor',               value: a => formatOrganoleptico(a.olor) },
     { label: 'Sabor',              value: a => formatOrganoleptico(a.sabor) },
     { label: 'Color',              value: a => formatOrganoleptico(a.color) },
+    ...(hasCataluna ? [
+      { label: 'Cloro Total (mg/l)',     value: a => a.cloro_total != null ? a.cloro_total : '' },
+      { label: 'Cloro Combinado (mg/l)', value: a => a.cloro_combinado != null ? a.cloro_combinado : '' }
+    ] : []),
     { label: 'Totalizador (m³)',   value: a => a.totalizador != null ? a.totalizador : '' },
     { label: 'Volumen (m³)',       value: a => getVolumen(a) != null ? getVolumen(a) : '' },
     { label: 'Consumo (m³/día)',   value: a => getM3PerDia(a) != null ? getM3PerDia(a) : '' },
@@ -426,8 +433,10 @@ const handleExportExcel = async () => {
   excelData.push([tituloInforme]);
   excelData.push([]); // Fila vacía para separación
 
+  const hasCatalunaExcel = analiticas.some(a => a.comunidad_id === CATALUNA_COMUNIDAD_ID)
+
   // Encabezados de la tabla
-  excelData.push([
+  const headers = [
     'Fecha',
     'Punto de Muestreo',
     'Operario',
@@ -437,16 +446,22 @@ const handleExportExcel = async () => {
     'Turbidez (NTU)',
     'Olor',
     'Sabor',
-    'Color',
+    'Color'
+  ]
+  if (hasCatalunaExcel) {
+    headers.push('Cloro Total (mg/l)', 'Cloro Combinado (mg/l)')
+  }
+  headers.push(
     'Totalizador (m³)',
     'Volumen (m³)',
     'Consumo (m³/día)',
     'Observaciones'
-  ]);
+  )
+  excelData.push(headers)
 
   // Datos de las analíticas
   analiticas.forEach(a => {
-    excelData.push([
+    const row = [
       formatDateForDisplay(a.fecha),
       getPuntoMuestreoNombre(a.punto_muestreo_fk),
       getOperarioNombre(a),
@@ -456,20 +471,29 @@ const handleExportExcel = async () => {
       a.turbidez !== null && a.turbidez !== undefined ? a.turbidez : '',
       formatOrganoleptico(a.olor),
       formatOrganoleptico(a.sabor),
-      formatOrganoleptico(a.color),
+      formatOrganoleptico(a.color)
+    ]
+    if (hasCatalunaExcel) {
+      row.push(
+        a.cloro_total != null ? a.cloro_total : '',
+        a.cloro_combinado != null ? a.cloro_combinado : ''
+      )
+    }
+    row.push(
       a.totalizador != null ? a.totalizador : '',
       getVolumen(a) != null ? getVolumen(a) : '',
       getM3PerDia(a) != null ? getM3PerDia(a) : '',
       a.observaciones ?? ''
-    ]);
-  });
+    )
+    excelData.push(row)
+  })
 
   // Crear libro de trabajo y hoja
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet(excelData);
 
   // Configurar anchos de columna
-  ws['!cols'] = [
+  const colWidths = [
     { wch: 12 },  // Fecha
     { wch: 30 },  // Punto de Muestreo
     { wch: 20 },  // Operario
@@ -479,12 +503,18 @@ const handleExportExcel = async () => {
     { wch: 15 },  // Turbidez
     { wch: 15 },  // Olor
     { wch: 15 },  // Sabor
-    { wch: 15 },  // Color
+    { wch: 15 }   // Color
+  ]
+  if (hasCatalunaExcel) {
+    colWidths.push({ wch: 15 }, { wch: 15 })
+  }
+  colWidths.push(
     { wch: 16 },  // Totalizador
     { wch: 14 },  // Volumen
     { wch: 16 },  // Consumo m³/día
     { wch: 40 }   // Observaciones
-  ];
+  )
+  ws['!cols'] = colWidths
 
   // Aplicar estilos a las celdas de título y encabezado
   const range = XLSX.utils.decode_range(ws['!ref']);
