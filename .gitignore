@@ -39,7 +39,6 @@ doppler.yaml
 /.qwen/
 settings.json
 .agents.omo/
-.agen
 .claude/
 .agents/
 .omo/ts/
