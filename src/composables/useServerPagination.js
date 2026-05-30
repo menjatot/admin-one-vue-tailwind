@@ -4,7 +4,10 @@ import { getAnaliticasPaginated, getAnaliticasFiltered } from '@/services/analit
 export function useServerPagination(initialOptions = {}) {
   const loading = ref(false)
   const error = ref(null)
-  
+
+  // Request deduplication: discard stale responses
+  let requestId = 0
+
   // Estado de la paginación
   const pagination = reactive({
     page: 1,
@@ -37,6 +40,9 @@ export function useServerPagination(initialOptions = {}) {
   // Datos
   const data = ref([])
 
+  // Debounce timer for filters
+  let filterDebounceTimer = null
+
   // Computed para información de paginación
   const paginationInfo = computed(() => ({
     from: (pagination.page - 1) * pagination.pageSize + 1,
@@ -48,6 +54,7 @@ export function useServerPagination(initialOptions = {}) {
 
   // Función para cargar datos
   const loadData = async () => {
+    const currentId = ++requestId
     loading.value = true
     error.value = null
 
@@ -73,6 +80,12 @@ export function useServerPagination(initialOptions = {}) {
 
       const result = await getAnaliticasPaginated(options)
 
+      // Discard stale responses
+      if (currentId !== requestId) {
+        console.log('⏭️ Respuesta descartada (petición obsoleta)')
+        return
+      }
+
       data.value = result.data
       pagination.totalItems = result.count
       pagination.totalPages = result.totalPages
@@ -80,10 +93,13 @@ export function useServerPagination(initialOptions = {}) {
       pagination.hasPreviousPage = result.hasPreviousPage
 
     } catch (err) {
+      if (currentId !== requestId) return
       console.error('Error loading paginated data:', err)
       error.value = err
     } finally {
-      loading.value = false
+      if (currentId === requestId) {
+        loading.value = false
+      }
     }
   }
 
@@ -108,7 +124,7 @@ export function useServerPagination(initialOptions = {}) {
 
   const changePageSize = (newPageSize) => {
     pagination.pageSize = newPageSize
-    pagination.page = 1 // Reset a primera página
+    pagination.page = 1
   }
 
   // Funciones de ordenamiento
@@ -119,10 +135,10 @@ export function useServerPagination(initialOptions = {}) {
       sorting.sortBy = column
       sorting.sortOrder = 'asc'
     }
-    pagination.page = 1 // Reset a primera página
+    pagination.page = 1
   }
 
-  // Función para aplicar filtros
+  // Función para aplicar filtros (NO llama loadData — el watcher lo hace)
   const applyFilters = (newFilters) => {
     console.log('⚙️ applyFilters llamado con:', newFilters)
 
@@ -131,14 +147,8 @@ export function useServerPagination(initialOptions = {}) {
       filters[key] = null
     })
 
-    // Aplicar nuevos filtros
+    // Aplicar nuevos filtros (el watcher de filters disparará loadData)
     Object.assign(filters, newFilters)
-    pagination.page = 1 // Reset a primera página
-
-    console.log('⚙️ Filtros actualizados, llamando a loadData()')
-
-    // Forzar recarga de datos inmediatamente
-    loadData()
   }
 
   // Función para limpiar filtros
@@ -147,13 +157,11 @@ export function useServerPagination(initialOptions = {}) {
       filters[key] = null
     })
     searchText.value = ''
-    pagination.page = 1
   }
 
   // Función para buscar
   const search = (text) => {
     searchText.value = text
-    pagination.page = 1 // Reset a primera página
   }
 
   // Función de refresh
@@ -165,7 +173,6 @@ export function useServerPagination(initialOptions = {}) {
   // Útil para exportaciones y reportes
   const loadAllFilteredData = async () => {
     try {
-      // Limpiar filtros vacíos antes de enviar
       const cleanFilters = {}
       Object.keys(filters).forEach(key => {
         if (filters[key] !== null && filters[key] !== undefined && filters[key] !== '') {
@@ -188,8 +195,33 @@ export function useServerPagination(initialOptions = {}) {
     }
   }
 
-  // Watch para recargar datos cuando cambian página, pageSize o sorting
-  // Los filtros se manejan directamente en applyFilters() para evitar doble carga
+  // Watch para filtros: reset página + cargar (debounced)
+  watch(
+    filters,
+    () => {
+      clearTimeout(filterDebounceTimer)
+      filterDebounceTimer = setTimeout(() => {
+        pagination.page = 1
+        loadData()
+      }, 300)
+    },
+    { deep: true }
+  )
+
+  // Watch para búsqueda: reset página + cargar (debounced)
+  let searchDebounceTimer = null
+  watch(
+    searchText,
+    () => {
+      clearTimeout(searchDebounceTimer)
+      searchDebounceTimer = setTimeout(() => {
+        pagination.page = 1
+        loadData()
+      }, 300)
+    }
+  )
+
+  // Watch para página, pageSize o sorting (sin debounce — cambios inmediatos)
   watch(
     [() => pagination.page, () => pagination.pageSize, sorting],
     () => {

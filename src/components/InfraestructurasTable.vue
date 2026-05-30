@@ -7,10 +7,13 @@ import {
   mdiAlertCircleOutline,
   mdiChevronDown,
   mdiChevronLeft,
+  mdiChevronRight,
   mdiMapMarker,
   mdiPencil,
   mdiTrashCan,
-  mdiFilterRemove
+  mdiFilterRemove,
+  mdiPageFirst,
+  mdiPageLast
 } from '@mdi/js'
 import BaseIcon from './BaseIcon.vue'
 import CardBoxModal from './CardBoxModal.vue'
@@ -21,7 +24,7 @@ import BaseLevel from './BaseLevel.vue'
 // import { anularUO as anularZona, createUO, updateUO } from '@/services/uo'
 import FormZona from './FormZona.vue'
 import { createZona, anularZona, updateZona } from '@/services/zonas'
-import { createInfraestructura, anularInfraestructura, updateInfraestructura } from '@/services/infraestructuras'
+import { createInfraestructura, anularInfraestructura, updateInfraestructura, syncZonasInfraestructura } from '@/services/infraestructuras'
 import FormInfraestructura from './FormInfraestructura.vue'
 import { useNotifications } from '@/composables/useNotifications'
 
@@ -83,7 +86,23 @@ const infraestructurasFiltradas = computed(() => {
   return infras
 })
 
-const infraestructuras = computed(() => infraestructurasFiltradas.value)
+// Paginación
+const PAGE_SIZE = 15
+const currentPage = ref(1)
+
+watch(filters, () => { currentPage.value = 1 }, { deep: true })
+
+const totalPages = computed(() => Math.ceil(infraestructurasFiltradas.value.length / PAGE_SIZE))
+
+const infraestructuras = computed(() => {
+  const start = (currentPage.value - 1) * PAGE_SIZE
+  return infraestructurasFiltradas.value.slice(start, start + PAGE_SIZE)
+})
+
+const goToPage = (page) => {
+  currentPage.value = Math.max(1, Math.min(page, totalPages.value))
+  expandedRows.value = []
+}
 
 const isModalDangerActive = ref(false)
 const dataToEdit = ref(null)
@@ -154,21 +173,33 @@ const handleDeleteData = async () => {
 }
 
 const saveForm = async (form) => {
-  //  console.log("ESCRITO Y HECHO", form);
-  if (form.esNuevo) {
-    console.log('Formulario Nuevo:', form.id);
-    await createInfraestructura(form)
-    // form.value=null
-  
-  } else {
-    console.log('Formulario Editado:', form);
-   await updateInfraestructura(form)
+  try {
+    let infraId = form.id
+
+    if (form.esNuevo) {
+      const created = await createInfraestructura(form)
+      infraId = created?.id
+    } else {
+      await updateInfraestructura(form)
+    }
+
+    // Sync zone assignments in zonas_infraestructuras
+    if (infraId != null) {
+      await syncZonasInfraestructura(infraId, form.zonas ?? [])
+      await plantaStore.loadZonasInfraestructuras()
+    }
+
+    await plantaStore.loadInfraestructuras()
+    closeModal()
+    notifySuccess('La infraestructura se ha guardado correctamente.', {
+      title: 'Infraestructura guardada'
+    })
+  } catch (error) {
+    console.error('Error al guardar infraestructura:', error)
+    notifyError('No se ha podido guardar la infraestructura.', {
+      title: 'Error al guardar infraestructura'
+    })
   }
-  await plantaStore.loadInfraestructuras()
-  closeModal()
-  notifySuccess('La infraestructura se ha guardado correctamente.', {
-    title: 'Infraestructura guardada'
-  })
 }
 
 watch(infraestructuras, (newValue) => {
@@ -235,7 +266,7 @@ defineExpose({
     <!-- Botones de acción -->
     <BaseLevel class="justify-between">
       <div class="text-sm text-gray-600 dark:text-gray-400">
-        Mostrando {{ infraestructuras.length }} infraestructura(s)
+        {{ infraestructurasFiltradas.length }} infraestructura(s) — página {{ currentPage }} de {{ totalPages || 1 }}
       </div>
       <div class="flex gap-2">
         <BaseButton
@@ -338,6 +369,23 @@ defineExpose({
         </template>
       </tbody>
     </table>
+  </div>
+
+  <!-- Controles de paginación -->
+  <div v-if="totalPages > 1" class="flex items-center justify-between mt-4 px-2">
+    <div class="text-sm text-gray-600 dark:text-gray-400">
+      Mostrando {{ (currentPage - 1) * PAGE_SIZE + 1 }}–{{ Math.min(currentPage * PAGE_SIZE, infraestructurasFiltradas.length) }}
+      de {{ infraestructurasFiltradas.length }}
+    </div>
+    <BaseButtons>
+      <BaseButton :icon="mdiPageFirst" small :disabled="currentPage === 1" @click="goToPage(1)" />
+      <BaseButton :icon="mdiChevronLeft" small :disabled="currentPage === 1" @click="goToPage(currentPage - 1)" />
+      <span class="px-3 py-1 text-sm font-medium text-gray-700 dark:text-gray-300">
+        {{ currentPage }} / {{ totalPages }}
+      </span>
+      <BaseButton :icon="mdiChevronRight" small :disabled="currentPage === totalPages" @click="goToPage(currentPage + 1)" />
+      <BaseButton :icon="mdiPageLast" small :disabled="currentPage === totalPages" @click="goToPage(totalPages)" />
+    </BaseButtons>
   </div>
 </template>
 

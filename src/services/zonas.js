@@ -1,6 +1,8 @@
-import { supabase } from './supabase'
+import { supabase, assertAuthenticated } from './supabase'
+import { logAudit } from './auditLog'
 
 export const createZona = async (zona) => {
+  assertAuthenticated('crear zonas')
   try {
     const { data } = await supabase
       .from('zonas_abastecimiento')
@@ -8,10 +10,13 @@ export const createZona = async (zona) => {
         id: zona.id,
         name: zona.name,
         com_autonoma_fk: zona.com_autonoma_fk,
-        unidades_operativas_fk: zona.unidades_operativas_fk
+        unidades_operativas_fk: zona.unidades_operativas_fk,
+        centro_coste_fk: zona.centro_coste_fk ?? null
       })
       .select()
       .single()
+
+    logAudit('CREATE', 'zonas', data.id, null, data)
 
     return data
   } catch (error) {
@@ -21,6 +26,7 @@ export const createZona = async (zona) => {
 }
 
 export const anularZona = async (id) => {
+    assertAuthenticated('anular zonas')
     console.log('ID: ',id)
     try {
       const { data, error: errorZona } = await supabase
@@ -32,6 +38,9 @@ export const anularZona = async (id) => {
         console.error('Error SQL:', errorZona)
         throw errorZona
       }
+
+      logAudit('DELETE', 'zonas', id, { id, activa: true }, data)
+
       return data
     } catch (error) {
       console.error('Error en anularUO:', error)
@@ -40,23 +49,34 @@ export const anularZona = async (id) => {
 }
   
 export const updateZona = async (data) => {
+    assertAuthenticated('actualizar zonas')
     try {
+        // Fetch current state before update
+        const { data: beforeUpdate } = await supabase
+            .from('zonas_abastecimiento')
+            .select('*')
+            .eq('id', data.id)
+            .single()
+
         const { data: updatedData, error: errorZona } = await supabase
         .from('zonas_abastecimiento')
             .update({
-            // id:data.id,
             name: data.name,
             com_autonoma_fk: data.com_autonoma_fk,
-            unidades_operativas_fk: data.unidades_operativas_fk
+            unidades_operativas_fk: data.unidades_operativas_fk,
+            centro_coste_fk: data.centro_coste_fk ?? null
         })
         .eq('id', data.id)
         .select()
             .single()
-        
+
         if (errorZona) {
             console.error('Error SQL:', errorZona)
             throw errorZona
         }
+
+        logAudit('UPDATE', 'zonas', data.id, beforeUpdate, updatedData)
+
         return updatedData
     } catch(error) {
         console.log('Error en updateZona:', error)

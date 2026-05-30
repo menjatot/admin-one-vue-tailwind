@@ -1,5 +1,6 @@
 import { fileURLToPath, URL } from "node:url";
 import { defineConfig, loadEnv } from "vite";
+/// <reference types="vitest" />
 import vue from "@vitejs/plugin-vue";
 import { VitePWA } from 'vite-plugin-pwa';
 
@@ -67,6 +68,18 @@ export default defineConfig(({ mode }) => {
                   maxAgeSeconds: 60 * 60 * 24 * 365 // 1 year
                 }
               }
+            },
+            {
+              urlPattern: ({ url }) => url.hostname.endsWith('tile.openstreetmap.org'),
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'osm-tiles',
+                expiration: {
+                  maxEntries: 2000,
+                  maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days
+                },
+                cacheableResponse: { statuses: [0, 200] }
+              }
             }
           ]
         }
@@ -77,15 +90,28 @@ export default defineConfig(({ mode }) => {
       minify: 'esbuild',
       rollupOptions: {
         output: {
-          manualChunks: {
-            'xlsx-vendor': ['xlsx'],
-            'pdf-vendor': ['jspdf', 'jspdf-autotable'],
-            'chart-vendor': ['chart.js'],
-            'leaflet-vendor': ['leaflet', '@vue-leaflet/vue-leaflet'],
-            'msal-vendor': ['@azure/msal-browser'],
-            'supabase-vendor': ['@supabase/supabase-js'],
-            'primevue-vendor': ['primevue'],
-            'formkit-vendor': ['@formkit/vue', '@formkit/themes'],
+          // Function form matches real file paths (id), preventing duplicate chunks
+          // when different entry points (ESM vs CJS) resolve to different files of
+          // the same package (e.g. leaflet-src.esm.js vs leaflet.js).
+          manualChunks(id) {
+            if (id.includes('node_modules/xlsx')) return 'xlsx-vendor'
+            if (id.includes('node_modules/jspdf')) return 'pdf-vendor'
+            if (id.includes('node_modules/chart.js') || id.includes('node_modules/chart-js')) return 'chart-vendor'
+            if (
+              id.includes('node_modules/leaflet') ||
+              id.includes('node_modules/@vue-leaflet')
+            ) return 'leaflet-vendor'
+            if (id.includes('node_modules/@azure/msal')) return 'msal-vendor'
+            if (id.includes('node_modules/@supabase')) return 'supabase-vendor'
+            if (id.includes('node_modules/primevue')) return 'primevue-vendor'
+            if (id.includes('node_modules/@formkit') || id.includes('node_modules/formkit')) return 'formkit-vendor'
+            if (
+              id.includes('node_modules/vue-router') ||
+              id.includes('node_modules/vue-demi') ||
+              id.includes('node_modules/pinia') ||
+              id.includes('node_modules/@vue/') ||
+              id.includes('node_modules/vue/')
+            ) return 'vue-vendor'
           }
         }
       }
@@ -104,6 +130,10 @@ export default defineConfig(({ mode }) => {
     server: {
       // Configuración específica para desarrollo
       port: parseInt(env.VITE_DEV_PORT) || 3000,
+    },
+    test: {
+      environment: 'happy-dom',
+      include: ['src/**/*.{test,spec}.{js,ts}']
     }
   };
 });

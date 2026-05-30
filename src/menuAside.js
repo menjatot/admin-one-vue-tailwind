@@ -10,9 +10,7 @@ export default [
       {
         label: 'Excel uploader',
         to: '/sinaq',
-        maxRole: 1,
-        minRole: 90
-        // icon: mdiWaterCircle
+        blockedFor: [1, '1', 10, '10']
       },
       {
         label: 'Formulario Analítica',
@@ -31,6 +29,10 @@ export default [
         label: 'Mapa',
         to: {name: "mapa"},
       },
+      // {
+      //   label: 'Video',
+      //   to: { name: "video" },
+      // },
       // {
       //   label: 'Prime Table Example',
       //   to: {name: "prime-table"},

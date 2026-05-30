@@ -3,6 +3,7 @@ import { computed, ref, watch, onMounted } from 'vue'
 import msalInstance from '@/services/msalConfig'
 import { getUserProfile } from '@/services/msalConfig'
 import { setSupabaseAuthContext } from '@/services/supabase'
+import { syncOfflineAnaliticas } from '@/services/offlineSync'
 import { usePlantasStore } from '@/stores/plantas'
 import { useNotifications } from '@/composables/useNotifications'
 
@@ -117,9 +118,11 @@ export const useLoginStore = defineStore('loginStore', () => {
         // Sincronizar contexto de seguridad con Supabase (RLS)
         setSupabaseAuthContext(userProfile.email, userRole.value)
 
-        // Re-inicializar el store de plantas para cargar solo los datos autorizados
-        const plantasStore = usePlantasStore()
-        await plantasStore.initializeStore()
+        // Enviar analíticas guardadas offline (auth context ya está listo)
+        syncOfflineAnaliticas()
+
+        // NOTA: initializeStore() se pospone hasta que setUserRole() determine el rol
+        // para evitar cargar datos con contexto de rol vacio
       }
     } catch (error) {
       console.error('Error en login:', error)
@@ -232,6 +235,7 @@ export const useLoginStore = defineStore('loginStore', () => {
   // (caso: app en background restaurada, sessionStorage preservado)
   if (isAuthenticated.value && userEmail.value) {
     setSupabaseAuthContext(userEmail.value, userRole.value)
+    syncOfflineAnaliticas()
     loadAuthorizedData()
   } else {
     // Intento de restauración silenciosa desde caché offline
@@ -263,6 +267,7 @@ export const useLoginStore = defineStore('loginStore', () => {
         startSessionTimeout()
 
         setSupabaseAuthContext(cached.email, cached.role)
+        syncOfflineAnaliticas()
         loadAuthorizedData()
       }
     } catch (e) {

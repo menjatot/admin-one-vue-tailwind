@@ -1,10 +1,13 @@
-import { computed, reactive, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { usePlantasStore } from '@/stores/plantas'
 import { useLoginStore } from '@/stores/login'
+import { usePermissions } from '@/composables/usePermissions'
+import { supabase } from '@/services/supabase'
 
 export default function useFormSelectData() {
   const loginStore = useLoginStore()
   const plantasStore = usePlantasStore()
+  const { seeAllZones, isAdmin, isOperario, isVisualizador } = usePermissions()
 
   const findOperarioByUser = (usuarioMail) => {
     // Verificar que existe el store y los datos
@@ -48,10 +51,13 @@ export default function useFormSelectData() {
     observaciones: '',
     ph: null,
     turbidez: null,
+    cloro_total: null,
+    cloro_combinado: null,
     operario: '',
     infraestructura: null,
     fecha_inicio: null,
-    fecha_final: null
+    fecha_final: null,
+    centro_coste: null
   })
 
   watch(
@@ -74,7 +80,7 @@ export default function useFormSelectData() {
   
   const selectUO = computed(() => {
     // Si no es admin, filtrar UOs basándonos en las zonas que el operario tiene asignadas
-    if (Number(loginStore.userRole) !== 99 && loginStore.userRole !== 'admin') {
+    if (!seeAllZones.value) {
       const operario = operarioLogueado.value
       if (!operario) return []
       
@@ -94,7 +100,7 @@ export default function useFormSelectData() {
     let zonas = plantasStore.getZonas
 
     // 1. Filtrado por Rol (Operario)
-    if (Number(loginStore.userRole) !== 99 && loginStore.userRole !== 'admin') {
+    if (!seeAllZones.value) {
       const operario = operarioLogueado.value
       if (operario && operario.zonas) {
         const zonasIds = operario.zonas.map(z => typeof z === 'object' ? z.id : z)
@@ -120,7 +126,7 @@ export default function useFormSelectData() {
     } else if (form.uo) {
       const zonasDeUo = plantasStore.getZonas.filter(z => z.unidades_operativas_fk === Number(form.uo)).map(z => z.id)
       infraestructurasDisponibles = infraestructurasDisponibles.filter(infra => zonasDeUo.includes(infra.zonas_fk))
-    } else if (Number(loginStore.userRole) !== 99 && loginStore.userRole !== 'admin') {
+    } else if (!seeAllZones.value) {
       const operarioActual = plantasStore.getOperarios.find(op => op.email?.toLowerCase() === loginStore.userEmail?.toLowerCase())
       if (operarioActual && operarioActual.zonas) {
         const zonasIds = operarioActual.zonas.map(zona => typeof zona === 'object' ? zona.id : zona)
@@ -156,57 +162,113 @@ export default function useFormSelectData() {
     }
   }
 
-  const selectPuntosMuestra = computed(() => {
-    let puntos = plantasStore.getPuntosMuestreo
+  const puntosCargados = ref([])
+  const cargandoPuntos = ref(false)
 
-    // Filtering by Role (Admin vs Operario)
-    if (Number(loginStore.userRole) !== 99 && loginStore.userRole !== 'admin') {
-      const operarioActual = plantasStore.getOperarios.find(op => op.email?.toLowerCase() === loginStore.userEmail?.toLowerCase())
-      if (!operarioActual || !operarioActual.zonas) {
-        console.warn('Operario no encontrado o sin zonas asignadas')
-        return []
+  watch(
+    () => [form.zona, form.infraestructura],
+    async ([zona, infra]) => {
+      if (!zona && !infra) {
+        puntosCargados.value = []
+        return
       }
-      const zonasIds = operarioActual.zonas.map(zona => typeof zona === 'object' ? zona.id : zona)
-      puntos = puntos.filter(punto => punto.activo && zonasIds.includes(punto.zona_fk))
-    }
 
-    // Cascading geographical filters
-    if (form.infraestructura) {
-      puntos = puntos.filter(punto => punto.infraestructura_fk === Number(form.infraestructura))
-    } else if (form.zona) {
-      // To reliably find points for a zone, find the infrastructures that belong to the zone
-      const infrasEnZona = plantasStore.getZonasInfraestructuras
-        .filter(zi => zi.zonas_fk === Number(form.zona))
-        .map(zi => zi.infraestructuras_fk)
-      puntos = puntos.filter(punto => infrasEnZona.includes(punto.infraestructura_fk) || punto.zona_fk === Number(form.zona))
-    } else if (form.uo) {
-      const zonasDeUo = plantasStore.getZonas.filter(z => z.unidades_operativas_fk === Number(form.uo)).map(z => z.id)
-      const infrasDeUo = plantasStore.getZonasInfraestructuras
-        .filter(zi => zonasDeUo.includes(zi.zonas_fk))
-        .map(zi => zi.infraestructuras_fk)
-      puntos = puntos.filter(punto => infrasDeUo.includes(punto.infraestructura_fk) || zonasDeUo.includes(punto.zona_fk))
-    }
+      // Non-admin: validate the selected zone is actually assigned to the operario
+      if (!seeAllZones.value) {
+        const operario = operarioLogueado.value
+        if (!operario?.zonas) {
+          puntosCargados.value = []
+          return
+        }
+        const zonasIds = operario.zonas.map(z => (typeof z === 'object' ? z.id : z))
+        if (zona && !zonasIds.includes(Number(zona))) {
+          puntosCargados.value = []
+          return
+        }
+      }
 
-    return puntos.map(punto => ({ value: punto.id, label: punto.name }))
-  })
+      cargandoPuntos.value = true
+      try {
+        let query = supabase
+          .from('puntos_muestreo')
+          .select('id, name, infraestructura_fk, zona_fk')
+          .eq('activo', true)
+
+        if (infra) {
+          query = query.eq('infraestructura_fk', Number(infra))
+        } else if (zona) {
+          const { data: ziData } = await supabase
+            .from('zonas_infraestructuras')
+            .select('infraestructuras_fk')
+            .eq('zonas_fk', Number(zona))
+
+          const infraIds = (ziData ?? []).map(r => r.infraestructuras_fk)
+
+          if (infraIds.length > 0) {
+            query = query.or(`zona_fk.eq.${zona},infraestructura_fk.in.(${infraIds.join(',')})`)
+          } else {
+            query = query.eq('zona_fk', Number(zona))
+          }
+        }
+
+        const { data } = await query
+        puntosCargados.value = data ?? []
+      } catch (error) {
+        console.error('Error cargando puntos de muestreo:', error)
+        puntosCargados.value = []
+      } finally {
+        cargandoPuntos.value = false
+      }
+    }
+  )
+
+  const selectPuntosMuestra = computed(() =>
+    puntosCargados.value.map(p => ({ value: p.id, label: p.name }))
+  )
   
 
-  const operarioPorZona = computed(() => {
-    let operariosRaw = plantasStore.getOperarios
-
-    // 1. Filtrado por Rol (Si no es admin, solo puede verse a sí mismo)
-    if (Number(loginStore.userRole) !== 99 && loginStore.userRole !== 'admin') {
-      const operario = operarioLogueado.value
-      if (!operario) return []
-      return [{ value: operario.id, label: operario.name }]
-    }
-
-    // 2. Filtrado por UO seleccionada para Administradores
+  const selectCentroCosto = computed(() => {
+    let centros = plantasStore.getCentrosCoste
     if (form.uo) {
-      operariosRaw = operariosRaw.filter((operario) => operario.ud_operativa_fk === Number(form.uo))
+      centros = centros.filter(cc => cc.uo_fk === Number(form.uo))
+    }
+    return centros.map(cc => ({
+      value: cc.id,
+      label: cc.code ? `${cc.code} - ${cc.name}` : cc.name
+    }))
+  })
+
+  const operarioPorZona = computed(() => {
+    const allOperarios = plantasStore.getOperarios
+
+    // 1. Operario: solo se ve a sí mismo
+    if (isOperario.value) {
+      const yo = operarioLogueado.value
+      if (!yo) return []
+      return [{ value: yo.id, label: yo.name }]
     }
 
-    return operariosRaw.map((operario) => ({ value: operario.id, label: operario.name }))
+    // 2. Administrador: ve todos, filtrando por UO si hay una seleccionada
+    if (isAdmin.value) {
+      const base = form.uo
+        ? allOperarios.filter((op) => op.ud_operativa_fk === Number(form.uo))
+        : allOperarios
+      return base.map((op) => ({ value: op.id, label: op.name }))
+    }
+
+    // 3. Visualizador: ve todos (las analiticas ya estan filtradas por zona via RLS)
+    if (isVisualizador.value) {
+      return allOperarios.map((op) => ({ value: op.id, label: op.name }))
+    }
+
+    // 4. Otros roles (gestor, técnico...):
+    //    ve los operarios que comparten zona con el usuario actual
+    const yo = operarioLogueado.value
+    if (!yo?.zonas?.length) return []
+    const misZonas = new Set(yo.zonas.map((z) => (typeof z === 'object' ? z.id : z)))
+    return allOperarios
+      .filter((op) => op.zonas?.some((z) => misZonas.has(typeof z === 'object' ? z.id : z)))
+      .map((op) => ({ value: op.id, label: op.name }))
   })
 
 
@@ -217,8 +279,11 @@ export default function useFormSelectData() {
     selectZona,
     selectInfraestructura,
     selectPuntosMuestra,
+    selectCentroCosto,
     operarioPorZona,
     findOperarioByUser,
-    operarioLogueado
+    operarioLogueado,
+    puntosCargados,
+    cargandoPuntos
   }
 }

@@ -11,7 +11,9 @@ import {
   mdiSetCenter,
   mdiPipeDisconnected,
   mdiTune,
-  
+  mdiHelpCircleOutline,
+  mdiFileDocumentOutline,
+  mdiCurrencyEur
 } from '@mdi/js'
 
 export default [
@@ -50,6 +52,16 @@ export default [
         icon: mdiTune,
         label: 'Parámetros de Calidad',
         to: {name:'parametrosCalidad'}
+      },
+      {
+        icon: mdiCurrencyEur,
+        label: 'Proyectos',
+        to: {name:'centrosCoste'}
+      },
+      {
+        icon: mdiFileDocumentOutline,
+        label: 'Registro de Actividad',
+        to: {name:'auditLog'}
       },
       {
         isDivider: true
@@ -91,6 +103,12 @@ export default [
     label: 'Light/Dark',
     isDesktopNoLabel: true,
     isToggleLightDark: true
+  },
+  {
+    icon: mdiHelpCircleOutline,
+    label: 'Ayuda',
+    isDesktopNoLabel: true,
+    to: '/video'
   },
   
   

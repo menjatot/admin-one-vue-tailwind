@@ -53,7 +53,7 @@ const componentClass = computed(() => {
   ]
 
   if (props.item.isDesktopNoLabel) {
-    base.push('lg:w-16', 'lg:justify-center')
+    base.push('lg:w-8', 'lg:justify-center', 'lg:px-1')
   }
 
   return base

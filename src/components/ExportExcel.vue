@@ -6,6 +6,7 @@ import useExtractdata from '@/composables/useUploadFormData'; // Para la lógica
 import * as XLSX from 'xlsx'; // Para la lógica Excel
 import { usePlantasStore } from '@/stores/plantas'; // Para obtener nombres/datos adicionales si es necesario
 import { useNotifications } from '@/composables/useNotifications'
+import { CATALUNA_COMUNIDAD_ID } from '@/constants/comunidades'
 
 const props = defineProps({
   selectedRows: {
@@ -37,7 +38,12 @@ const { warning: notifyWarning, info: notifyInfo } = useNotifications()
 
 // --- Lógica para formatear datos para Excel (similar a la propuesta anterior) ---
 const getPuntoMuestreoNombre = (id) => plantasStore.getPuntosMuestreo.find(p => p.id === id)?.name || 'N/A';
-const getOperarioNombre = (id) => plantasStore.getOperarios.find(o => o.id === id)?.name || 'N/A';
+const getOperarioNombre = (analitica) => {
+  // Primero intentar usar los datos ya cargados desde el servidor (personal.name)
+  if (analitica?.personal?.name) return analitica.personal.name;
+  // Fallback: buscar en el store de operarios
+  return plantasStore.getOperarios.find(o => o.id === analitica?.personal_fk)?.name || 'N/A';
+};
 const getTipoAnaliticaNombre = (id) => {
   if (id === 28) return 'Operacional';
   if (id === 29) return 'Rutina';
@@ -93,7 +99,7 @@ const handleDownloadXML = () => {
 const handleDownloadExcel = () => {
   if (selectedRows.value.length === 0) {
     notifyWarning(
-      'Selecciona al menos una analitica para definir el rango de fechas de exportacion a Excel.',
+      'Selecciona al menos una analitica para exportar a Excel.',
       {
         title: 'Seleccion requerida'
       }
@@ -101,37 +107,36 @@ const handleDownloadExcel = () => {
     return;
   }
 
-  let minDate = selectedRows.value[0].fecha;
-  let maxDate = selectedRows.value[0].fecha;
+  // Exportar solo las analíticas seleccionadas (marcadas con checkbox), no todas las filtradas
+  let minDate = selectedRows.value[0].fecha
+  let maxDate = selectedRows.value[0].fecha
 
   selectedRows.value.forEach(row => {
-    if (row.fecha < minDate) minDate = row.fecha;
-    if (row.fecha > maxDate) maxDate = row.fecha;
-  });
+    if (row.fecha < minDate) minDate = row.fecha
+    if (row.fecha > maxDate) maxDate = row.fecha
+  })
 
-  const analiticasEnRango = allAnaliticasForDateRange.value.filter(analitica => {
-    return analitica.fecha >= minDate && analitica.fecha <= maxDate;
-  });
+  const hasCataluna = selectedRows.value.some(a => a.comunidad_id === CATALUNA_COMUNIDAD_ID)
 
-  if (analiticasEnRango.length === 0) {
-    notifyWarning('No se han encontrado analiticas en el rango de fechas seleccionado.', {
-      title: 'Sin datos para exportar'
-    })
-    return;
-  }
-
-  const dataForSheet = analiticasEnRango.map(a => ({
-    'Fecha': formatDateForDisplay(a.fecha),
-    'Punto de Muestreo': getPuntoMuestreoNombre(a.punto_muestreo_fk),
-    'Operario': getOperarioNombre(a.personal_fk),
-    'Tipo Analítica': getTipoAnaliticaNombre(a.type),
-    'Cloro (mg/l)': a.cloro,
-    'pH': a.ph,
-    'Turbidez (NTU)': a.turbidez,
-    'Olor': formatOrganoleptico(a.olor),
-    'Sabor': formatOrganoleptico(a.sabor),
-    'Observaciones': a.observaciones
-  }));
+  const dataForSheet = selectedRows.value.map(a => {
+    const row = {
+      'Fecha': formatDateForDisplay(a.fecha),
+      'Punto de Muestreo': getPuntoMuestreoNombre(a.punto_muestreo_fk),
+      'Operario': getOperarioNombre(a),
+      'Tipo Analítica': getTipoAnaliticaNombre(a.type),
+      'Cloro (mg/l)': a.cloro,
+      'pH': a.ph,
+      'Turbidez (NTU)': a.turbidez,
+      'Olor': formatOrganoleptico(a.olor),
+      'Sabor': formatOrganoleptico(a.sabor),
+      'Observaciones': a.observaciones
+    }
+    if (hasCataluna) {
+      row['Cloro Total (mg/l)'] = a.cloro_total != null ? a.cloro_total : ''
+      row['Cloro Combinado (mg/l)'] = a.cloro_combinado != null ? a.cloro_combinado : ''
+    }
+    return row
+  })
 
   const worksheet = XLSX.utils.json_to_sheet(dataForSheet);
   const workbook = XLSX.utils.book_new();

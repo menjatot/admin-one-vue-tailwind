@@ -1,4 +1,5 @@
-import { supabase } from './supabase'
+import { supabase, assertAuthenticated } from './supabase'
+import { logAudit } from './auditLog'
 
 
 export const getUO = async () => {
@@ -8,6 +9,7 @@ export const getUO = async () => {
 
 
 export const anularUO = async (id) => {
+  assertAuthenticated('anular unidades operativas')
   console.log(id)
   try {
     const { data, error: errorUO } = await supabase
@@ -19,6 +21,9 @@ export const anularUO = async (id) => {
       console.error('Error SQL:', errorUO)
       throw errorUO
     }
+
+    logAudit('DELETE', 'uo', id, { id, activo: true }, { id, activo: false })
+
     return data
   } catch (error) {
     console.error('Error en anularUO:', error)
@@ -27,6 +32,7 @@ export const anularUO = async (id) => {
 }
 
 export const createUO = async (uo) => {
+  assertAuthenticated('crear unidades operativas')
   try {
     const { data } = await supabase
       .from('unidades_operativas')
@@ -35,6 +41,9 @@ export const createUO = async (uo) => {
         description: uo.description
       })
       .select()
+
+    logAudit('CREATE', 'uo', data?.[0]?.id, null, data?.[0])
+
     return data
   } catch (error) {
     console.error('Error en createUO:', error)
@@ -47,6 +56,7 @@ export const createUO = async (uo) => {
 
 
 export const updateUO = async (data) => {
+  assertAuthenticated('actualizar unidades operativas')
   const MAX_RETRIES = 3;
   const RETRY_DELAY = 1000;
 
@@ -67,6 +77,11 @@ export const updateUO = async (data) => {
         .single()
 
       if (errorUO) throw errorUO
+
+      logAudit('UPDATE', 'uo', data.id,
+        { id: data.id, name: data.name, description: data.description },
+        updateData
+      )
 
       return updateData
 

@@ -11,6 +11,7 @@ import AnaliticsEdit from './AnaliticsEdit.vue'
 // import UserAvatar from '@/components/UserAvatar.vue'
 import { usePlantasStore } from '../stores/plantas'
 import { useLoginStore } from '../stores/login'
+import { usePermissions } from '@/composables/usePermissions'
 // import { getAnaliticas } from '@/services/analiticas'
 import useFormSelectData from '../composables/useFormSelectData'
 import { useAnalyticsLoader } from '../composables/useAnalyticsLoader'
@@ -21,14 +22,16 @@ import CardBoxModal from './CardBoxModal.vue'
 import AutocompleteSelect from './AutocompleteSelect.vue'
 import { getAllParametrosCalidad } from '@/services/parametrosCalidad'
 import { DEFAULT_ANALITICA_RANGES, normalizeParametrosCalidad, formatRangeLabel } from '@/constants/parametrosCalidad'
+import { getInfraPinSvg } from '@/helpers/maps'
+import { isCloroWrong, isPhWrong, isTurbidezWrong, isOrganolepticWrong } from '@/composables/useRangeCheck'
 
 const plantaStore = usePlantasStore()
 const loginStore = useLoginStore()
 const { loadAnalytics, loading: analyticsLoading } = useAnalyticsLoader()
 
-const isViewerRole = computed(() => loginStore.userRole === 10 || loginStore.userRole === '10')
-const canEditAnaliticas = computed(() => !isViewerRole.value)
-const canDeleteAnaliticas = computed(() => !isViewerRole.value)
+const { canWrite, seeAllZones } = usePermissions()
+const canEditAnaliticas = canWrite
+const canDeleteAnaliticas = canWrite
 
 const ORGANOLEPTIC_CORRECT = 1
 // const ORGANOLEPTIC_WRONG = 0
@@ -55,7 +58,24 @@ const getRangesForAnalitica = (analitica) => {
 
 const getCloroRangeLabel = (analitica) => formatRangeLabel(getRangesForAnalitica(analitica).cloro)
 const getPhRangeLabel = (analitica) => formatRangeLabel(getRangesForAnalitica(analitica).ph)
-const getTurbidezRangeLabel = (analitica) => formatRangeLabel(getRangesForAnalitica(analitica).turbidez)
+const getTurbidezRangeLabel = (analitica) => {
+  const ranges = getRangesForAnalitica(analitica)
+  const isDC = getInfraTypeFromAnalitica(analitica) === 5
+  return formatRangeLabel({
+    min: isDC ? ranges.turbidez.dcMin : ranges.turbidez.min,
+    max: isDC ? ranges.turbidez.dcMax : ranges.turbidez.max
+  })
+}
+
+const getInfraTypeFromAnalitica = (analitica) => {
+  if (analitica?.infraestructura_type != null) return analitica.infraestructura_type
+  const pmId = analitica?.punto_muestreo_fk
+  if (!pmId) return null
+  const pm = plantaStore.getPuntosMuestreo.find((p) => p.id === pmId)
+  if (!pm?.infraestructura_fk) return null
+  const infra = plantaStore.getInfraestructuras.find((i) => i.id === pm.infraestructura_fk)
+  return infra?.type ?? null
+}
 
 const loadParametrosCalidad = async () => {
   try {
@@ -161,7 +181,7 @@ const currentPage = ref(0)
 // Obtener las zonas del usuario logueado
 const userZonas = computed(() => {
   // Si el rol del usuario es admin (antes era 99), no filtramos por zona (puede ver todo)
-  if (loginStore.userRole === 'admin' || loginStore.userRole === 99 || loginStore.userRole === '99') {
+  if (seeAllZones.value) {
     return null
   }
 
@@ -214,11 +234,11 @@ const checkAnaliticaUserZonas = (analitica, userZonasArray) => {
 const analiticsFiltered = computed(() =>
   plantaStore.getAnaliticas.filter((analitica) => {
     // Restricción por zona según el rol del usuario
-    const isAdmin = loginStore.userRole === 'admin' || loginStore.userRole === 99 || loginStore.userRole === '99'
+    const isAdmin = seeAllZones.value
     const zonaFilter = 
       isAdmin || // Administrador ve todo
       checkAnaliticaUserZonas(analitica, userZonas.value) // Comprobar array de zonas del operario
-    const wrongValuesFilter = !showOnlyWrongValues.value || isWrongValues(analitica)
+    const wrongValuesFilter = !showOnlyWrongValues.value || checkWrongValues(analitica)
 
     return (
       zonaFilter && // Nueva restricción por zona
@@ -277,8 +297,9 @@ const pagesList = computed(() => {
   return pagesList
 })
 
-const getNameOperario = (id) => {
-  const operario = plantasStore.getOperarios.find((operario) => operario.id === id)
+const getNameOperario = (analitica) => {
+  if (analitica?.personal?.name) return analitica.personal.name
+  const operario = plantasStore.getOperarios.find((operario) => operario.id === analitica?.personal_fk)
   return operario ? operario.name : 'No asignado'
 }
 
@@ -311,41 +332,29 @@ const allRowsChecked = computed(() => {
   )
 })
 
-const isCloroWrong = (analitica) => {
-  if (analitica.cloro === null || analitica.cloro === undefined) return false
-  const range = getRangesForAnalitica(analitica).cloro
-  return analitica.cloro < range.min || analitica.cloro > range.max
-}
-const isPhWrong = (analitica) => {
-  if (analitica.ph === null || analitica.ph === undefined) return false
-  const range = getRangesForAnalitica(analitica).ph
-  return analitica.ph < range.min || analitica.ph > range.max
-}
-const isTurbidezWrong = (analitica) => {
-  if (analitica.turbidez === null || analitica.turbidez === undefined) return false
-  const range = getRangesForAnalitica(analitica).turbidez
-  return analitica.turbidez < range.min || analitica.turbidez > range.max
-}
-const isOrganolepticWrong = (organolepticValue) => {
-  if (organolepticValue === null || organolepticValue === undefined) return false
-  return +organolepticValue === 0
-}
+const checkCloroWrong = (analitica) => isCloroWrong(analitica.cloro, getRangesForAnalitica(analitica).cloro)
 
-const isWrongValues = (analitica) => {
-  if (
-    isCloroWrong(analitica) ||
-    isPhWrong(analitica) ||
-    isTurbidezWrong(analitica) ||
-    isOrganolepticWrong(analitica.olor) ||
-    isOrganolepticWrong(analitica.color) ||
-    isOrganolepticWrong(analitica.sabor)
-  ) {
-    {
-      return true
-    }
-  }
-}
+const checkPhWrong = (analitica) => isPhWrong(analitica.ph, getRangesForAnalitica(analitica).ph)
 
+const checkTurbidezWrong = (analitica) =>
+  isTurbidezWrong(
+    analitica.turbidez,
+    getRangesForAnalitica(analitica).turbidez,
+    getInfraTypeFromAnalitica(analitica) === 5
+  )
+
+const checkOrganolepticWrong = isOrganolepticWrong
+
+const checkWrongValues = (analitica) => {
+  return (
+    checkCloroWrong(analitica) ||
+    checkPhWrong(analitica) ||
+    checkTurbidezWrong(analitica) ||
+    checkOrganolepticWrong(analitica.olor) ||
+    checkOrganolepticWrong(analitica.color) ||
+    checkOrganolepticWrong(analitica.sabor)
+  )
+}
 
 const toggleAllRows = (isChecked) => {
   if (isChecked) {
@@ -453,10 +462,15 @@ const updateAnaliticaSeleccionada = async (analitica) => {
 
 // Cargar analíticas solo cuando este componente se monte
 onMounted(async () => {
-  console.log('FILTROS: ', filters.value)
   resetForm()
-  
-  // Usar el composable para carga inteligente
+
+  // On page reload the store starts empty — ensure operarios are loaded before
+  // loadAnalytics() resolves, otherwise userZonas returns null and analiticsFiltered
+  // shows all rows (even to non-admin users) until the reactive computed self-corrects.
+  if (!plantasStore.getOperarios.length) {
+    await plantasStore.loadOperarios()
+  }
+
   try {
     await loadAnalytics()
     await loadParametrosCalidad()
@@ -503,16 +517,16 @@ onMounted(async () => {
     <div class="flex flex-col">
       <label class="font-bold mb-1 text-sm text-gray-700 dark:text-gray-300">Fecha Inicio</label>
       <input 
-        type="date" 
         v-model="filters.fecha_inicio" 
+        type="date" 
         class="w-full border rounded shadow-sm px-3 py-2 text-sm transition-colors bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-200 border-gray-300 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
       />
     </div>
     <div class="flex flex-col">
       <label class="font-bold mb-1 text-sm text-gray-700 dark:text-gray-300">Fecha Final</label>
       <input 
-        type="date" 
         v-model="filters.fecha_final" 
+        type="date" 
         class="w-full border rounded shadow-sm px-3 py-2 text-sm transition-colors bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-200 border-gray-300 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
       />
     </div>
@@ -528,11 +542,11 @@ onMounted(async () => {
   </div>
   <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
     <div class="flex flex-col">
-      <label class="font-bold mb-1 text-sm text-gray-700 dark:text-gray-300">Zona de Muestra</label>
+      <label class="font-bold mb-1 text-sm text-gray-700 dark:text-gray-300">Zona de Abastecimiento</label>
       <AutocompleteSelect
         v-model="filters.zona"
         :options="selectZona"
-        placeholder="Zona de Muestra"
+        placeholder="Zona de Abastecimiento"
         class="w-full"
       />
     </div>
@@ -577,11 +591,12 @@ onMounted(async () => {
         /> -->
           <!-- <input type="checkbox" class="rounded"   @change="allRowsChecked($event)" /> -->
         </th>
+        <th class="w-10 text-center">Infra</th>
         <th class="cursor-pointer" @click="handleSort('fecha')" >Fecha <span v-if="sortKey === 'fecha'">{{ sortDir === 'asc' ? '↑' : '↓' }}</span></th>
         <th class="cursor-pointer" @click="handleSort('punto_muestreo_fk')">Punto Muestreo <span v-if="sortKey === 'punto_muestreo_fk'">{{ sortDir === 'asc' ? '↑' : '↓' }}</span></th>
         <th class="cursor-pointer" @click="handleSort('personal_fk')">Operario<span v-if="sortKey === 'personal_fk'">{{ sortDir === 'asc' ? '↑' : '↓' }}</span></th>
         <th class="cursor-pointer" @click="handleSort('type')">Tipo<span v-if="sortKey === 'type'">{{ sortDir === 'asc' ? '↑' : '↓' }}</span></th>
-        <th class="text-center">
+        <th class="text-center w-10">
           <TableCheckboxCell
             :model-value="showOnlyWrongValues"
             label="Solo valores incorrectos"
@@ -600,31 +615,39 @@ onMounted(async () => {
             @update:model-value="(isChecked) => addAnalitica(analitica, isChecked)"
           />
 
+          <td data-label="Infra" class="text-center">
+            <span
+              v-if="getInfraTypeFromAnalitica(analitica) != null"
+              class="inline-flex items-center justify-center shrink-0"
+              v-html="getInfraPinSvg(getInfraTypeFromAnalitica(analitica), 28)"
+            />
+          </td>
+
           <td data-label="Fecha">
-            <!-- <td data-label="Fecha" :class="{'bg-red-400': isWrongValues(analitica)}"> -->
+            <!-- <td data-label="Fecha" :class="{'bg-red-400': checkWrongValues(analitica)}"> -->
             {{ analitica.fecha }}
           </td>
           <td data-label="Punto de Muestreo">
             {{ getPuntoMuestreo(analitica.punto_muestreo_fk) }}
           </td>
           <td data-label="Persona">
-            {{ getNameOperario(analitica.personal_fk) }}
+            {{ getNameOperario(analitica) }}
           </td>
           <td data-label="Tipo Analítica" class="lg:w-32">
             {{ getTipoAnalitica(analitica.type) }}
           </td>
 
-          <td>
+          <td class="text-right w-10">
             <BaseButton
               :icon="expandedRows.includes(analitica.id) ? mdiChevronDown : mdiChevronLeft"
-              :color="isWrongValues(analitica) ? 'danger' : 'info'"
+              :color="checkWrongValues(analitica) ? 'danger' : 'info'"
               @click="toggleExpand(analitica.id)"
             />
           </td>
         </tr>
         <tr v-if="expandedRows.includes(analitica.id)" :key="`expanded-${analitica.id}`">
-          <td colspan="6" class="p-0 border-b border-gray-200 dark:border-slate-700">
-            <div class="bg-gray-50 dark:bg-slate-800/50 px-5 py-4">
+          <td colspan="7" class="p-0 border-b border-gray-200 dark:border-slate-700 overflow-x-auto">
+            <div class="bg-gray-50 dark:bg-slate-800/50 px-5 py-4 w-full max-w-full min-w-0">
 
               <!-- Header -->
               <div class="flex items-center justify-between mb-4">
@@ -650,12 +673,12 @@ onMounted(async () => {
               </div>
 
               <!-- Metric cards -->
-              <div class="grid grid-cols-3 gap-3 mb-4" :class="{ 'lg:grid-cols-4': analitica.totalizador != null }">
+              <div class="grid grid-cols-3 gap-3 mb-4 min-w-0" :class="{ 'lg:grid-cols-4': analitica.totalizador != null }">
                 <!-- Cloro -->
                 <div
                   :class="[
                     'rounded-xl p-3 flex flex-col gap-1 border',
-                    isCloroWrong(analitica)
+                    checkCloroWrong(analitica)
                       ? 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-700'
                       : 'bg-white border-gray-200 dark:bg-slate-700 dark:border-slate-600'
                   ]"
@@ -664,7 +687,7 @@ onMounted(async () => {
                   <span
                     :class="[
                       'text-2xl font-bold',
-                      isCloroWrong(analitica) ? 'text-red-500' : 'text-gray-800 dark:text-white'
+                      checkCloroWrong(analitica) ? 'text-red-500' : 'text-gray-800 dark:text-white'
                     ]"
                   >
                     {{ analitica.cloro != null ? analitica.cloro : '—' }}
@@ -676,12 +699,12 @@ onMounted(async () => {
                         'text-xs font-semibold px-2 py-0.5 rounded-full',
                         analitica.cloro == null
                           ? 'bg-gray-100 text-gray-400 dark:bg-slate-600 dark:text-gray-400'
-                          : isCloroWrong(analitica)
+                          : checkCloroWrong(analitica)
                             ? 'bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400'
                             : 'bg-green-100 text-green-600 dark:bg-green-900/40 dark:text-green-400'
                       ]"
                     >
-                      {{ analitica.cloro == null ? 'Sin muestra' : isCloroWrong(analitica) ? '⚠ Fuera de rango' : '✓ Correcto' }}
+                      {{ analitica.cloro == null ? 'Sin muestra' : checkCloroWrong(analitica) ? '⚠ Fuera de rango' : '✓ Correcto' }}
                     </span>
                   </div>
                 </div>
@@ -690,7 +713,7 @@ onMounted(async () => {
                 <div
                   :class="[
                     'rounded-xl p-3 flex flex-col gap-1 border',
-                    isPhWrong(analitica)
+                    checkPhWrong(analitica)
                       ? 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-700'
                       : 'bg-white border-gray-200 dark:bg-slate-700 dark:border-slate-600'
                   ]"
@@ -699,7 +722,7 @@ onMounted(async () => {
                   <span
                     :class="[
                       'text-2xl font-bold',
-                      isPhWrong(analitica) ? 'text-red-500' : 'text-gray-800 dark:text-white'
+                      checkPhWrong(analitica) ? 'text-red-500' : 'text-gray-800 dark:text-white'
                     ]"
                   >
                     {{ analitica.ph != null ? analitica.ph : '—' }}
@@ -711,12 +734,12 @@ onMounted(async () => {
                         'text-xs font-semibold px-2 py-0.5 rounded-full',
                         analitica.ph == null
                           ? 'bg-gray-100 text-gray-400 dark:bg-slate-600 dark:text-gray-400'
-                          : isPhWrong(analitica)
+                          : checkPhWrong(analitica)
                             ? 'bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400'
                             : 'bg-green-100 text-green-600 dark:bg-green-900/40 dark:text-green-400'
                       ]"
                     >
-                      {{ analitica.ph == null ? 'Sin muestra' : isPhWrong(analitica) ? '⚠ Fuera de rango' : '✓ Correcto' }}
+                      {{ analitica.ph == null ? 'Sin muestra' : checkPhWrong(analitica) ? '⚠ Fuera de rango' : '✓ Correcto' }}
                     </span>
                   </div>
                 </div>
@@ -725,7 +748,7 @@ onMounted(async () => {
                 <div
                   :class="[
                     'rounded-xl p-3 flex flex-col gap-1 border',
-                    isTurbidezWrong(analitica)
+                    checkTurbidezWrong(analitica)
                       ? 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-700'
                       : 'bg-white border-gray-200 dark:bg-slate-700 dark:border-slate-600'
                   ]"
@@ -734,7 +757,7 @@ onMounted(async () => {
                   <span
                     :class="[
                       'text-2xl font-bold',
-                      isTurbidezWrong(analitica) ? 'text-red-500' : 'text-gray-800 dark:text-white'
+                      checkTurbidezWrong(analitica) ? 'text-red-500' : 'text-gray-800 dark:text-white'
                     ]"
                   >
                     {{ analitica.turbidez != null ? analitica.turbidez : '—' }}
@@ -746,12 +769,12 @@ onMounted(async () => {
                         'text-xs font-semibold px-2 py-0.5 rounded-full',
                         analitica.turbidez == null
                           ? 'bg-gray-100 text-gray-400 dark:bg-slate-600 dark:text-gray-400'
-                          : isTurbidezWrong(analitica)
+                          : checkTurbidezWrong(analitica)
                             ? 'bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400'
                             : 'bg-green-100 text-green-600 dark:bg-green-900/40 dark:text-green-400'
                       ]"
                     >
-                      {{ analitica.turbidez == null ? 'Sin muestra' : isTurbidezWrong(analitica) ? '⚠ Fuera de rango' : '✓ Correcto' }}
+                      {{ analitica.turbidez == null ? 'Sin muestra' : checkTurbidezWrong(analitica) ? '⚠ Fuera de rango' : '✓ Correcto' }}
                     </span>
                   </div>
                 </div>
@@ -775,9 +798,55 @@ onMounted(async () => {
                         class="text-sm font-semibold text-blue-400 dark:text-blue-300 whitespace-nowrap"
                       >
                         · {{ getM3PerDia(analitica) }} m³/día
-                      </span>
-                    </div>
+                    </span>
                   </div>
+                </div>
+                <!-- Cloro Total / Cloro Combinado (solo Cataluña) -->
+                <div
+                  v-if="analitica.comunidad_id === 10"
+                  class="rounded-xl p-3 flex flex-col gap-1 border bg-amber-50 border-amber-200 dark:bg-amber-900/20 dark:border-amber-700"
+                >
+                  <span class="text-xs font-medium uppercase tracking-wide text-amber-600 dark:text-amber-400">Cloro Total</span>
+                  <span class="text-2xl font-bold text-amber-700 dark:text-amber-300">
+                    {{ analitica.cloro_total != null ? analitica.cloro_total : '—' }}
+                  </span>
+                  <span class="text-xs text-amber-500 dark:text-amber-400">mg/l</span>
+                </div>
+                <div
+                  v-if="analitica.comunidad_id === 10"
+                  :class="[
+                    'rounded-xl p-3 flex flex-col gap-1 border',
+                    analitica.cloro_combinado != null && analitica.cloro_combinado < 0
+                      ? 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-700'
+                      : 'bg-amber-50 border-amber-200 dark:bg-amber-900/20 dark:border-amber-700'
+                  ]"
+                >
+                  <span
+                    :class="[
+                      'text-xs font-medium uppercase tracking-wide',
+                      analitica.cloro_combinado != null && analitica.cloro_combinado < 0
+                        ? 'text-red-600 dark:text-red-400'
+                        : 'text-amber-600 dark:text-amber-400'
+                    ]"
+                  >Cloro Combinado</span>
+                  <span
+                    :class="[
+                      'text-2xl font-bold',
+                      analitica.cloro_combinado != null && analitica.cloro_combinado < 0
+                        ? 'text-red-500 dark:text-red-400'
+                        : 'text-amber-700 dark:text-amber-300'
+                    ]"
+                  >
+                    {{ analitica.cloro_combinado != null ? analitica.cloro_combinado : '—' }}
+                  </span>
+                  <div class="flex flex-wrap items-center gap-1">
+                    <span class="text-xs text-gray-400">mg/l</span>
+                    <span
+                      v-if="analitica.cloro_combinado != null && analitica.cloro_combinado < 0"
+                      class="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400"
+                    >⚠ Negativo</span>
+                  </div>
+                </div>
                   <span v-else class="text-xs text-gray-400 italic">Sin analítica anterior para calcular volumen</span>
                 </div>
               </div>
@@ -790,7 +859,7 @@ onMounted(async () => {
                   :key="key"
                   :class="[
                     'inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold',
-                    isOrganolepticWrong(analitica[key])
+                    checkOrganolepticWrong(analitica[key])
                       ? 'bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400'
                       : 'bg-green-100 text-green-600 dark:bg-green-900/40 dark:text-green-400'
                   ]"

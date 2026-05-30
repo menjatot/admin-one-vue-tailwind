@@ -1,4 +1,5 @@
-import { supabase } from './supabase'
+import { supabase, assertAuthenticated } from './supabase'
+import { logAudit } from './auditLog'
 
 export const getOperarios = async () => {
   const { data } = await supabase.from('personal').select('*')
@@ -11,6 +12,7 @@ export const getOperarios = async () => {
 // }
 
 export const setOperarios = async (operario) => {
+  assertAuthenticated('crear operarios')
   try {
     // 1. Insertar operario y obtener ID
     const { data: newOperario, error: errorOperario } = await supabase
@@ -20,7 +22,8 @@ export const setOperarios = async (operario) => {
         email: operario.email,
         phone: operario.phone,
         ud_operativa_fk: operario.ud_operativa_fk,
-        type: operario.type
+        type: operario.type,
+        rol_id: operario.rol_id
       })
       .select() // Devuelve todos los campos, incluido el ID generado
       .single() // Devuelve un único registro en lugar de un array
@@ -45,6 +48,9 @@ export const setOperarios = async (operario) => {
       insertedZonas = data
     }
 
+    // Audit log
+    logAudit('CREATE', 'operarios', newOperario.id, null, { ...operario, zonas: insertedZonas })
+
     return {
       operario: newOperario,
       zonas: insertedZonas
@@ -63,7 +69,15 @@ export const setOperarios = async (operario) => {
 // }
 
 export const deleteOperario = async (id) => {
+  assertAuthenticated('eliminar operarios')
   try {
+    // 0. Fetch operario data before deletion for audit
+    const { data: operarioToDelete } = await supabase
+      .from('personal')
+      .select('*')
+      .eq('id', id)
+      .single()
+
     // 1. Primero borrar registros en zonas_personal
     const { error: errorZonas } = await supabase
       .from('zonas_personal')
@@ -80,6 +94,9 @@ export const deleteOperario = async (id) => {
 
     if (errorOperario) throw errorOperario
 
+    // Audit log
+    logAudit('DELETE', 'operarios', id, operarioToDelete, null)
+
     return true
 
   } catch (error) {
@@ -90,8 +107,20 @@ export const deleteOperario = async (id) => {
 
 
 export const updateOperariobyId = async (data) => {
+  assertAuthenticated('actualizar operarios')
   try {
-    // console.log('updateOperariobyId: ',id, data);
+    // 0. Fetch current state before update for audit
+    const { data: beforeUpdate } = await supabase
+      .from('personal')
+      .select('*')
+      .eq('id', data.id)
+      .single()
+
+    const { data: beforeZonas } = await supabase
+      .from('zonas_personal')
+      .select('*')
+      .eq('personal_fk', data.id)
+
     // 1. Limpiar datos del operario
     const cleanDataOperario = {
       // id: data.id,
@@ -99,7 +128,8 @@ export const updateOperariobyId = async (data) => {
       email: data.email,
       phone: data.phone,
       ud_operativa_fk: data.ud_operativa_fk,
-      type: data.type
+      type: data.type,
+      rol_id: data.rol_id
     }
     // 2. Actualizar datos del operario
     const { data: updateDataOperario, errorOperario } = await supabase
@@ -107,7 +137,7 @@ export const updateOperariobyId = async (data) => {
       .update(cleanDataOperario)
       .eq('id', data.id)
       .select()
-    
+
 
     if (errorOperario) throw errorOperario
 
@@ -133,6 +163,12 @@ export const updateOperariobyId = async (data) => {
       .select()
 
     if (errorInsert) throw errorInsert
+
+    // Audit log
+    logAudit('UPDATE', 'operarios', data.id,
+      { ...beforeUpdate, zonas: beforeZonas },
+      { ...updateDataOperario, zonas: insertedZonas }
+    )
 
     return {
       operario: updateDataOperario,

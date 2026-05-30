@@ -35,3 +35,11 @@ coverage
 .env.*.local
 doppler.yaml
 .mcp.json
+/sql/
+/.qwen/
+settings.json
+.agents.omo/
+.claude/
+.agents/
+.omo/ts/
+

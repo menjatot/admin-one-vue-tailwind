@@ -54,6 +54,17 @@ export default function useExtractdata() {
             </DETERMINACION_BOLETIN>
           `)
         }
+
+        if (analitica.cloro_combinado != null) {
+          determinaciones.push(`
+            <DETERMINACION_BOLETIN>
+              <COD_PARAMETRO>044</COD_PARAMETRO>
+              <ID_MET_ANALISIS>50680</ID_MET_ANALISIS>
+              <VALOR_CUANTIF>${formatDatos(analitica.cloro_combinado)}</VALOR_CUANTIF>
+              <COD_ANALISTA>${COD_ANALISTA}</COD_ANALISTA>
+            </DETERMINACION_BOLETIN>
+          `)
+        }
   
         // Valores cualitativos
         if (analitica.olor && analitica.type === 29) {

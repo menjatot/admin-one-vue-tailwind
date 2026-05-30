@@ -2,7 +2,6 @@
 import { computed, onMounted, ref } from 'vue'
 import { mdiTune } from '@mdi/js'
 import LayoutAuthenticated from '@/layouts/LayoutAuthenticated.vue'
-import SectionMain from '@/components/SectionMain.vue'
 import SectionTitleLineWithButton from '@/components/SectionTitleLineWithButton.vue'
 import CardBox from '@/components/CardBox.vue'
 import BaseButton from '@/components/BaseButton.vue'
@@ -33,7 +32,9 @@ const ensureRangeRow = (comunidadId) => {
       ph_min: DEFAULT_ANALITICA_RANGES.ph.min,
       ph_max: DEFAULT_ANALITICA_RANGES.ph.max,
       turbidez_min: DEFAULT_ANALITICA_RANGES.turbidez.min,
-      turbidez_max: DEFAULT_ANALITICA_RANGES.turbidez.max
+      turbidez_max: DEFAULT_ANALITICA_RANGES.turbidez.max,
+      turbidez_min_dc: DEFAULT_ANALITICA_RANGES.turbidez.dcMin,
+      turbidez_max_dc: DEFAULT_ANALITICA_RANGES.turbidez.dcMax
     }
   }
 
@@ -53,7 +54,9 @@ const hydrateRanges = (records) => {
       ph_min: normalized.ph.min,
       ph_max: normalized.ph.max,
       turbidez_min: normalized.turbidez.min,
-      turbidez_max: normalized.turbidez.max
+      turbidez_max: normalized.turbidez.max,
+      turbidez_min_dc: normalized.turbidez.dcMin,
+      turbidez_max_dc: normalized.turbidez.dcMax
     }
   })
 
@@ -64,6 +67,7 @@ const validateRow = (row) => {
   if (row.cloro_min > row.cloro_max) return 'Cloro min no puede ser mayor que cloro max'
   if (row.ph_min > row.ph_max) return 'pH min no puede ser mayor que pH max'
   if (row.turbidez_min > row.turbidez_max) return 'Turbidez min no puede ser mayor que turbidez max'
+  if (row.turbidez_min_dc > row.turbidez_max_dc) return 'Turbidez DC min no puede ser mayor que turbidez DC max'
   return null
 }
 
@@ -104,7 +108,9 @@ const saveComunidad = async (comunidadId) => {
       ph_min: Number(row.ph_min),
       ph_max: Number(row.ph_max),
       turbidez_min: Number(row.turbidez_min),
-      turbidez_max: Number(row.turbidez_max)
+      turbidez_max: Number(row.turbidez_max),
+      turbidez_min_dc: Number(row.turbidez_min_dc),
+      turbidez_max_dc: Number(row.turbidez_max_dc)
     })
 
     notifySuccess('Rangos guardados correctamente para la comunidad.', {
@@ -127,7 +133,7 @@ onMounted(() => {
 
 <template>
   <LayoutAuthenticated>
-    <SectionMain>
+    <section class="p-6">
       <SectionTitleLineWithButton :icon="mdiTune" title="Parámetros de Calidad" main />
 
       <CardBox has-table>
@@ -149,6 +155,8 @@ onMounted(() => {
                 <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">pH max</th>
                 <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Turbidez min</th>
                 <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Turbidez max</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Turb. min DC</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Turb. max DC</th>
                 <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">Acción</th>
               </tr>
             </thead>
@@ -179,6 +187,12 @@ onMounted(() => {
                 <td class="px-4 py-3">
                   <input v-model.number="ensureRangeRow(comunidad.id).turbidez_max" type="number" step="0.01" class="w-28 rounded border border-gray-300 px-2 py-1 text-sm" />
                 </td>
+                <td class="px-4 py-3">
+                  <input v-model.number="ensureRangeRow(comunidad.id).turbidez_min_dc" type="number" step="0.01" class="w-28 rounded border border-gray-300 px-2 py-1 text-sm" />
+                </td>
+                <td class="px-4 py-3">
+                  <input v-model.number="ensureRangeRow(comunidad.id).turbidez_max_dc" type="number" step="0.01" class="w-28 rounded border border-gray-300 px-2 py-1 text-sm" />
+                </td>
                 <td class="px-4 py-3 text-right">
                   <BaseButton
                     color="info"
@@ -193,6 +207,6 @@ onMounted(() => {
           </table>
         </div>
       </CardBox>
-    </SectionMain>
+    </section>
   </LayoutAuthenticated>
 </template>

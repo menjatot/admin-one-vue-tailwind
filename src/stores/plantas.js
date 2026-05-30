@@ -16,6 +16,7 @@ export const usePlantasStore = defineStore('plantasStore', () => {
   const analiticaToUpdate = ref(null)
   const tipoPersonal = ref([])
   const zonas_personal = ref([])
+  const centrosCoste = ref([])
 
   // onMounted(() => {
   //   loadZonas()
@@ -43,7 +44,8 @@ export const usePlantasStore = defineStore('plantasStore', () => {
         loadInfraestructuras(),
         loadTipoInfraestructura(),
         loadZonasInfraestructuras(),
-        loadTipoPersonal()
+        loadTipoPersonal(),
+        loadCentrosCoste()
       ])
       console.log('📊 Store inicializado (sin analíticas)')
     } catch (error) {
@@ -64,7 +66,8 @@ export const usePlantasStore = defineStore('plantasStore', () => {
         loadInfraestructuras(),
         loadTipoInfraestructura(),
         loadZonasInfraestructuras(),
-        loadTipoPersonal()
+        loadTipoPersonal(),
+        loadCentrosCoste()
       ])
       console.log('📊 Store inicializado (con analíticas)')
     } catch (error) {
@@ -73,16 +76,40 @@ export const usePlantasStore = defineStore('plantasStore', () => {
   }
 
   const loadZonas = async () => {
-    const { data } = await supabase.from('zonas_abastecimiento').select('*')
-    zonas.value = data
+    const PAGE_SIZE = 1000
+    let allData = []
+    let from = 0
+    while (true) {
+      const { data, error } = await supabase
+        .from('zonas_abastecimiento')
+        .select('*')
+        .range(from, from + PAGE_SIZE - 1)
+      if (error || !data || data.length === 0) break
+      allData = allData.concat(data)
+      if (data.length < PAGE_SIZE) break
+      from += PAGE_SIZE
+    }
+    zonas.value = allData
   }
   // const loadOperarios = async () => {
   //   const { data } = await supabase.from('personal').select('*')
   //   operarios.value = data
   // }
   const loadZonasOperarios = async () => {
-    const { data } = await supabase.from('zonas_personal').select('*')
-    zonas_personal.value = data
+    const PAGE_SIZE = 1000
+    let allData = []
+    let from = 0
+    while (true) {
+      const { data, error } = await supabase
+        .from('zonas_personal')
+        .select('*')
+        .range(from, from + PAGE_SIZE - 1)
+      if (error || !data || data.length === 0) break
+      allData = allData.concat(data)
+      if (data.length < PAGE_SIZE) break
+      from += PAGE_SIZE
+    }
+    zonas_personal.value = allData
   }
   // const loadAnaliticas = async () => {
   //   const { data } = await supabase.from('analiticas').select('*')
@@ -91,16 +118,23 @@ export const usePlantasStore = defineStore('plantasStore', () => {
 
   const loadAnaliticas = async () => {
     try {
-      const { data, error } = await supabase
-        .from('analiticas')
-        .select(`
-          *,
-          puntos_muestreo (
-            id,
-            name,
-            infraestructuras (
+      const PAGE_SIZE = 1000
+      let allData = []
+      let from = 0
+
+      while (true) {
+        const { data, error } = await supabase
+          .from('analiticas')
+          .select(`
+            *,
+            puntos_muestreo (
               id,
               name,
+              infraestructuras (
+                id,
+                name,
+                type
+              ),
               zonas_abastecimiento (
                 id,
                 name,
@@ -114,16 +148,21 @@ export const usePlantasStore = defineStore('plantasStore', () => {
                 )
               )
             )
-          )
-        `)
-  
-      if (error) throw error
-  
-      if (data) {
-        const mappedData = data.map(item => {
+          `)
+          .range(from, from + PAGE_SIZE - 1)
+
+        if (error) throw error
+        if (!data || data.length === 0) break
+        allData = allData.concat(data)
+        if (data.length < PAGE_SIZE) break
+        from += PAGE_SIZE
+      }
+
+      if (allData.length > 0) {
+        const mappedData = allData.map(item => {
           const puntoMuestreo = item.puntos_muestreo
           const infraestructura = puntoMuestreo?.infraestructuras || {}
-          const zonaAbastecimiento = infraestructura?.zonas_abastecimiento || {}
+          const zonaAbastecimiento = puntoMuestreo?.zonas_abastecimiento || {}
           const unidadOperativa = zonaAbastecimiento?.unidades_operativas || {}
           const comunidadAutonoma = zonaAbastecimiento?.comunidades_autonomas || {}
   
@@ -133,6 +172,7 @@ export const usePlantasStore = defineStore('plantasStore', () => {
             punto_muestreo_name: puntoMuestreo?.name,
             infraestructura_id: infraestructura?.id,
             infraestructura_name: infraestructura?.name,
+            infraestructura_type: infraestructura?.type,
             zona_id: zonaAbastecimiento?.id,
             zona_name: zonaAbastecimiento?.name,
             unidad_id: unidadOperativa?.id,
@@ -156,44 +196,67 @@ export const usePlantasStore = defineStore('plantasStore', () => {
 const loadOperarios = async () => {
   try {
     const { data: operariosData, error } = await supabase.from('personal').select('*')
-    
+
     if (error) throw error
 
-    const {data:zonasPersonal } = await supabase.from('zonas_personal').select('*')
-    
-    // Enriquecer cada operario con sus zonas asignadas
-    operarios.value = operariosData.map(operario => {
-      // Filtrar las relaciones de zonas_personal para este operario
+    const PAGE_SIZE = 1000
+    let allZonasPersonal = []
+    let from = 0
+    while (true) {
+      const { data, error: zpError } = await supabase
+        .from('zonas_personal')
+        .select('*')
+        .range(from, from + PAGE_SIZE - 1)
+      if (zpError || !data || data.length === 0) break
+      allZonasPersonal = allZonasPersonal.concat(data)
+      if (data.length < PAGE_SIZE) break
+      from += PAGE_SIZE
+    }
 
-
-
-      const relacionesZonas = zonasPersonal.filter(
-        relacion => relacion.personal_fk === operario.id).map(relacion => relacion.zonas_fk)
-    
-
-      // console.log('relacionesZonas: ',relacionesZonas);
-      
-      // Obtener los IDs de las zonas asignadas a este operario
-      // const zonasIds = relacionesZonas.map(relacion => relacion.zonas_fk)
-
-      // console.log('zonasIds: ',zonasIds);
-      
-      // Buscar los datos completos de cada zona
-      // const zonasOperario = zonas.value.filter(zona => 
-      //   zonasIds.includes(zona.id)
-      // )
-      
-     // console.log('zonasOperario:',zonasOperario)
-      // Añadir las zonas al objeto operario
+    // Enriquecer cada operario del query normal con sus zonas
+    const enrichedOperarios = (operariosData || []).map(operario => {
+      const relacionesZonas = allZonasPersonal
+        .filter(relacion => relacion.personal_fk === operario.id)
+        .map(relacion => relacion.zonas_fk)
       return {
         ...operario,
         zonas: relacionesZonas || []
       }
     })
-    
+
+    // Suplementar con RPC (solo id+name) para operarios bloqueados por RLS
+    // La RPC es SECURITY DEFINER: expone datos minimos sin comprometer seguridad
+    try {
+      const { data: rpcData, error: rpcError } = await supabase.rpc('get_operarios_basic')
+      if (!rpcError && rpcData && rpcData.length > 0) {
+        const existingIds = new Set(enrichedOperarios.map(o => o.id))
+        const missingOperarios = rpcData
+          .filter(r => !existingIds.has(r.id))
+          .map(r => ({ id: r.id, name: r.name, zonas: [] }))
+
+        operarios.value = [...enrichedOperarios, ...missingOperarios]
+        console.log(`📊 Operarios: ${enrichedOperarios.length} directos + ${missingOperarios.length} via RPC`)
+        return operarios.value
+      }
+    } catch (rpcErr) {
+      console.warn('RPC suplementaria fallo:', rpcErr)
+    }
+
+    operarios.value = enrichedOperarios
     return operarios.value
   } catch (error) {
     console.error('Error cargando operarios:', error)
+    // Fallback completo a RPC
+    try {
+      const { data: rpcData, error: rpcError } = await supabase.rpc('get_operarios_basic')
+      if (!rpcError && rpcData && rpcData.length > 0) {
+        operarios.value = rpcData.map(op => ({ id: op.id, name: op.name, zonas: [] }))
+        console.log(`✅ Cargados ${operarios.value.length} operarios via RPC (fallback)`)
+        return operarios.value
+      }
+    } catch (rpcErr) {
+      console.warn('RPC fallback no disponible:', rpcErr)
+    }
     return []
   }
 }
@@ -204,8 +267,23 @@ const loadOperarios = async () => {
   }
 
   const loadPuntosMuestreo = async () => {
-    const { data } = await supabase.from('puntos_muestreo').select('*')
-    puntosMuestreo.value = data
+    const PAGE_SIZE = 1000
+    let allData = []
+    let from = 0
+
+    while (true) {
+      const { data, error } = await supabase
+        .from('puntos_muestreo')
+        .select('*')
+        .range(from, from + PAGE_SIZE - 1)
+
+      if (error || !data || data.length === 0) break
+      allData = allData.concat(data)
+      if (data.length < PAGE_SIZE) break
+      from += PAGE_SIZE
+    }
+
+    puntosMuestreo.value = allData
   }
   const loadUnidadesOperativas = async () => {
     const { data } = await supabase.from('unidades_operativas').select('*')
@@ -217,17 +295,52 @@ const loadOperarios = async () => {
   }
 
   const loadZonasInfraestructuras = async () => {
-    const { data } = await supabase.from('zonas_infraestructuras').select('*')
-    zonas_infraestructuras.value = data
+    const PAGE_SIZE = 1000
+    let allData = []
+    let from = 0
+
+    while (true) {
+      const { data, error } = await supabase
+        .from('zonas_infraestructuras')
+        .select('*')
+        .range(from, from + PAGE_SIZE - 1)
+
+      if (error || !data || data.length === 0) break
+      allData = allData.concat(data)
+      if (data.length < PAGE_SIZE) break
+      from += PAGE_SIZE
+    }
+
+    zonas_infraestructuras.value = allData
   }
   const loadTipoInfraestructura = async () => {
     const { data } = await supabase.from('tipo_infraestructura').select('*')
     tipo_infraestructura.value = data
   }
 
+  const loadCentrosCoste = async () => {
+    const { data } = await supabase.from('centros_coste').select('*')
+    centrosCoste.value = data ?? []
+  }
+
   const loadInfraestructuras = async () => {
-    const { data } = await supabase.from('infraestructuras').select('*')
-    infraestructuras.value = data
+    const PAGE_SIZE = 1000
+    let allData = []
+    let from = 0
+
+    while (true) {
+      const { data, error } = await supabase
+        .from('infraestructuras')
+        .select('*')
+        .range(from, from + PAGE_SIZE - 1)
+
+      if (error || !data || data.length === 0) break
+      allData = allData.concat(data)
+      if (data.length < PAGE_SIZE) break
+      from += PAGE_SIZE
+    }
+
+    infraestructuras.value = allData
   }
 
   const getZonas = computed(() => {
@@ -275,6 +388,10 @@ const loadOperarios = async () => {
 
   const getTipoPersonal = computed(() => {
     return tipoPersonal.value
+  })
+
+  const getCentrosCoste = computed(() => {
+    return centrosCoste.value
   })
 
   const getPuntosMuestreoTotal = computed(() => {
@@ -373,6 +490,8 @@ const getZonasOperario = computed(() => {
     initializeStoreWithAnalytics,
     zonas_personal,
     loadZonasOperarios,
-    getZonasOperario
+    getZonasOperario,
+    getCentrosCoste,
+    loadCentrosCoste
   }
 })
