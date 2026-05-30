@@ -41,5 +41,12 @@ settings.json
 .agents.omo/
 .claude/
 .agents/
-.omo/ts/
+.omo/
+.opencode/
+.sisyphus/
+supabase/.temp/
+skills-lock.json
+basura/
+Snippets/
+dev-dist/workbox-*
 
