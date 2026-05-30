@@ -153,6 +153,14 @@ const handlePrintHTML = async () => {
     }
   }
 
+  function getComunidadFromAnalitica(a) {
+    if (a.comunidad_id) return a.comunidad_id
+    const punto = plantasStore.getPuntosMuestreo.find(p => p.id === a.punto_muestreo_fk)
+    if (!punto?.zona_fk) return null
+    const zona = plantasStore.getZonas.find(z => z.id === punto.zona_fk)
+    return zona?.com_autonoma_fk ?? null
+  }
+
   // Definición centralizada de columnas
   const hasCataluna = analiticas.some(a => getComunidadFromAnalitica(a) === CATALUNA_COMUNIDAD_ID)
 
@@ -184,14 +192,6 @@ const handlePrintHTML = async () => {
     if (!punto) return { id: null, name: 'Sin zona' }
     const zona = plantasStore.getZonas.find(z => z.id === punto.zona_fk)
     return { id: zona?.id ?? null, name: zona?.name ?? 'Sin zona' }
-  }
-
-  const getComunidadFromAnalitica = (a) => {
-    if (a.comunidad_id) return a.comunidad_id
-    const punto = plantasStore.getPuntosMuestreo.find(p => p.id === a.punto_muestreo_fk)
-    if (!punto?.zona_fk) return null
-    const zona = plantasStore.getZonas.find(z => z.id === punto.zona_fk)
-    return zona?.com_autonoma_fk ?? null
   }
 
   // Pre-computar todos los valores de celda + metadata de zona para el JS del HTML
