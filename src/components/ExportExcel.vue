@@ -38,6 +38,13 @@ const { warning: notifyWarning, info: notifyInfo } = useNotifications()
 
 // --- Lógica para formatear datos para Excel (similar a la propuesta anterior) ---
 const getPuntoMuestreoNombre = (id) => plantasStore.getPuntosMuestreo.find(p => p.id === id)?.name || 'N/A';
+const getComunidadFromAnalitica = (a) => {
+  if (a.comunidad_id) return a.comunidad_id
+  const punto = plantasStore.getPuntosMuestreo.find(p => p.id === a.punto_muestreo_fk)
+  if (!punto?.zona_fk) return null
+  const zona = plantasStore.getZonas.find(z => z.id === punto.zona_fk)
+  return zona?.com_autonoma_fk ?? null
+};
 const getOperarioNombre = (analitica) => {
   // Primero intentar usar los datos ya cargados desde el servidor (personal.name)
   if (analitica?.personal?.name) return analitica.personal.name;
@@ -116,7 +123,7 @@ const handleDownloadExcel = () => {
     if (row.fecha > maxDate) maxDate = row.fecha
   })
 
-  const hasCataluna = selectedRows.value.some(a => a.comunidad_id === CATALUNA_COMUNIDAD_ID)
+  const hasCataluna = selectedRows.value.some(a => getComunidadFromAnalitica(a) === CATALUNA_COMUNIDAD_ID)
 
   const dataForSheet = selectedRows.value.map(a => {
     const row = {

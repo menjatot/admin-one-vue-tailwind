@@ -73,6 +73,14 @@ const esCataluna = computed(() => {
   return false
 })
 
+const esCatalunaHistorico = (analitica) => {
+  if (analitica.comunidad_id) return analitica.comunidad_id === CATALUNA_COMUNIDAD_ID
+  const punto = plantaStore.getPuntosMuestreo.find((p) => p.id === analitica.punto_muestreo_fk)
+  if (!punto?.zona_fk) return false
+  const zona = plantaStore.getZonas.find((z) => z.id === punto.zona_fk)
+  return zona?.com_autonoma_fk === CATALUNA_COMUNIDAD_ID
+}
+
 const cloroCombinado = computed(() => {
   if (form.cloro_total == null || form.cloro_total === '' || form.cloro == null || form.cloro === '') return null
   const total = Number(form.cloro_total)
@@ -432,7 +440,7 @@ watch(
               </div>
 
               <!-- Valores principales -->
-              <div :class="['grid gap-2 text-center mb-2', analitica.comunidad_id === 10 ? 'grid-cols-5' : 'grid-cols-3']">
+              <div :class="['grid gap-2 text-center mb-2', esCatalunaHistorico(analitica) ? 'grid-cols-5' : 'grid-cols-3']">
                 <div class="bg-gray-50 dark:bg-slate-700 rounded p-2">
                   <p class="text-xs text-gray-500 dark:text-gray-400">Cloro</p>
                   <p class="text-sm font-bold text-gray-800 dark:text-gray-100">
@@ -454,7 +462,7 @@ watch(
                   </p>
                 </div>
                 <div
-                  v-if="analitica.comunidad_id === 10"
+                  v-if="esCatalunaHistorico(analitica)"
                   class="bg-yellow-50 dark:bg-yellow-900/30 rounded p-2"
                 >
                   <p class="text-xs text-gray-500 dark:text-gray-400">Cloro Total</p>
@@ -464,7 +472,7 @@ watch(
                   </p>
                 </div>
                 <div
-                  v-if="analitica.comunidad_id === 10"
+                  v-if="esCatalunaHistorico(analitica)"
                   class="bg-yellow-50 dark:bg-yellow-900/30 rounded p-2"
                 >
                   <p class="text-xs text-gray-500 dark:text-gray-400">Cloro Comb.</p>

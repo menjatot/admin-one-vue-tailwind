@@ -2,6 +2,7 @@
 import { FormKit } from '@formkit/vue'
 import { computed, ref, watch } from 'vue'
 import { CATALUNA_COMUNIDAD_ID } from '@/constants/comunidades'
+import { usePlantasStore } from '@/stores/plantas'
 
 const props = defineProps({
   analitic: {
@@ -34,7 +35,15 @@ const saborValue = computed({
   set: (checked) => (localAnalitic.value.sabor = checked ? 0 : 1)
 })
 
-const esCataluna = computed(() => localAnalitic.value.comunidad_id === CATALUNA_COMUNIDAD_ID)
+const plantaStore = usePlantasStore()
+
+const esCataluna = computed(() => {
+  if (localAnalitic.value.comunidad_id) return localAnalitic.value.comunidad_id === CATALUNA_COMUNIDAD_ID
+  const punto = plantaStore.getPuntosMuestreo.find((p) => p.id === localAnalitic.value.punto_muestreo_fk)
+  if (!punto?.zona_fk) return false
+  const zona = plantaStore.getZonas.find((z) => z.id === punto.zona_fk)
+  return zona?.com_autonoma_fk === CATALUNA_COMUNIDAD_ID
+})
 
 watch(
   () => [localAnalitic.value.cloro_total, localAnalitic.value.cloro],

@@ -306,6 +306,8 @@ const allRowsChecked = computed(() => {
 
 const checkCloroWrong = (analitica) => isCloroWrong(analitica.cloro, getRangesForAnalitica(analitica).cloro)
 
+const esCataluna = (analitica) => getComunidadIdFromAnalitica(analitica) === 10
+
 const checkPhWrong = (analitica) => isPhWrong(analitica.ph, getRangesForAnalitica(analitica).ph)
 
 const checkTurbidezWrong = (analitica) =>
@@ -963,7 +965,7 @@ onMounted(async () => {
                   </div>
                   <!-- Cloro Total / Cloro Combinado (solo Cataluña) -->
                   <div
-                    v-if="analitica.comunidad_id === 10"
+                    v-if="esCataluna(analitica)"
                     class="rounded-xl p-2 sm:p-3 flex flex-col gap-1 border bg-amber-50 border-amber-200 dark:bg-amber-900/20 dark:border-amber-700"
                   >
                     <span class="text-xs font-medium uppercase tracking-wide text-amber-600 dark:text-amber-400">Cloro Total</span>
@@ -973,7 +975,7 @@ onMounted(async () => {
                     <span class="text-xs text-amber-500 dark:text-amber-400">mg/l</span>
                   </div>
                   <div
-                    v-if="analitica.comunidad_id === 10"
+                    v-if="esCataluna(analitica)"
                     :class="[
                       'rounded-xl p-2 sm:p-3 flex flex-col gap-1 border',
                       analitica.cloro_combinado != null && analitica.cloro_combinado < 0
