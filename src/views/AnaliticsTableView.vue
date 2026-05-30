@@ -17,7 +17,7 @@ import { usePermissions } from '@/composables/usePermissions';
 const tablaAnaliticas = ref();
 const { exportXMLData } = useExtractdata();
 const selectedZona= ref(null);
-const { isAdmin: isAdminRole, canExport: canExportAndPrint, isOperario } = usePermissions();
+const { isAdmin: isAdminRole, canExport: canExportAndPrint, isOperario, isVisualizador } = usePermissions();
 const { resumen, sinIncidencias, cargando, cargarIncidencias } = useDashboardIncidencias()
 const dashboardAbierto = ref(true)
 const loginStore = useLoginStore()
@@ -37,7 +37,7 @@ const getNombrePunto = (puntoId) => {
 }
 
 onMounted(() => {
-  if (!isOperario.value) cargarIncidencias(getZonasOperario())
+  if (!isOperario.value && !isVisualizador.value) cargarIncidencias(getZonasOperario())
 })
 
 const limpiarFiltros = () => {
@@ -143,7 +143,7 @@ const loadAllAnalyticsForExport = async () => {
       </SectionTitleLineWithButton>
 
       <!-- Dashboard de incidencias -->
-      <CardBox v-if="resumen.total > 0 && !isOperario" class="mb-6 mx-10">
+      <CardBox v-if="resumen.total > 0 && !isOperario && !isVisualizador" class="mb-6 mx-10">
         <div class="flex items-center justify-between mb-3">
           <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-200">
             Resumen de incidencias — últimos 7 días

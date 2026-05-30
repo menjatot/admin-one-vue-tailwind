@@ -34,7 +34,7 @@ const getZonasOperario = () => {
 }
 
 onMounted(() => {
-  if (loginStore.userRole !== '1') cargarIncidencias(getZonasOperario())
+  if (loginStore.userRole !== '1' && loginStore.userRole !== '10') cargarIncidencias(getZonasOperario())
 })
 
 // Inicializar seguridad de sesión
@@ -100,7 +100,7 @@ const menuClick = (event, item) => {
         </NavBarItemPlain> -->
       </NavBar>
       <div
-        v-if="resumen.conIncidencias > 0 && !incidenciasBannerCerrado && loginStore.userRole !== '1'"
+        v-if="resumen.conIncidencias > 0 && !incidenciasBannerCerrado && loginStore.userRole !== '1' && loginStore.userRole !== '10'"
         class="mx-4 mt-2 flex items-center justify-between rounded-lg border border-red-200 bg-red-50 px-4 py-2 dark:border-red-700 dark:bg-red-900/20"
       >
         <button
