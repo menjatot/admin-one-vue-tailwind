@@ -87,24 +87,13 @@ defineExpose({
 })
 
 const showOnlyWrongValues = ref(false)
-const wrongAnaliticas = ref([])
-const loadingWrongValues = ref(false)
 
-watch(showOnlyWrongValues, async (show) => {
-  if (show) {
-    loadingWrongValues.value = true
-    try {
-      const allData = await loadAllFilteredData()
-      wrongAnaliticas.value = allData.filter((a) => checkWrongValues(a))
-    } catch (e) {
-      console.error('Error fetching all data for wrong values filter:', e)
-      wrongAnaliticas.value = []
-    } finally {
-      loadingWrongValues.value = false
-    }
-  } else {
-    wrongAnaliticas.value = []
-  }
+// El toggle "solo fuera de rango" es ahora un filtro server-side (computed column
+// fuera_de_rango en Postgres), no una descarga + filtrado en cliente. Re-aplicamos
+// los filtros para que loadData pagine solo las analíticas fuera de rango.
+watch(showOnlyWrongValues, () => {
+  if (isInitializing.value) return
+  applyLocalFilters()
 })
 const expandedRows = ref([])
 const isModalDeleteAnaliticsActive = ref(false)
@@ -289,13 +278,9 @@ const getTipoAnalitica = (id) => {
   }
 }
 
-// Computed para filtrar analíticas según el checkbox
-const filteredAnalitics = computed(() => {
-  if (showOnlyWrongValues.value) {
-    return wrongAnaliticas.value
-  }
-  return analitics.value
-})
+// El filtrado "fuera de rango" ahora es server-side, así que la tabla muestra
+// siempre el conjunto paginado tal cual viene del servidor.
+const filteredAnalitics = computed(() => analitics.value)
 
 const allRowsChecked = computed(() => {
   return filteredAnalitics.value.length > 0 &&
@@ -384,6 +369,7 @@ const applyLocalFilters = () => {
   if (localFilters.infraestructura) serverFilters.infraestructura_fk = localFilters.infraestructura
   if (localFilters.uo) serverFilters.uo_fk = localFilters.uo
   if (localFilters.centro_coste) serverFilters.centro_coste_fk = localFilters.centro_coste
+  if (showOnlyWrongValues.value) serverFilters.fuera_de_rango = true
 
   // Siempre inyectar restricción de zonas para usuarios no admin
   const zonaIds = getUserZonaIds()
@@ -730,16 +716,15 @@ onMounted(async () => {
   </div>
   <!-- Loading overlay para la tabla -->
   <div class="relative">
-    <div v-if="loading || fetchingAll || loadingWrongValues" class="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10 rounded">
+    <div v-if="loading || fetchingAll" class="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10 rounded">
       <div class="flex items-center gap-2">
         <BaseIcon :path="mdiLoading" class="animate-spin" />
         <span v-if="fetchingAll">Seleccionando todas las analíticas...</span>
-        <span v-else-if="loadingWrongValues">Cargando todas las analíticas para filtrar...</span>
         <span v-else>Cargando datos...</span>
       </div>
     </div>
 
-    <table class="w-full" :class="{ 'opacity-50': loading || fetchingAll || loadingWrongValues }">
+    <table class="w-full" :class="{ 'opacity-50': loading || fetchingAll }">
       <thead>
         <tr>
           <th v-if="checkable" class="text-center w-12" title="Seleccionar todas las analíticas de todas las páginas que cumplan los filtros actuales">
@@ -1083,7 +1068,7 @@ onMounted(async () => {
   </div>
 
   <!-- Paginación -->
-  <div v-if="!showOnlyWrongValues" class="p-3 lg:px-6 border-t border-gray-100 dark:border-slate-800">
+  <div class="p-3 lg:px-6 border-t border-gray-100 dark:border-slate-800">
     <BaseLevel>
       <BaseButtons>
         <BaseButton
@@ -1118,9 +1103,9 @@ onMounted(async () => {
         <div>Página {{ paginationInfo.currentPage }} de {{ paginationInfo.totalPages }}</div>
       </div>
     </BaseLevel>
-  </div>
-  <div v-else class="p-3 lg:px-6 border-t border-gray-100 dark:border-slate-800 text-sm text-gray-600">
-    {{ loadingWrongValues ? 'Buscando valores incorrectos...' : `${wrongAnaliticas.length} analítica${wrongAnaliticas.length !== 1 ? 's' : ''} con valores fuera de rango` }}
+    <div v-if="showOnlyWrongValues" class="mt-2 text-sm text-amber-600 dark:text-amber-400">
+      Mostrando solo analíticas con valores fuera de rango ({{ paginationInfo.total }} en total)
+    </div>
   </div>
 </template>
 

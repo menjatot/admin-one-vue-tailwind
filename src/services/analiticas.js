@@ -2,76 +2,111 @@ import { supabase, assertAuthenticated } from './supabase'
 import { logAudit } from './auditLog'
 
 const PAGE_SIZE = 1000
-const MAX_IN_FILTER = 300
 
 // Paginate a Supabase query to fetch all rows (Supabase caps at 1000 by default)
 const fetchAll = async (query) => {
   let allData = []
   let from = 0
-  while (true) {
+  let keepGoing = true
+  while (keepGoing) {
     const { data, error } = await query.range(from, from + PAGE_SIZE - 1)
     if (error) throw error
     if (!data || data.length === 0) break
     allData = allData.concat(data)
-    if (data.length < PAGE_SIZE) break
-    from += PAGE_SIZE
+    if (data.length < PAGE_SIZE) keepGoing = false
+    else from += PAGE_SIZE
   }
   return allData
 }
 
-// Fetch all rows matching an ID set via batched .in() queries (avoids URL length limits)
-const fetchByIdsBatched = async (table, selectQuery, idColumn, ids, buildQuery) => {
-  if (ids.length <= MAX_IN_FILTER) {
-    let query = supabase.from(table).select(selectQuery).in(idColumn, ids)
-    if (buildQuery) query = buildQuery(query)
-    return fetchAll(query)
+const EMPTY_SCOPE = Symbol('empty-scope')
+
+// Resolve UO / zona(s) / centro_coste / infraestructura filters into a description
+// of how to constrain analiticas via their punto_muestreo, WITHOUT materializing
+// the (potentially thousands of) punto IDs on the client.
+//
+// Returns:
+//   null         → no spatial filter present, query analiticas unconstrained
+//   EMPTY_SCOPE  → filter resolves to zero zonas/puntos, caller returns empty result
+//   { kind: 'infra', infra }      → constrain by punto_muestreo.infraestructura_fk
+//   { kind: 'zonas', zonas: [] }  → constrain by punto_muestreo.zona_fk IN (zonas)
+//
+// Note: every punto_muestreo has a zona_fk (verified: 0 rows with infra-but-no-zona),
+// so the zona_fk filter fully covers the old zona-OR-infra logic for UO/zona/CC filters.
+// The infra branch is only used when a *specific* infrastructure is selected.
+const resolvePuntoScope = async (filters) => {
+  const hasSpatialFilter =
+    filters.uo_fk ||
+    filters.infraestructura_fk ||
+    filters.zona_fk ||
+    filters.zonas_fk ||
+    filters.centro_coste_fk
+
+  if (!hasSpatialFilter) return null
+
+  // A specific infrastructure was selected → constrain by it directly.
+  if (filters.infraestructura_fk) {
+    return { kind: 'infra', infra: filters.infraestructura_fk }
   }
 
-  let allData = []
-  for (let i = 0; i < ids.length; i += MAX_IN_FILTER) {
-    const batch = ids.slice(i, i + MAX_IN_FILTER)
-    let query = supabase.from(table).select(selectQuery).in(idColumn, batch)
-    if (buildQuery) query = buildQuery(query)
-    const batchData = await fetchAll(query)
-    allData = allData.concat(batchData)
-  }
-  return allData
-}
+  // Build the effective zona set, mirroring the original precedence:
+  //   zona_fk  >  zonas_fk (intersected with centro_coste)  >  zonas of UO
+  let effectiveZonasFk = filters.zonas_fk ? [...filters.zonas_fk] : null
 
-// Find all puntos_muestreo IDs linked to the given zonas.
-// Matches both direct (puntos_muestreo.zona_fk) and indirect
-// (via zonas_infraestructuras junction table) relationships.
-const getPuntosMuestreoByZonas = async (targetZonas, infraestructuraFk) => {
-  // When a specific infrastructure is selected, match by it directly
-  if (infraestructuraFk) {
-    const data = await fetchAll(
-      supabase.from('puntos_muestreo').select('id').eq('infraestructura_fk', infraestructuraFk)
+  if (filters.centro_coste_fk && !filters.zona_fk) {
+    const ccZonasData = await fetchAll(
+      supabase.from('zonas_abastecimiento').select('id').eq('centro_coste_fk', filters.centro_coste_fk)
     )
-    return data.map(pm => pm.id)
+    const ccZonaIds = ccZonasData.map((z) => z.id)
+    if (ccZonaIds.length === 0) return EMPTY_SCOPE
+    effectiveZonasFk = effectiveZonasFk
+      ? effectiveZonasFk.filter((id) => ccZonaIds.includes(id))
+      : ccZonaIds
   }
 
-  // No specific infra: find puntos linked directly OR indirectly
-  // 1. Get infra IDs linked to target zonas via the junction table
-  const ziData = await fetchAll(
-    supabase.from('zonas_infraestructuras').select('infraestructuras_fk').in('zonas_fk', targetZonas)
-  )
-
-  const infraIds = [...new Set((ziData ?? []).map(r => r.infraestructuras_fk))]
-
-  // 2. Query puntos_muestreo with OR condition matching the frontend logic
-  let query = supabase.from('puntos_muestreo').select('id')
-
-  if (infraIds.length > 0) {
-    const zonaStr = targetZonas.join(',')
-    const infraStr = infraIds.join(',')
-    query = query.or(`zona_fk.in.(${zonaStr}),infraestructura_fk.in.(${infraStr})`)
-  } else {
-    query = query.in('zona_fk', targetZonas)
+  let zonaIdsFromUO = null
+  if (filters.uo_fk) {
+    const zonasData = await fetchAll(
+      supabase.from('zonas_abastecimiento').select('id').eq('unidades_operativas_fk', filters.uo_fk)
+    )
+    zonaIdsFromUO = zonasData.map((z) => z.id)
+    if (zonaIdsFromUO.length === 0) return EMPTY_SCOPE
   }
 
-  const data = await fetchAll(query)
-  return data.map(pm => pm.id)
+  let targetZonas = []
+  if (filters.zona_fk) targetZonas = [filters.zona_fk]
+  else if (effectiveZonasFk && effectiveZonasFk.length > 0) targetZonas = effectiveZonasFk
+  else if (zonaIdsFromUO) targetZonas = zonaIdsFromUO
+
+  if (targetZonas.length === 0) return EMPTY_SCOPE
+
+  return { kind: 'zonas', zonas: targetZonas }
 }
+
+// Apply the resolved scope to an analiticas query by filtering on the embedded
+// punto_muestreo foreign table. Requires the select to embed punto_muestreo with !inner.
+const applyPuntoScope = (query, scope) => {
+  if (!scope) return query
+  if (scope.kind === 'infra') return query.eq('punto_muestreo.infraestructura_fk', scope.infra)
+  return query.in('punto_muestreo.zona_fk', scope.zonas)
+}
+
+const emptyPage = (page, pageSize) => ({
+  data: [],
+  count: 0,
+  page,
+  pageSize,
+  totalPages: 0,
+  hasNextPage: false,
+  hasPreviousPage: false
+})
+
+// Select for the analiticas list. Embeds punto_muestreo as an inner join when a
+// spatial scope is active so the embedded filter actually constrains parent rows.
+const buildSelect = (hasScope) =>
+  hasScope
+    ? '*,personal:personal_fk(id, name),punto_muestreo:punto_muestreo_fk!inner(id, name, zona_fk, infraestructura_fk)'
+    : '*,personal:personal_fk(id, name),punto_muestreo:punto_muestreo_fk(id, name, zona_fk)'
 
 export const getAnaliticas = async () => {
   const data = await fetchAll(supabase.from('analiticas').select('*'))
@@ -88,181 +123,42 @@ export const getAnaliticasPaginated = async (options = {}) => {
     searchText = ''
   } = options
 
-  console.log('📊 Filtros recibidos en getAnaliticasPaginated:', filters)
+  // Resolve UO/zona/CC/infra filters into an embedded-table scope (1 small query at most).
+  const scope = await resolvePuntoScope(filters)
+  if (scope === EMPTY_SCOPE) return emptyPage(page, pageSize)
 
-  // **PASO 1: Obtener IDs de puntos de muestreo según filtros de UO/infraestructura/zona**
-  let puntosMuestreoIds = null
+  const hasScope = scope !== null
+  const orderDirection = sortOrder !== 'desc'
 
-  // Si hay filtro de UO, infraestructura, zona, zonas (array) o centro_coste, hacer query previa
-  if (filters.uo_fk || filters.infraestructura_fk || filters.zona_fk || filters.zonas_fk || filters.centro_coste_fk) {
-    console.log('🔍 Filtros de UO/Infraestructura/Zona/CC detectados, obteniendo puntos de muestreo...')
-
-    // Sub-paso 1a: Si hay filtro de centro_coste, obtener las zonas que pertenecen a ese CC
-    if (filters.centro_coste_fk && !filters.zona_fk) {
-      console.log('  🔍 Obteniendo zonas de Centro de Coste:', filters.centro_coste_fk)
-      const ccZonasData = await fetchAll(
-        supabase.from('zonas_abastecimiento').select('id').eq('centro_coste_fk', filters.centro_coste_fk)
-      )
-
-      const ccZonaIds = ccZonasData.map(z => z.id)
-      console.log(`  ✓ Encontradas ${ccZonaIds.length} zonas para CC ${filters.centro_coste_fk}`)
-
-      if (ccZonaIds.length === 0) {
-        return { data: [], count: 0, page, pageSize, totalPages: 0, hasNextPage: false, hasPreviousPage: false }
-      }
-
-      // Inyectar como filtro de zonas (se combina con zonas_fk si existe)
-      if (filters.zonas_fk && filters.zonas_fk.length > 0) {
-        filters.zonas_fk = filters.zonas_fk.filter(id => ccZonaIds.includes(id))
-      } else {
-        filters.zonas_fk = ccZonaIds
-      }
-    }
-
-    // Sub-paso 1b: Si hay filtro de UO, primero obtener las zonas de esa UO
-    let zonaIds = null
-    if (filters.uo_fk) {
-      console.log('  🔍 Obteniendo zonas de UO:', filters.uo_fk)
-      const zonasData = await fetchAll(
-        supabase.from('zonas_abastecimiento').select('id').eq('unidades_operativas_fk', filters.uo_fk)
-      )
-
-      zonaIds = zonasData.map(z => z.id)
-      console.log(`  ✓ Encontradas ${zonaIds.length} zonas para UO ${filters.uo_fk}:`, zonaIds)
-
-      if (zonaIds.length === 0) {
-        console.log('  ⚠️ No hay zonas para esta UO, retornando 0 resultados')
-        return {
-          data: [],
-          count: 0,
-          page,
-          pageSize,
-          totalPages: 0,
-          hasNextPage: false,
-          hasPreviousPage: false
-        }
-      }
-    }
-
-    // Sub-paso 1c: Obtener puntos de muestreo con los filtros correspondientes
-    const targetZonas = []
-    if (filters.zona_fk) targetZonas.push(filters.zona_fk)
-    else if (filters.zonas_fk && filters.zonas_fk.length > 0) targetZonas.push(...filters.zonas_fk)
-    else if (zonaIds) targetZonas.push(...zonaIds)
-
-    if (targetZonas.length > 0) {
-      console.log('  ➜ Buscando puntos de muestreo por zonas:', targetZonas.length, 'zonas')
-      const pmIds = await getPuntosMuestreoByZonas(targetZonas, filters.infraestructura_fk)
-      puntosMuestreoIds = pmIds
-    } else if (filters.infraestructura_fk) {
-      // Solo filtro de infraestructura (sin zonas)
-      const pmData = await fetchAll(
-        supabase.from('puntos_muestreo').select('id').eq('infraestructura_fk', filters.infraestructura_fk)
-      )
-      puntosMuestreoIds = pmData.map(pm => pm.id)
-    }
-
-    console.log(`  ✓ Encontrados ${puntosMuestreoIds.length} puntos de muestreo que cumplen condiciones`)
-
-    // Si no hay puntos de muestreo que cumplan, retornar vacío
-    if (puntosMuestreoIds.length === 0) {
-      console.log('  ⚠️ No hay puntos de muestreo que cumplan los filtros, retornando 0 resultados')
-      return {
-        data: [],
-        count: 0,
-        page,
-        pageSize,
-        totalPages: 0,
-        hasNextPage: false,
-        hasPreviousPage: false
-      }
-    }
-  }
-
-  // **PASO 2: Query principal de analíticas**
-  const selectQuery = '*,personal:personal_fk(id, name),punto_muestreo:punto_muestreo_fk(id, name, zona_fk)'
-  console.log('🔗 Select query:', selectQuery)
-
-  // Helper: apply direct filters to a query
+  // Direct (top-level) column filters shared by both code paths.
   const applyDirectFilters = (query) => {
     if (filters.fecha_inicio) query = query.gte('fecha', filters.fecha_inicio)
     if (filters.fecha_final) query = query.lte('fecha', filters.fecha_final)
     if (filters.punto_muestreo_fk) query = query.eq('punto_muestreo_fk', filters.punto_muestreo_fk)
     if (filters.personal_fk) query = query.eq('personal_fk', filters.personal_fk)
     if (filters.type) query = query.eq('type', filters.type)
+    // fuera_de_rango is a PostgREST computed column (DB function fuera_de_rango(analiticas))
+    if (filters.fuera_de_rango) query = query.eq('fuera_de_rango', true)
     if (searchText) query = query.ilike('observaciones', `%${searchText}%`)
     return query
   }
 
-  const orderDirection = sortOrder === 'desc' ? false : true
-
-  // If we have a large ID set, batch the .in() query to avoid URL length limits
-  if (puntosMuestreoIds !== null && puntosMuestreoIds.length > MAX_IN_FILTER) {
-    console.log(`  ⚡ Batched query: ${puntosMuestreoIds.length} IDs in batches of ${MAX_IN_FILTER}`)
-
-    const allData = await fetchByIdsBatched(
-      'analiticas',
-      selectQuery,
-      'punto_muestreo_fk',
-      puntosMuestreoIds,
-      applyDirectFilters
-    )
-
-    // Sort
-    allData.sort((a, b) => {
-      const aVal = a[sortBy]
-      const bVal = b[sortBy]
-      if (aVal == null) return 1
-      if (bVal == null) return -1
-      const cmp = aVal < bVal ? -1 : aVal > bVal ? 1 : 0
-      return sortOrder === 'desc' ? -cmp : cmp
-    })
-
-    // Paginate
-    const from = (page - 1) * pageSize
-    const data = allData.slice(from, from + pageSize)
-    const count = allData.length
-
-    console.log(`✅ Query exitosa (batched): ${count} analíticas encontradas, mostrando ${data?.length} en esta página`)
-
-    return {
-      data,
-      count,
-      page,
-      pageSize,
-      totalPages: Math.ceil(count / pageSize),
-      hasNextPage: page * pageSize < count,
-      hasPreviousPage: page > 1
-    }
-  }
-
-  // Standard query with server-side pagination
-  let query = supabase
-    .from('analiticas')
-    .select(selectQuery, { count: 'exact' })
-
-  if (puntosMuestreoIds !== null) {
-    console.log('  ✓ Aplicando filtro punto_muestreo_fk con IDs obtenidos en PASO 1:', puntosMuestreoIds.length, 'IDs')
-    query = query.in('punto_muestreo_fk', puntosMuestreoIds)
-  }
-
+  // Single server-side query: filtering, ordering, exact count and pagination
+  // all happen in the database. No client-side download/sort of the full table.
+  let query = supabase.from('analiticas').select(buildSelect(hasScope), { count: 'exact' })
+  query = applyPuntoScope(query, scope)
   query = applyDirectFilters(query)
   query = query.order(sortBy, { ascending: orderDirection })
 
-  // Paginación
   const from = (page - 1) * pageSize
-  const to = from + pageSize - 1
-  query = query.range(from, to)
+  query = query.range(from, from + pageSize - 1)
 
   const { data, error, count } = await query
 
   if (error) {
-    console.error('❌ Error fetching paginated analiticas:', error)
-    console.error('   Error details:', error.message, error.details, error.hint)
+    console.error('❌ Error fetching paginated analiticas:', error.message, error.details, error.hint)
     throw error
   }
-
-  console.log(`✅ Query exitosa: ${count} analíticas encontradas, mostrando ${data?.length} en esta página`)
 
   return {
     data,
@@ -276,159 +172,34 @@ export const getAnaliticasPaginated = async (options = {}) => {
 }
 
 export const getAnaliticasFiltered = async (options = {}) => {
-  const {
-    sortBy = 'fecha',
-    sortOrder = 'desc',
-    filters = {},
-    searchText = ''
-  } = options
+  const { sortBy = 'fecha', sortOrder = 'desc', filters = {}, searchText = '' } = options
 
-  console.log('📊 getAnaliticasFiltered - Filtros recibidos:', filters)
+  const scope = await resolvePuntoScope(filters)
+  if (scope === EMPTY_SCOPE) return []
 
-  // **PASO 1: Obtener IDs de puntos de muestreo según filtros de UO/infraestructura/zona**
-  let puntosMuestreoIds = null
+  const hasScope = scope !== null
+  const orderDirection = sortOrder !== 'desc'
 
-  if (filters.uo_fk || filters.infraestructura_fk || filters.zona_fk || filters.zonas_fk || filters.centro_coste_fk) {
-    console.log('🔍 Filtros de UO/Infraestructura/Zona/CC detectados en getAnaliticasFiltered')
-
-    // Sub-paso 1a: Si hay filtro de centro_coste, obtener las zonas de ese CC
-    if (filters.centro_coste_fk && !filters.zona_fk) {
-      console.log('  🔍 Obteniendo zonas de Centro de Coste:', filters.centro_coste_fk)
-      const ccZonasData = await fetchAll(
-        supabase.from('zonas_abastecimiento').select('id').eq('centro_coste_fk', filters.centro_coste_fk)
-      )
-
-      const ccZonaIds = ccZonasData.map(z => z.id)
-      console.log(`  ✓ Encontradas ${ccZonaIds.length} zonas para CC ${filters.centro_coste_fk}`)
-
-      if (ccZonaIds.length === 0) return []
-
-      if (filters.zonas_fk && filters.zonas_fk.length > 0) {
-        filters.zonas_fk = filters.zonas_fk.filter(id => ccZonaIds.includes(id))
-      } else {
-        filters.zonas_fk = ccZonaIds
-      }
-    }
-
-    // Sub-paso 1b: Si hay filtro de UO, primero obtener las zonas de esa UO
-    let zonaIds = null
-    if (filters.uo_fk) {
-      console.log('  🔍 Obteniendo zonas de UO:', filters.uo_fk)
-      const zonasData = await fetchAll(
-        supabase.from('zonas_abastecimiento').select('id').eq('unidades_operativas_fk', filters.uo_fk)
-      )
-
-      zonaIds = zonasData.map(z => z.id)
-      console.log(`  ✓ Encontradas ${zonaIds.length} zonas para UO ${filters.uo_fk}:`, zonaIds)
-
-      if (zonaIds.length === 0) {
-        console.log('  ⚠️ No hay zonas para esta UO, retornando array vacío')
-        return []
-      }
-    }
-
-    const targetZonas = []
-    if (filters.zona_fk) targetZonas.push(filters.zona_fk)
-    else if (filters.zonas_fk && filters.zonas_fk.length > 0) targetZonas.push(...filters.zonas_fk)
-    else if (zonaIds) targetZonas.push(...zonaIds)
-
-    if (targetZonas.length > 0) {
-      console.log('  ➜ Buscando puntos de muestreo por zonas:', targetZonas.length, 'zonas')
-      const pmIds = await getPuntosMuestreoByZonas(targetZonas, filters.infraestructura_fk)
-      puntosMuestreoIds = pmIds
-    } else if (filters.infraestructura_fk) {
-      const pmData = await fetchAll(
-        supabase.from('puntos_muestreo').select('id').eq('infraestructura_fk', filters.infraestructura_fk)
-      )
-      puntosMuestreoIds = pmData.map(pm => pm.id)
-    }
-
-    console.log(`  ✓ Encontrados ${puntosMuestreoIds.length} puntos de muestreo en getAnaliticasFiltered`)
-
-    if (puntosMuestreoIds.length === 0) {
-      console.log('  ⚠️ No hay puntos de muestreo, retornando array vacío')
-      return []
-    }
-  }
-
-  // **PASO 2: Query principal de analíticas**
-  const selectQuery = '*,personal:personal_fk(id, name),punto_muestreo:punto_muestreo_fk(id, name, zona_fk)'
-
-  // Helper: apply direct filters to a query
   const applyDirectFilters = (query) => {
     if (filters.fecha_inicio) query = query.gte('fecha', filters.fecha_inicio)
     if (filters.fecha_final) query = query.lte('fecha', filters.fecha_final)
     if (filters.punto_muestreo_fk) query = query.eq('punto_muestreo_fk', filters.punto_muestreo_fk)
     if (filters.personal_fk) query = query.eq('personal_fk', filters.personal_fk)
     if (filters.type) query = query.eq('type', filters.type)
+    // fuera_de_rango is a PostgREST computed column (DB function fuera_de_rango(analiticas))
+    if (filters.fuera_de_rango) query = query.eq('fuera_de_rango', true)
     if (searchText) query = query.ilike('observaciones', `%${searchText}%`)
     return query
   }
 
-  const orderDirection = sortOrder === 'desc' ? false : true
-
-  // If we have a large ID set, batch the .in() query to avoid URL length limits
-  if (puntosMuestreoIds !== null && puntosMuestreoIds.length > MAX_IN_FILTER) {
-    console.log(`  ⚡ Batched query: ${puntosMuestreoIds.length} IDs in batches of ${MAX_IN_FILTER}`)
-
-    const allData = await fetchByIdsBatched(
-      'analiticas',
-      selectQuery,
-      'punto_muestreo_fk',
-      puntosMuestreoIds,
-      applyDirectFilters
-    )
-
-    // Sort
-    allData.sort((a, b) => {
-      const aVal = a[sortBy]
-      const bVal = b[sortBy]
-      if (aVal == null) return 1
-      if (bVal == null) return -1
-      const cmp = aVal < bVal ? -1 : aVal > bVal ? 1 : 0
-      return sortOrder === 'desc' ? -cmp : cmp
-    })
-
-    console.log(`✅ getAnaliticasFiltered exitosa (batched): ${allData.length} analíticas encontradas`)
-    return allData
-  }
-
-  // Standard query
-  let query = supabase
-    .from('analiticas')
-    .select(selectQuery)
-
-  if (puntosMuestreoIds !== null) {
-    console.log('  ✓ Aplicando filtro punto_muestreo_fk con IDs obtenidos:', puntosMuestreoIds.length, 'IDs')
-    query = query.in('punto_muestreo_fk', puntosMuestreoIds)
-  }
-
+  // No pagination here (used for exports): fetch every matching row, but with the
+  // filter applied server-side so we only page through the rows that actually match.
+  let query = supabase.from('analiticas').select(buildSelect(hasScope))
+  query = applyPuntoScope(query, scope)
   query = applyDirectFilters(query)
   query = query.order(sortBy, { ascending: orderDirection })
 
-  const data = await fetchAll(query)
-
-  console.log(`✅ getAnaliticasFiltered exitosa: ${data?.length} analíticas encontradas`)
-
-  return data
-}
-
-export const getAnaliticasFilteredCount = async (filters = {}) => {
-  let query = supabase
-    .from('analiticas')
-    .select('*', { count: 'exact', head: true })
-
-  // Aplicar los mismos filtros que en getAnaliticasPaginated
-  if (filters.fecha_inicio) query = query.gte('fecha', filters.fecha_inicio)
-  if (filters.fecha_final) query = query.lte('fecha', filters.fecha_final)
-  if (filters.punto_muestreo_fk) query = query.eq('punto_muestreo_fk', filters.punto_muestreo_fk)
-  if (filters.personal_fk) query = query.eq('personal_fk', filters.personal_fk)
-  if (filters.type) query = query.eq('type', filters.type)
-
-  const { count, error } = await query
-
-  if (error) throw error
-  return count
+  return fetchAll(query)
 }
 
 export const setAnaliticas = async(analitica) => {
