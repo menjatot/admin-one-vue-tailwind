@@ -46,10 +46,24 @@ const { selectedRows, allAnaliticasForDateRange, fileNameBase, logoUrl, companyN
 const plantasStore = usePlantasStore();
 const exporting = ref(false)
 
+const groupByZona = ref(false)
+
 const getZonaNombre = (zonaId) => {
   if (!zonaId) return '';
   const zona = plantasStore.getZonas.find(z => z.id === zonaId);
   return zona ? zona.name : '';
+};
+
+// Resuelve la zona de abastecimiento de una analítica (id + nombre). Usa la zona
+// embebida del punto de muestreo si viene del servidor, con fallback al store.
+const getZonaInfoFromAnalitica = (a) => {
+  if (a.zona_name) return { id: a.zona_id ?? null, name: a.zona_name };
+  const zonaFk =
+    a.punto_muestreo?.zona_fk ??
+    plantasStore.getPuntosMuestreo.find(p => p.id === a.punto_muestreo_fk)?.zona_fk;
+  if (!zonaFk) return { id: null, name: 'Sin zona' };
+  const zona = plantasStore.getZonas.find(z => z.id === zonaFk);
+  return { id: zona?.id ?? null, name: zona?.name ?? 'Sin zona' };
 };
 
 // --- Funciones auxiliares de formato ---
@@ -167,6 +181,7 @@ const handlePrintHTML = async () => {
   const columns = [
     { label: 'Fecha',              value: a => formatDateForDisplay(a.fecha) },
     { label: 'Punto de Muestreo',  value: a => getPuntoMuestreoNombre(a.punto_muestreo_fk) },
+    { label: 'Zona de Abastecimiento', value: a => getZonaInfoFromAnalitica(a).name },
     { label: 'Operario',           value: a => getOperarioNombre(a) },
     { label: 'Código SINAC',       value: a => a.punto_muestreo_fk },
     { label: 'Cloro (mg/l)',       value: a => a.cloro != null ? a.cloro : '' },
@@ -185,18 +200,9 @@ const handlePrintHTML = async () => {
     { label: 'Observaciones',      value: a => a.observaciones ?? '' }
   ]
 
-  // Resolver zona para cada analítica (con fallback a búsqueda en store)
-  const getZonaFromAnalitica = (a) => {
-    if (a.zona_name) return { id: a.zona_id, name: a.zona_name }
-    const punto = plantasStore.getPuntosMuestreo.find(p => p.id === a.punto_muestreo_fk)
-    if (!punto) return { id: null, name: 'Sin zona' }
-    const zona = plantasStore.getZonas.find(z => z.id === punto.zona_fk)
-    return { id: zona?.id ?? null, name: zona?.name ?? 'Sin zona' }
-  }
-
   // Pre-computar todos los valores de celda + metadata de zona para el JS del HTML
   const serializedData = analiticas.map(a => {
-    const zona = getZonaFromAnalitica(a)
+    const zona = getZonaInfoFromAnalitica(a)
     return {
       zona_id: zona.id,
       zona_name: zona.name,
@@ -261,7 +267,7 @@ const handlePrintHTML = async () => {
 
         <div class="no-print controls-panel">
           <label class="group-check-label">
-            <input type="checkbox" onchange="toggleGroupByZona(this.checked)" />
+            <input type="checkbox" ${groupByZona.value ? 'checked' : ''} onchange="toggleGroupByZona(this.checked)" />
             &#128205; Agrupar por zona de abastecimiento
           </label>
           <div class="controls-divider"></div>
@@ -279,7 +285,7 @@ const handlePrintHTML = async () => {
           var REPORT_DATA = ${JSON.stringify(serializedData)};
           var COLUMN_LABELS = ${JSON.stringify(columns.map(c => c.label))};
           var visibleCols = COLUMN_LABELS.map(function(_, i) { return i; });
-          var groupByZona = false;
+          var groupByZona = ${groupByZona.value};
           var sortCol = -1;
           var sortAsc = true;
 
@@ -443,10 +449,11 @@ const handleExportExcel = async () => {
 
   const hasCatalunaExcel = analiticas.some(a => a.comunidad_id === CATALUNA_COMUNIDAD_ID)
 
-  // Encabezados de la tabla
+  // Encabezados de la tabla (incluye Zona de Abastecimiento)
   const headers = [
     'Fecha',
     'Punto de Muestreo',
+    'Zona de Abastecimiento',
     'Operario',
     'Código SINAC',
     'Cloro (mg/l)',
@@ -467,11 +474,15 @@ const handleExportExcel = async () => {
   )
   excelData.push(headers)
 
-  // Datos de las analíticas
-  analiticas.forEach(a => {
+  const lastColIndex = headers.length - 1
+  const groupMerges = []
+
+  // Construye la fila de datos de una analítica
+  const buildExcelRow = (a) => {
     const row = [
       formatDateForDisplay(a.fecha),
       getPuntoMuestreoNombre(a.punto_muestreo_fk),
+      getZonaInfoFromAnalitica(a).name,
       getOperarioNombre(a),
       a.punto_muestreo_fk,
       a.cloro !== null && a.cloro !== undefined ? a.cloro : '',
@@ -493,8 +504,39 @@ const handleExportExcel = async () => {
       getM3PerDia(a) != null ? getM3PerDia(a) : '',
       a.observaciones ?? ''
     )
-    excelData.push(row)
-  })
+    return row
+  }
+
+  if (groupByZona.value) {
+    // Agrupado por zona: ordenar por zona -> punto -> fecha e insertar una fila
+    // de cabecera (celda combinada) por cada zona, igual que el informe HTML agrupado.
+    const ordenadas = [...analiticas].sort((a, b) => {
+      const zc = (getZonaInfoFromAnalitica(a).name || '').localeCompare(
+        getZonaInfoFromAnalitica(b).name || '', 'es'
+      )
+      if (zc !== 0) return zc
+      if (a.punto_muestreo_fk !== b.punto_muestreo_fk) return a.punto_muestreo_fk - b.punto_muestreo_fk
+      return new Date(a.fecha) - new Date(b.fecha)
+    })
+
+    let prevZonaId = Symbol('init')
+    ordenadas.forEach(a => {
+      const zona = getZonaInfoFromAnalitica(a)
+      if (zona.id !== prevZonaId) {
+        const headerRow = new Array(headers.length).fill('')
+        headerRow[0] = `◆ ${zona.name || 'Sin zona'}`
+        excelData.push(headerRow)
+        groupMerges.push({
+          s: { r: excelData.length - 1, c: 0 },
+          e: { r: excelData.length - 1, c: lastColIndex }
+        })
+        prevZonaId = zona.id
+      }
+      excelData.push(buildExcelRow(a))
+    })
+  } else {
+    analiticas.forEach(a => excelData.push(buildExcelRow(a)))
+  }
 
   // Crear libro de trabajo y hoja
   const wb = XLSX.utils.book_new();
@@ -504,6 +546,7 @@ const handleExportExcel = async () => {
   const colWidths = [
     { wch: 12 },  // Fecha
     { wch: 30 },  // Punto de Muestreo
+    { wch: 28 },  // Zona de Abastecimiento
     { wch: 20 },  // Operario
     { wch: 15 },  // Código SINAC
     { wch: 15 },  // Cloro
@@ -555,10 +598,12 @@ const handleExportExcel = async () => {
     }
   }
 
-  // Combinar celdas para el título (primera fila)
+  // Combinar celdas del título/subtítulo (a lo ancho de todas las columnas) y de
+  // las filas de cabecera de cada zona cuando se agrupa.
   ws['!merges'] = [
-    { s: { r: 0, c: 0 }, e: { r: 0, c: 13 } }, // Título
-    { s: { r: 1, c: 0 }, e: { r: 1, c: 13 } }  // Subtítulo
+    { s: { r: 0, c: 0 }, e: { r: 0, c: lastColIndex } }, // Título
+    { s: { r: 1, c: 0 }, e: { r: 1, c: lastColIndex } }, // Subtítulo
+    ...groupMerges
   ];
 
   // Agregar la hoja al libro
@@ -663,7 +708,15 @@ const handleExportExcel = async () => {
 </script>
 
 <template>
-  <div class="flex flex-wrap gap-2">
+  <div class="flex flex-wrap items-center gap-2">
+    <label
+      class="inline-flex items-center gap-1.5 px-2 text-sm font-medium text-gray-600 dark:text-gray-300 cursor-pointer select-none"
+      title="Agrupa las filas por zona de abastecimiento en el Excel y abre el informe de impresión ya agrupado"
+    >
+      <input v-model="groupByZona" type="checkbox" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+      Agrupar por zona
+    </label>
+
     <button
       v-if="props.enableHtmlPrint"
       class="inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-medium text-white bg-gradient-to-r from-slate-500 to-slate-700 shadow-md shadow-slate-300/50 dark:shadow-slate-900/40 transition-all duration-200 hover:from-slate-600 hover:to-slate-800 hover:-translate-y-0.5 hover:shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-md"
