@@ -89,6 +89,7 @@ const getOperarioNombre = (analitica) => {
 const getTipoAnaliticaNombre = (id) => {
   if (id === 28) return 'Operacional';
   if (id === 29) return 'Rutina';
+  if (id === 99) return 'Seguimiento';
   return 'N/A';
 };
 const formatDateForDisplay = (dateString) => {
@@ -186,6 +187,7 @@ const handlePrintHTML = async () => {
     { label: 'Fecha',              value: a => formatDateForDisplay(a.fecha) },
     { label: 'Punto de Muestreo',  value: a => getPuntoMuestreoNombre(a.punto_muestreo_fk) },
     { label: 'Zona de Abastecimiento', value: a => getZonaInfoFromAnalitica(a).name },
+    { label: 'Tipo de Analítica',  value: a => getTipoAnaliticaNombre(a.type), defaultHidden: true },
     { label: 'Operario',           value: a => getOperarioNombre(a) },
     { label: 'Código SINAC',       value: a => a.punto_muestreo_fk },
     { label: 'Cloro (mg/l)',       value: a => a.cloro != null ? a.cloro : '' },
@@ -217,8 +219,11 @@ const handlePrintHTML = async () => {
   })
 
   const columnSelectorHtml = columns.map((col, i) =>
-    `<label class="col-check-label"><input type="checkbox" checked onchange="toggleColumn(${i}, this.checked)" />${col.label}</label>`
+    `<label class="col-check-label"><input type="checkbox" ${col.defaultHidden ? '' : 'checked'} onchange="toggleColumn(${i}, this.checked)" />${col.label}</label>`
   ).join('')
+
+  // Índices de columnas visibles inicialmente (excluye las ocultas por defecto)
+  const initialVisibleCols = columns.map((_, i) => i).filter(i => !columns[i].defaultHidden)
 
   const htmlContent = `
     <html>
@@ -288,7 +293,7 @@ const handlePrintHTML = async () => {
         <script>
           var REPORT_DATA = ${JSON.stringify(serializedData)};
           var COLUMN_LABELS = ${JSON.stringify(columns.map(c => c.label))};
-          var visibleCols = COLUMN_LABELS.map(function(_, i) { return i; });
+          var visibleCols = ${JSON.stringify(initialVisibleCols)};
           var groupByZona = ${groupByZona.value};
           var sortCol = -1;
           var sortAsc = true;
@@ -458,6 +463,7 @@ const handleExportExcel = async () => {
     'Fecha',
     'Punto de Muestreo',
     'Zona de Abastecimiento',
+    'Tipo de Analítica',
     'Operario',
     'Código SINAC',
     'Cloro (mg/l)',
@@ -487,6 +493,7 @@ const handleExportExcel = async () => {
       formatDateForDisplay(a.fecha),
       getPuntoMuestreoNombre(a.punto_muestreo_fk),
       getZonaInfoFromAnalitica(a).name,
+      getTipoAnaliticaNombre(a.type),
       getOperarioNombre(a),
       a.punto_muestreo_fk,
       a.cloro !== null && a.cloro !== undefined ? a.cloro : '',
@@ -551,6 +558,7 @@ const handleExportExcel = async () => {
     { wch: 12 },  // Fecha
     { wch: 30 },  // Punto de Muestreo
     { wch: 28 },  // Zona de Abastecimiento
+    { wch: 16 },  // Tipo de Analítica
     { wch: 20 },  // Operario
     { wch: 15 },  // Código SINAC
     { wch: 15 },  // Cloro
