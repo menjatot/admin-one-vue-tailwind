@@ -66,6 +66,18 @@ const getZonaInfoFromAnalitica = (a) => {
   return { id: zona?.id ?? null, name: zona?.name ?? 'Sin zona' };
 };
 
+// Resuelve la comunidad autónoma de una analítica (punto -> zona.com_autonoma_fk),
+// con fallback al store. Usado para decidir las columnas específicas de Cataluña.
+const getComunidadFromAnalitica = (a) => {
+  if (a.comunidad_id) return a.comunidad_id;
+  const zonaFk =
+    a.punto_muestreo?.zona_fk ??
+    plantasStore.getPuntosMuestreo.find(p => p.id === a.punto_muestreo_fk)?.zona_fk;
+  if (!zonaFk) return null;
+  const zona = plantasStore.getZonas.find(z => z.id === zonaFk);
+  return zona?.com_autonoma_fk ?? null;
+};
+
 // --- Funciones auxiliares de formato ---
 const getPuntoMuestreoNombre = (id) => plantasStore.getPuntosMuestreo.find(p => p.id === id)?.name || 'N/A';
 const getOperarioNombre = (analitica) => {
@@ -165,14 +177,6 @@ const handlePrintHTML = async () => {
     if (nombreZona) {
       tituloInforme = `Informe de Analíticas - ${nombreZona} (${formatDateForDisplay(minDate)} - ${formatDateForDisplay(maxDate)})`;
     }
-  }
-
-  function getComunidadFromAnalitica(a) {
-    if (a.comunidad_id) return a.comunidad_id
-    const punto = plantasStore.getPuntosMuestreo.find(p => p.id === a.punto_muestreo_fk)
-    if (!punto?.zona_fk) return null
-    const zona = plantasStore.getZonas.find(z => z.id === punto.zona_fk)
-    return zona?.com_autonoma_fk ?? null
   }
 
   // Definición centralizada de columnas
@@ -447,7 +451,7 @@ const handleExportExcel = async () => {
   excelData.push([tituloInforme]);
   excelData.push([]); // Fila vacía para separación
 
-  const hasCatalunaExcel = analiticas.some(a => a.comunidad_id === CATALUNA_COMUNIDAD_ID)
+  const hasCatalunaExcel = analiticas.some(a => getComunidadFromAnalitica(a) === CATALUNA_COMUNIDAD_ID)
 
   // Encabezados de la tabla (incluye Zona de Abastecimiento)
   const headers = [
