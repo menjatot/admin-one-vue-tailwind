@@ -19,7 +19,7 @@ const { exportXMLData } = useExtractdata();
 const selectedZona= ref(null);
 const { isAdmin: isAdminRole, canExport: canExportAndPrint, isOperario, isVisualizador } = usePermissions();
 const { resumen, sinIncidencias, cargando, cargarIncidencias } = useDashboardIncidencias()
-const dashboardAbierto = ref(true)
+const dashboardAbierto = ref(false)
 const loginStore = useLoginStore()
 const plantaStore = usePlantasStore()
 
