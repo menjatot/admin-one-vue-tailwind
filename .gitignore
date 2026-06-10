@@ -27,6 +27,7 @@ coverage
 *.sln
 *.sw?
 *.sql
+*.md
 
 .codegpt
 
@@ -49,4 +50,3 @@ skills-lock.json
 basura/
 Snippets/
 dev-dist/workbox-*
-
