@@ -3,7 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { usePlantasStore } from '@/stores/plantas'
 import { useLoginStore } from '@/stores/login'
 import useFormSelectData from '@/composables/useFormSelectData'
-import { supabase, assertAnaliticaWritePermission } from '@/services/supabase'
+import { supabase, assertAnaliticaWritePermission, setSupabaseAuthContext } from '@/services/supabase'
 import { saveAnaliticaOffline } from '@/services/offlineSync'
 import { getAnaliticasPunto } from '@/services/analiticas'
 import { useNotifications } from '@/composables/useNotifications'
@@ -224,6 +224,13 @@ const getVolumenData = (analitica) => {
 
 const submitHandler = async () => {
   try {
+    // Re-sync RLS headers defensively — headers live in-memory and can be lost
+    // if the PWA is killed on iOS and the store restores from offline cache before
+    // Supabase fires its SIGNED_OUT event, resetting the module-level variables.
+    if (loginStore.userEmail) {
+      setSupabaseAuthContext(loginStore.userEmail, loginStore.userRole)
+    }
+
     assertAnaliticaWritePermission('crear')
 
     const newAnalitica = {
@@ -243,6 +250,16 @@ const submitHandler = async () => {
         ? Number(cloroCombinado.value)
         : null,
       totalizador: esDeposito.value && totalizador.value !== '' ? Number(totalizador.value) : null
+    }
+
+    // Guard: personal_fk null causes an RLS violation because Supabase cannot
+    // verify zone assignment. This happens when the operarios store hasn't loaded yet.
+    if (!newAnalitica.personal_fk) {
+      notifyError(
+        'No se ha podido identificar el operario. Espera un momento y vuelve a intentarlo, o recarga la página.',
+        { title: 'Operario no identificado', life: 8000 }
+      )
+      return
     }
 
     // 1. Verificar conexión a internet
@@ -265,8 +282,13 @@ const submitHandler = async () => {
 
     if (error) {
       console.error('Error al insertar datos:', error)
-      notifyError(`Error al insertar datos: ${error.message}`, {
-        title: 'No se ha podido guardar la analítica'
+      const isRlsError = error.message?.includes('row-level security') || error.code === '42501'
+      const userMessage = isRlsError
+        ? 'Sin permiso para guardar en este punto de muestreo. Verifica que estás asignado a su zona o contacta con el administrador.'
+        : `Error al insertar datos: ${error.message}`
+      notifyError(userMessage, {
+        title: 'No se ha podido guardar la analítica',
+        life: isRlsError ? 0 : 8000
       })
     } else {
       cargarHistorial(newAnalitica.punto_muestreo_fk)
