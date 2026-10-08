@@ -76,7 +76,7 @@ const buildClusterGroup = () => {
 
     const marker = L.marker([punto.posicion.lat, punto.posicion.lon], {
       icon: markerDivIcon(getIconByInfraestructura(punto.infraestructura_fk)),
-      draggable: true,
+      draggable: false,
     })
 
     marker.bindTooltip(`<b>${punto.name}</b><br><span style="font-size:0.85em">id: ${punto.id}</span>`)
@@ -91,7 +91,6 @@ const buildClusterGroup = () => {
         >${buttonLabel}</button>
       </div>
     `)
-    marker.on('dragend', onDragEnd)
     clusterGroup.addLayer(marker)
   })
 
@@ -191,16 +190,6 @@ const closeModal = () => {
   isModalActive.value = false
   selectedPunto.value = null
   historyOnly.value = false
-}
-
-const onDragEnd = (event) => {
-  const posicion = {
-    lat: event.target.getLatLng().lat,
-    lon: event.target.getLatLng().lng
-  }
-  console.log('New position:', posicion)
-
-  console.log(event.target.getLatLng())
 }
 
 const getUserLocation = () => {
