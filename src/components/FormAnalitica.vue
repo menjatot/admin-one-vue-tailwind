@@ -456,7 +456,7 @@ watch(
                   <p class="text-xs text-gray-500 dark:text-gray-400">Cloro</p>
                   <p class="text-sm font-bold text-gray-800 dark:text-gray-100">
                     {{ analitica.cloro ?? '-' }}
-                    <span v-if="analitica.cloro" class="text-xs font-normal">mg/l</span>
+                    <span v-if="analitica.cloro != null" class="text-xs font-normal">mg/l</span>
                   </p>
                 </div>
                 <div class="bg-gray-50 dark:bg-slate-700 rounded p-2">
@@ -469,7 +469,7 @@ watch(
                   <p class="text-xs text-gray-500 dark:text-gray-400">Turbidez</p>
                   <p class="text-sm font-bold text-gray-800 dark:text-gray-100">
                     {{ analitica.turbidez ?? '-' }}
-                    <span v-if="analitica.turbidez" class="text-xs font-normal">UNF</span>
+                    <span v-if="analitica.turbidez != null" class="text-xs font-normal">UNF</span>
                   </p>
                 </div>
                 <div
@@ -479,7 +479,7 @@ watch(
                   <p class="text-xs text-gray-500 dark:text-gray-400">Cloro Total</p>
                   <p class="text-sm font-bold text-gray-800 dark:text-gray-100">
                     {{ analitica.cloro_total ?? '-' }}
-                    <span v-if="analitica.cloro_total" class="text-xs font-normal">mg/l</span>
+                    <span v-if="analitica.cloro_total != null" class="text-xs font-normal">mg/l</span>
                   </p>
                 </div>
                 <div
@@ -489,7 +489,7 @@ watch(
                   <p class="text-xs text-gray-500 dark:text-gray-400">Cloro Comb.</p>
                   <p class="text-sm font-bold text-gray-800 dark:text-gray-100">
                     {{ analitica.cloro_combinado ?? '-' }}
-                    <span v-if="analitica.cloro_combinado" class="text-xs font-normal">mg/l</span>
+                    <span v-if="analitica.cloro_combinado != null" class="text-xs font-normal">mg/l</span>
                   </p>
                 </div>
               </div>
