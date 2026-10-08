@@ -80,6 +80,13 @@ const getComunidadFromAnalitica = (a) => {
 
 // --- Funciones auxiliares de formato ---
 const getPuntoMuestreoNombre = (id) => plantasStore.getPuntosMuestreo.find(p => p.id === id)?.name || 'N/A';
+// Coordenadas del punto de muestreo (lat, lon con 6 decimales ≈ 0,1 m)
+const getCoordenadas = (analitica) => {
+  const punto = plantasStore.getPuntosMuestreo.find(p => p.id === analitica?.punto_muestreo_fk);
+  const pos = analitica?.punto_muestreo?.posicion ?? punto?.posicion;
+  if (!pos || pos.lat == null || pos.lon == null) return '';
+  return `${Number(pos.lat).toFixed(6)}, ${Number(pos.lon).toFixed(6)}`;
+};
 const getOperarioNombre = (analitica) => {
   // Primero intentar usar los datos ya cargados desde el servidor (personal.name)
   if (analitica?.personal?.name) return analitica.personal.name;
@@ -208,6 +215,7 @@ const handlePrintHTML = async () => {
     { label: 'Tipo de Analítica',  value: a => getTipoAnaliticaNombre(a.type), defaultHidden: true },
     { label: 'Operario',           value: a => getOperarioNombre(a) },
     { label: 'Código SINAC',       value: a => a.punto_muestreo_fk },
+    { label: 'Coordenadas',        value: a => getCoordenadas(a) },
     { label: 'Cloro (mg/l)',       value: a => a.cloro != null ? a.cloro : '' },
     { label: 'pH',                 value: a => a.ph != null ? a.ph : '' },
     { label: 'Turbidez (NTU)',     value: a => a.turbidez != null ? a.turbidez : '' },
@@ -491,6 +499,7 @@ const handleExportExcel = async () => {
     'Tipo de Analítica',
     'Operario',
     'Código SINAC',
+    'Coordenadas',
     'Cloro (mg/l)',
     'pH',
     'Turbidez (NTU)',
@@ -521,6 +530,7 @@ const handleExportExcel = async () => {
       getTipoAnaliticaNombre(a.type),
       getOperarioNombre(a),
       a.punto_muestreo_fk,
+      getCoordenadas(a),
       a.cloro !== null && a.cloro !== undefined ? a.cloro : '',
       a.ph !== null && a.ph !== undefined ? a.ph : '',
       a.turbidez !== null && a.turbidez !== undefined ? a.turbidez : '',
@@ -586,6 +596,7 @@ const handleExportExcel = async () => {
     { wch: 16 },  // Tipo de Analítica
     { wch: 20 },  // Operario
     { wch: 15 },  // Código SINAC
+    { wch: 24 },  // Coordenadas
     { wch: 15 },  // Cloro
     { wch: 10 },  // pH
     { wch: 15 },  // Turbidez
