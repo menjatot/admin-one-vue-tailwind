@@ -131,7 +131,7 @@ const getM3PerDia = (analitica) => {
   return dias > 0 ? Math.round((volumen / dias) * 100) / 100 : null
 }
 
-const { warning: notifyWarning } = useNotifications()
+const { warning: notifyWarning, error: notifyError } = useNotifications()
 
 const getAnaliticasParaExportar = () => {
   if (selectedRows.value.length === 0) {
@@ -155,6 +155,24 @@ const getAnaliticasParaExportar = () => {
 // ...existing code...
 
 const handlePrintHTML = async () => {
+  // La ventana se abre DE FORMA SÍNCRONA dentro del click: si se hace después de
+  // un await (la carga previa de datos tarda varios segundos), el navegador pierde
+  // la "activación transitoria" del usuario, bloquea window.open como popup
+  // emergente y no se abre nada.
+  const printWindow = window.open('', '_blank')
+  if (!printWindow) {
+    notifyWarning(
+      'El navegador ha bloqueado la ventana de impresión. Permite las ventanas emergentes (pop-ups) de esta aplicación e inténtalo de nuevo.',
+      { title: 'Ventana bloqueada', life: 8000 }
+    )
+    return
+  }
+  printWindow.document.write(
+    '<!doctype html><html><head><title>Generando informe...</title></head>' +
+    '<body style="font-family: Arial, sans-serif; margin: 20px;">Generando informe...</body></html>'
+  )
+  printWindow.document.close()
+
   exporting.value = true
   try {
     if (props.onBeforeExport) {
@@ -406,12 +424,19 @@ const handlePrintHTML = async () => {
     </html>
   `
 
-  const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
-  const blobUrl = URL.createObjectURL(blob);
-  const printWindow = window.open(blobUrl, '_blank');
-  if (printWindow) {
-    printWindow.addEventListener('unload', () => URL.revokeObjectURL(blobUrl), { once: true });
+  if (printWindow.closed) {
+    notifyWarning('La ventana de impresión se cerró antes de terminar.', { title: 'Ventana cerrada' })
+    return
   }
+  printWindow.document.open()
+  printWindow.document.write(htmlContent)
+  printWindow.document.close()
+  } catch (error) {
+    console.error('Error al generar el informe de impresión:', error)
+    if (!printWindow.closed) printWindow.close()
+    notifyError('No se ha podido generar el informe: ' + (error?.message ?? error), {
+      title: 'Error al imprimir'
+    })
   } finally {
     exporting.value = false
   }
