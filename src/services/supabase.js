@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { logAudit } from './auditLog'
+import { toNumberOrNull } from '@/helpers/analiticaPayload'
 // import {corsHeaders} from '../helpers/cors'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -168,12 +169,12 @@ export const updateAnaliticabyId = async (id, data) => {
       personal_fk: data.personal_fk,
       punto_muestreo_fk: data.punto_muestreo_fk,
       type: data.type,
-      cloro: data.cloro,
-      color: data.color,
+      cloro: toNumberOrNull(data.cloro),
+      color: toNumberOrNull(data.color),
       olor: data.olor,
       sabor: data.sabor,
-      ph: data.ph,
-      turbidez: data.turbidez,
+      ph: toNumberOrNull(data.ph),
+      turbidez: toNumberOrNull(data.turbidez),
       observaciones: data.observaciones,
       registro: data.registro
     }

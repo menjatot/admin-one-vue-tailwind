@@ -11,6 +11,7 @@ import CardBox from './CardBox.vue'
 import { confetti } from '@tsparticles/confetti'
 import { mdiHistory, mdiAlertCircle, mdiCheckCircle } from '@mdi/js'
 import { CATALUNA_COMUNIDAD_ID } from '@/constants/comunidades'
+import { buildAnaliticaPayload } from '@/helpers/analiticaPayload'
 import BaseIcon from './BaseIcon.vue'
 
 const plantaStore = usePlantasStore()
@@ -233,24 +234,12 @@ const submitHandler = async () => {
 
     assertAnaliticaWritePermission('crear')
 
-    const newAnalitica = {
-      punto_muestreo_fk: form.punto_muestreo_fk,
-      fecha: form.fecha,
-      color: form.color ? Number(form.color) : null,
-      olor: form.olor,
-      sabor: form.sabor,
-      cloro: form.cloro ? Number(form.cloro) : null,
-      type: form.type,
-      observaciones: form.observaciones,
-      personal_fk: form.operario,
-      ph: form.ph ? Number(form.ph) : null,
-      turbidez: form.turbidez ? Number(form.turbidez) : null,
-      cloro_total: esCataluna.value && form.cloro_total !== '' ? Number(form.cloro_total) : null,
-      cloro_combinado: esCataluna.value && cloroCombinado.value !== null
-        ? Number(cloroCombinado.value)
-        : null,
-      totalizador: esDeposito.value && totalizador.value !== '' ? Number(totalizador.value) : null
-    }
+    const newAnalitica = buildAnaliticaPayload(form, {
+      esCataluna: esCataluna.value,
+      esDeposito: esDeposito.value,
+      cloroCombinado: cloroCombinado.value,
+      totalizador: totalizador.value
+    })
 
     // Guard: personal_fk null causes an RLS violation because Supabase cannot
     // verify zone assignment. This happens when the operarios store hasn't loaded yet.
