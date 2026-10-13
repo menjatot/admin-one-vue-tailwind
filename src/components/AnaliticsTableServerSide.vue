@@ -7,6 +7,7 @@ import BaseButtons from '@/components/BaseButtons.vue'
 import BaseButton from '@/components/BaseButton.vue'
 import BaseIcon from '@/components/BaseIcon.vue'
 import AnaliticsEdit from './AnaliticsEdit.vue'
+import FormAnalitica from './FormAnalitica.vue'
 import CardBoxModal from './CardBoxModal.vue'
 import { usePlantasStore } from '../stores/plantas'
 import { useLoginStore } from '../stores/login'
@@ -37,6 +38,10 @@ const ORGANOLEPTIC_CORRECT = 1
 const analiticaToDelete = ref(null)
 const analiticaToEdit = ref(null)
 const analiticaToUpdate = ref(null)
+
+// Historial de un punto de muestreo (click en la celda del listado)
+const historialPunto = ref(null)
+const isHistorialPuntoModalActive = ref(false)
 
 const {
   form: localFilters,
@@ -263,6 +268,18 @@ const getPuntoMuestreo = (id) => {
     (puntoMuestreo) => puntoMuestreo.id === id
   )
   return puntoMuestreo ? puntoMuestreo.name : 'No asignado'
+}
+
+const abrirHistorialPunto = (puntoId) => {
+  if (!puntoId) return
+  const punto = plantaStore.getPuntosMuestreo.find((p) => p.id === puntoId)
+  historialPunto.value = { id: puntoId, name: punto?.name ?? `Punto ${puntoId}` }
+  isHistorialPuntoModalActive.value = true
+}
+
+const cerrarHistorialPunto = () => {
+  isHistorialPuntoModalActive.value = false
+  historialPunto.value = null
 }
 
 const getTipoAnalitica = (id) => {
@@ -576,6 +593,23 @@ onMounted(async () => {
     </p>
   </CardBoxModal>
 
+  <CardBoxModal
+    v-model="isHistorialPuntoModalActive"
+    :title="'Últimas 5 analíticas en ' + (historialPunto?.name ?? '')"
+    no-button
+    class="modal-overlay"
+    :modal-size="'xl'"
+    @cancel="cerrarHistorialPunto"
+  >
+    <FormAnalitica
+      v-if="historialPunto"
+      :initial-position="historialPunto.id"
+      :history-only="true"
+      class="h-full"
+      @close-modal="cerrarHistorialPunto"
+    />
+  </CardBoxModal>
+
   <!-- Controles superiores -->
   <div class="mb-4">
     <div class="flex flex-wrap justify-between items-center gap-y-2 mb-4">
@@ -795,7 +829,14 @@ onMounted(async () => {
               {{ analitica.fecha }}
             </td>
             <td data-label="Punto de Muestreo">
-              {{ getPuntoMuestreo(analitica.punto_muestreo_fk) }}
+              <button
+                type="button"
+                class="text-left font-medium text-blue-600 underline-offset-2 hover:underline dark:text-blue-400"
+                title="Ver historial de este punto de muestreo"
+                @click="abrirHistorialPunto(analitica.punto_muestreo_fk)"
+              >
+                {{ getPuntoMuestreo(analitica.punto_muestreo_fk) }}
+              </button>
             </td>
             <td data-label="Persona">
               {{ getNameOperario(analitica) }}
