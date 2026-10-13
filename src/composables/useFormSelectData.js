@@ -51,6 +51,7 @@ export default function useFormSelectData() {
     observaciones: '',
     ph: null,
     turbidez: null,
+    aluminio: null,
     cloro_total: null,
     cloro_combinado: null,
     operario: '',

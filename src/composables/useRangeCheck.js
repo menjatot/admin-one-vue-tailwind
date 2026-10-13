@@ -25,12 +25,21 @@ export function isOrganolepticWrong(value) {
   return +value === 0
 }
 
+// Aluminio (µg/L): solo genera incidencia si supera el máximo; sin mínimo.
+export const ALUMINIO_MAX = 200
+
+export function isAluminioWrong(aluminio) {
+  if (aluminio === null || aluminio === undefined || aluminio === '') return false
+  return Number(aluminio) > ALUMINIO_MAX
+}
+
 export function isWrongValues(analitica, ranges) {
   return (
     isCloroWrong(analitica.cloro, ranges?.cloro) ||
     isPhWrong(analitica.ph, ranges?.ph) ||
     (analitica.turbidez !== undefined &&
       isTurbidezWrong(analitica.turbidez, ranges?.turbidez, analitica._isDC)) ||
+    isAluminioWrong(analitica.aluminio) ||
     isOrganolepticWrong(analitica.olor) ||
     isOrganolepticWrong(analitica.color) ||
     isOrganolepticWrong(analitica.sabor)

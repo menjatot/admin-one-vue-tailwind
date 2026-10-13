@@ -213,6 +213,7 @@ const loadAllAnalyticsForExport = async () => {
                     <span v-if="inc.cloroWrong" class="text-xs px-1.5 py-0.5 rounded bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400">Cloro</span>
                     <span v-if="inc.phWrong" class="text-xs px-1.5 py-0.5 rounded bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400">pH</span>
                     <span v-if="inc.turbidezWrong" class="text-xs px-1.5 py-0.5 rounded bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400">Turbidez</span>
+                    <span v-if="inc.aluminioWrong" class="text-xs px-1.5 py-0.5 rounded bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400">Aluminio</span>
                     <span v-if="inc.olorWrong || inc.colorWrong || inc.saborWrong" class="text-xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-600 dark:bg-amber-900/40 dark:text-amber-400">Organolépticos</span>
                   </div>
                 </div>

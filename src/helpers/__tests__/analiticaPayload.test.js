@@ -93,4 +93,20 @@ describe('buildAnaliticaPayload', () => {
     expect(payload.olor).toBe(1)
     expect(payload.sabor).toBe(1)
   })
+
+  it('incluye aluminio en Seguimiento (99), conservando el 0', () => {
+    expect(buildAnaliticaPayload({ ...baseForm, type: 99, aluminio: 0 }).aluminio).toBe(0)
+    expect(buildAnaliticaPayload({ ...baseForm, type: 99, aluminio: 250 }).aluminio).toBe(250)
+    expect(buildAnaliticaPayload({ ...baseForm, type: 99, aluminio: '150' }).aluminio).toBe(150)
+  })
+
+  it('no incluye la clave aluminio fuera de Seguimiento', () => {
+    const payload = buildAnaliticaPayload({ ...baseForm, type: 29, aluminio: 150 })
+    expect('aluminio' in payload).toBe(false)
+  })
+
+  it('no incluye la clave aluminio en Seguimiento si está vacío', () => {
+    const payload = buildAnaliticaPayload({ ...baseForm, type: 99, aluminio: '' })
+    expect('aluminio' in payload).toBe(false)
+  })
 })

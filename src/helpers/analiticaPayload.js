@@ -20,7 +20,7 @@ export function buildAnaliticaPayload(
   form,
   { esCataluna = false, esDeposito = false, cloroCombinado = null, totalizador = '' } = {}
 ) {
-  return {
+  const payload = {
     punto_muestreo_fk: form.punto_muestreo_fk,
     fecha: form.fecha,
     color: toNumberOrNull(form.color),
@@ -36,4 +36,15 @@ export function buildAnaliticaPayload(
     cloro_combinado: esCataluna ? toNumberOrNull(cloroCombinado) : null,
     totalizador: esDeposito ? toNumberOrNull(totalizador) : null
   }
+
+  // Aluminio (µg/L): parámetro de las analíticas de Seguimiento (tipo 99).
+  // Se incluye solo cuando hay valor, para no enviar una clave que aún no
+  // exista en la tabla (PostgREST rechaza columnas desconocidas y rompería
+  // el guardado). El 0 se conserva como valor válido.
+  const aluminio = toNumberOrNull(form.aluminio)
+  if (Number(form.type) === 99 && aluminio !== null) {
+    payload.aluminio = aluminio
+  }
+
+  return payload
 }

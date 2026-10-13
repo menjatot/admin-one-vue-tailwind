@@ -3,7 +3,7 @@ import { supabase } from '@/services/supabase'
 import { usePlantasStore } from '@/stores/plantas'
 import { getAllParametrosCalidad } from '@/services/parametrosCalidad'
 import { normalizeParametrosCalidad, DEFAULT_ANALITICA_RANGES } from '@/constants/parametrosCalidad'
-import { isCloroWrong, isPhWrong, isTurbidezWrong, isOrganolepticWrong } from '@/composables/useRangeCheck'
+import { isCloroWrong, isPhWrong, isTurbidezWrong, isOrganolepticWrong, isAluminioWrong } from '@/composables/useRangeCheck'
 
 export function useDashboardIncidencias() {
   const incidencias = ref([])
@@ -78,6 +78,7 @@ export function useDashboardIncidencias() {
           cloro: a.cloro,
           ph: a.ph,
           turbidez: a.turbidez,
+          aluminio: a.aluminio,
           olor: a.olor,
           color: a.color,
           sabor: a.sabor,
@@ -86,6 +87,7 @@ export function useDashboardIncidencias() {
           cloroWrong: isCloroWrong(a.cloro, ranges.cloro),
           phWrong: isPhWrong(a.ph, ranges.ph),
           turbidezWrong: isTurbidezWrong(a.turbidez, ranges.turbidez),
+          aluminioWrong: isAluminioWrong(a.aluminio),
           olorWrong: isOrganolepticWrong(a.olor),
           colorWrong: isOrganolepticWrong(a.color),
           saborWrong: isOrganolepticWrong(a.sabor),
@@ -93,6 +95,7 @@ export function useDashboardIncidencias() {
             isCloroWrong(a.cloro, ranges.cloro) ||
             isPhWrong(a.ph, ranges.ph) ||
             isTurbidezWrong(a.turbidez, ranges.turbidez) ||
+            isAluminioWrong(a.aluminio) ||
             isOrganolepticWrong(a.olor) ||
             isOrganolepticWrong(a.color) ||
             isOrganolepticWrong(a.sabor)
@@ -116,6 +119,7 @@ export function useDashboardIncidencias() {
       porCloro: wrong.filter((a) => a.cloroWrong).length,
       porPh: wrong.filter((a) => a.phWrong).length,
       porTurbidez: wrong.filter((a) => a.turbidezWrong).length,
+      porAluminio: wrong.filter((a) => a.aluminioWrong).length,
       porOrganolepticos: wrong.filter((a) => a.olorWrong || a.colorWrong || a.saborWrong).length,
       puntosAfectados: new Set(wrong.map((a) => a.punto_muestreo_fk)).size,
       ultimas: wrong.slice(0, 5)

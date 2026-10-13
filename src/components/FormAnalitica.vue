@@ -12,6 +12,7 @@ import { confetti } from '@tsparticles/confetti'
 import { mdiHistory, mdiAlertCircle, mdiCheckCircle } from '@mdi/js'
 import { CATALUNA_COMUNIDAD_ID } from '@/constants/comunidades'
 import { buildAnaliticaPayload } from '@/helpers/analiticaPayload'
+import { isAluminioWrong } from '@/composables/useRangeCheck'
 import BaseIcon from './BaseIcon.vue'
 
 const plantaStore = usePlantasStore()
@@ -138,6 +139,7 @@ const resetForm = () => {
   form.operario = ''
   form.ph = ''
   form.turbidez = ''
+  form.aluminio = ''
   form.cloro_total = ''
   form.zona = ''
   form.infraestructura = ''
@@ -472,6 +474,16 @@ watch(
                     <span v-if="analitica.turbidez != null" class="text-xs font-normal">UNF</span>
                   </p>
                 </div>
+                <div v-if="analitica.aluminio != null" class="bg-gray-50 dark:bg-slate-700 rounded p-2">
+                  <p class="text-xs text-gray-500 dark:text-gray-400">Aluminio</p>
+                  <p
+                    class="text-sm font-bold"
+                    :class="isAluminioWrong(analitica.aluminio) ? 'text-red-500' : 'text-gray-800 dark:text-gray-100'"
+                  >
+                    {{ analitica.aluminio }}
+                    <span class="text-xs font-normal">µg/L</span>
+                  </p>
+                </div>
                 <div
                   v-if="esCatalunaHistorico(analitica)"
                   class="bg-yellow-50 dark:bg-yellow-900/30 rounded p-2"
@@ -694,6 +706,20 @@ watch(
                 number: 'Introduce un número',
                 min: 'El valor mínimo es 0',
                 max: 'El valor máximo es 999'
+              }"
+            />
+            <FormKit
+              v-if="form.type === 99"
+              v-model.number="form.aluminio"
+              type="number"
+              placeholder="Aluminio"
+              label="Aluminio"
+              help="µg/L"
+              validation="number|min:0|max:9999"
+              :validation-messages="{
+                number: 'Introduce un número',
+                min: 'El valor mínimo es 0',
+                max: 'El valor máximo es 9999'
               }"
             />
             <FormKit

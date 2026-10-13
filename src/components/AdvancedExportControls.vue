@@ -207,6 +207,7 @@ const handlePrintHTML = async () => {
 
   // Definición centralizada de columnas
   const hasCataluna = analiticas.some(a => getComunidadFromAnalitica(a) === CATALUNA_COMUNIDAD_ID)
+  const hasAluminio = analiticas.some(a => a.aluminio != null)
 
   const columns = [
     { label: 'Fecha',              value: a => formatDateForDisplay(a.fecha) },
@@ -219,6 +220,9 @@ const handlePrintHTML = async () => {
     { label: 'Cloro (mg/l)',       value: a => a.cloro != null ? a.cloro : '' },
     { label: 'pH',                 value: a => a.ph != null ? a.ph : '' },
     { label: 'Turbidez (NTU)',     value: a => a.turbidez != null ? a.turbidez : '' },
+    ...(hasAluminio ? [
+      { label: 'Aluminio (µg/L)',  value: a => a.aluminio != null ? a.aluminio : '' }
+    ] : []),
     { label: 'Olor',               value: a => formatOrganoleptico(a.olor) },
     { label: 'Sabor',              value: a => formatOrganoleptico(a.sabor) },
     { label: 'Color',              value: a => formatOrganoleptico(a.color) },
@@ -490,6 +494,7 @@ const handleExportExcel = async () => {
   excelData.push([]); // Fila vacía para separación
 
   const hasCatalunaExcel = analiticas.some(a => getComunidadFromAnalitica(a) === CATALUNA_COMUNIDAD_ID)
+  const hasAluminioExcel = analiticas.some(a => a.aluminio != null)
 
   // Encabezados de la tabla (incluye Zona de Abastecimiento)
   const headers = [
@@ -503,6 +508,7 @@ const handleExportExcel = async () => {
     'Cloro (mg/l)',
     'pH',
     'Turbidez (NTU)',
+    ...(hasAluminioExcel ? ['Aluminio (µg/L)'] : []),
     'Olor',
     'Sabor',
     'Color'
@@ -534,6 +540,7 @@ const handleExportExcel = async () => {
       a.cloro !== null && a.cloro !== undefined ? a.cloro : '',
       a.ph !== null && a.ph !== undefined ? a.ph : '',
       a.turbidez !== null && a.turbidez !== undefined ? a.turbidez : '',
+      ...(hasAluminioExcel ? [a.aluminio != null ? a.aluminio : ''] : []),
       formatOrganoleptico(a.olor),
       formatOrganoleptico(a.sabor),
       formatOrganoleptico(a.color)
@@ -600,6 +607,7 @@ const handleExportExcel = async () => {
     { wch: 15 },  // Cloro
     { wch: 10 },  // pH
     { wch: 15 },  // Turbidez
+    ...(hasAluminioExcel ? [{ wch: 15 }] : []),  // Aluminio
     { wch: 15 },  // Olor
     { wch: 15 },  // Sabor
     { wch: 15 }   // Color

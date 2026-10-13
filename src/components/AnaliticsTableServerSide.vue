@@ -21,7 +21,7 @@ import { useNotifications } from '@/composables/useNotifications'
 import { getAllParametrosCalidad } from '@/services/parametrosCalidad'
 import { DEFAULT_ANALITICA_RANGES, normalizeParametrosCalidad, formatRangeLabel } from '@/constants/parametrosCalidad'
 import { getInfraPinSvg } from '@/helpers/maps'
-import { isCloroWrong, isPhWrong, isTurbidezWrong, isOrganolepticWrong } from '@/composables/useRangeCheck'
+import { isCloroWrong, isPhWrong, isTurbidezWrong, isOrganolepticWrong, isAluminioWrong } from '@/composables/useRangeCheck'
 
 const checkedRows = ref([])
 const fetchingAll = ref(false)
@@ -321,11 +321,14 @@ const checkTurbidezWrong = (analitica) =>
 
 const checkOrganolepticWrong = isOrganolepticWrong
 
+const checkAluminioWrong = (analitica) => isAluminioWrong(analitica.aluminio)
+
 const checkWrongValues = (analitica) => {
   return (
     checkCloroWrong(analitica) ||
     checkPhWrong(analitica) ||
     checkTurbidezWrong(analitica) ||
+    checkAluminioWrong(analitica) ||
     checkOrganolepticWrong(analitica.olor) ||
     checkOrganolepticWrong(analitica.color) ||
     checkOrganolepticWrong(analitica.sabor)
@@ -986,6 +989,42 @@ onMounted(async () => {
                         ]"
                       >
                         {{ analitica.turbidez == null ? 'Sin muestra' : checkTurbidezWrong(analitica) ? '⚠ Fuera de rango' : '✓ Correcto' }}
+                      </span>
+                    </div>
+                  </div>
+
+                  <!-- Aluminio (solo analíticas de Seguimiento, tipo 99) -->
+                  <div
+                    v-if="analitica.type === 99"
+                    :class="[
+                      'rounded-xl p-2 sm:p-3 flex flex-col gap-1 border',
+                      checkAluminioWrong(analitica)
+                        ? 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-700'
+                        : 'bg-white border-gray-200 dark:bg-slate-700 dark:border-slate-600'
+                    ]"
+                  >
+                    <span class="text-xs font-medium uppercase tracking-wide text-gray-400">Aluminio</span>
+                    <span
+                      :class="[
+                        'text-xl sm:text-2xl font-bold',
+                        checkAluminioWrong(analitica) ? 'text-red-500' : 'text-gray-800 dark:text-white'
+                      ]"
+                    >
+                      {{ analitica.aluminio != null ? analitica.aluminio : '—' }}
+                    </span>
+                    <div class="flex flex-wrap items-center gap-1">
+                      <span class="text-xs text-gray-400">µg/L &nbsp;≤ 200</span>
+                      <span
+                        :class="[
+                          'text-xs font-semibold px-2 py-0.5 rounded-full',
+                          analitica.aluminio == null
+                            ? 'bg-gray-100 text-gray-400 dark:bg-slate-600 dark:text-gray-400'
+                            : checkAluminioWrong(analitica)
+                              ? 'bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400'
+                              : 'bg-green-100 text-green-600 dark:bg-green-900/40 dark:text-green-400'
+                        ]"
+                      >
+                        {{ analitica.aluminio == null ? 'Sin muestra' : checkAluminioWrong(analitica) ? '⚠ Fuera de rango' : '✓ Correcto' }}
                       </span>
                     </div>
                   </div>

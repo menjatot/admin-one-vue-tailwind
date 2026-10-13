@@ -175,6 +175,8 @@ export const updateAnaliticabyId = async (id, data) => {
       sabor: data.sabor,
       ph: toNumberOrNull(data.ph),
       turbidez: toNumberOrNull(data.turbidez),
+      // La columna aluminio solo se envía si la fila la trae (existe en la tabla)
+      ...(data.aluminio !== undefined ? { aluminio: toNumberOrNull(data.aluminio) } : {}),
       observaciones: data.observaciones,
       registro: data.registro
     }

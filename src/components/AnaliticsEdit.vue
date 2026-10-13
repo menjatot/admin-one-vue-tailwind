@@ -169,6 +169,20 @@ watch(
           max: 'El valor máximo es 999'
         }"
       />
+      <FormKit
+        v-if="localAnalitic.type === 99"
+        v-model.number="localAnalitic.aluminio"
+        type="number"
+        placeholder="Aluminio"
+        label="Aluminio"
+        help="µg/L"
+        validation="number|min:0|max:9999"
+        :validation-messages="{
+          number: 'Introduce un número',
+          min: 'El valor mínimo es 0',
+          max: 'El valor máximo es 9999'
+        }"
+      />
     </div>
     <div
       v-if="esCataluna"
