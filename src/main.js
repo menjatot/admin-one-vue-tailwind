@@ -56,3 +56,36 @@ router.afterEach((to) => {
     ? `${to.meta.title} — ${defaultDocumentTitle}`
     : defaultDocumentTitle
 })
+
+// --- Auto-recuperación tras despliegues ---
+// Si la pestaña mantiene en memoria una versión antigua de la app y el usuario
+// navega a una ruta cuyo chunk ya no existe en el servidor, el .htaccess devuelve
+// index.html (text/html), los módulos no cargan y la navegación "no hace nada".
+// En ese caso recargamos UNA vez para coger la versión nueva (el guard evita
+// bucles si el servidor estuviera realmente roto).
+const CHUNK_RELOAD_KEY = 'sinaq-chunk-reload-ts'
+const reloadOnceForNewVersion = () => {
+  const last = Number(sessionStorage.getItem(CHUNK_RELOAD_KEY) || 0)
+  if (Date.now() - last > 15000) {
+    sessionStorage.setItem(CHUNK_RELOAD_KEY, String(Date.now()))
+    window.location.reload()
+    return true
+  }
+  console.error(
+    '[SINAQ] Un recurso de la aplicación no se pudo cargar y ya se intentó recargar hace unos segundos. Recarga manualmente (Ctrl/Cmd+Shift+R).'
+  )
+  return false
+}
+
+window.addEventListener('vite:preloadError', (event) => {
+  console.warn('[SINAQ] Fallo al cargar un módulo (posible versión antigua tras despliegue). Recargando…', event.payload)
+  reloadOnceForNewVersion()
+})
+
+router.onError((error) => {
+  const msg = String(error?.message || '')
+  if (/dynamically imported module|Loading chunk|module script failed|MIME type/i.test(msg)) {
+    console.warn('[SINAQ] Error de carga de módulo en el router. Recargando…', msg)
+    reloadOnceForNewVersion()
+  }
+})
