@@ -71,3 +71,26 @@ export const updatePuntoMuestreo = async (data) => {
 
     return puntoMuestreo
 }
+
+// Oculta o vuelve a mostrar un punto en el mapa (sin anularlo: sigue disponible
+// para registrar analíticas y en el resto de pantallas).
+export const setPuntoOcultoMapa = async (id, oculto) => {
+    assertAuthenticated('ocultar puntos de muestreo en el mapa')
+    const { data: beforeData } = await supabase
+        .from('puntos_muestreo')
+        .select('*')
+        .eq('id', id)
+        .single()
+
+    const { data, error } = await supabase
+        .from('puntos_muestreo')
+        .update({ oculto_mapa: Boolean(oculto) })
+        .eq('id', id)
+        .select()
+        .single()
+    if (error) throw error
+
+    logAudit('UPDATE', 'puntos_muestreo', id, beforeData, data)
+
+    return data
+}

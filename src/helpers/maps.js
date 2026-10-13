@@ -121,3 +121,24 @@ export const markerDivIcon = (iconName) => {
   return iconCache[iconName]
 }
 
+// ─── Visibilidad de puntos en el mapa ────────────────────────────────────────
+// Bucket = tipo de infraestructura del punto (1..5) o 'sin' si no tiene.
+export const tipoBucketDePunto = (punto) => {
+  const tipo = getTipoInfrastructuraByPunto(punto?.infraestructura_fk)
+  return tipo == null ? 'sin' : Number(tipo)
+}
+
+export const esBucketVisible = (bucket, tiposVisibles) =>
+  !tiposVisibles || tiposVisibles.map(String).includes(String(bucket))
+
+/**
+ * Filtra los puntos que se muestran en el mapa:
+ *  - excluye los marcados como ocultos por el administrador (oculto_mapa),
+ *  - si `tiposVisibles` es null/undefined muestra todos los tipos; si es un
+ *    array, solo los buckets incluidos (ids de tipo o 'sin').
+ */
+export const filtrarPuntosMapa = (puntos, tiposVisibles, tipoDe = tipoBucketDePunto) =>
+  (puntos || []).filter(
+    (p) => !p.oculto_mapa && esBucketVisible(tipoDe(p), tiposVisibles)
+  )
+

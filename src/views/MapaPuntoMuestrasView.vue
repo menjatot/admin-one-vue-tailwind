@@ -3,7 +3,8 @@ import BaseButton from '@/components/BaseButton.vue'
 import CardBox from '@/components/CardBox.vue'
 import SectionTitleLineWithButton from '@/components/SectionTitleLineWithButton.vue'
 import LayoutAuthenticated from '@/layouts/LayoutAuthenticated.vue'
-import { mdiCrosshairsGps, mdiDownload, mdiFilter, mdiFlaskEmptyOutline, mdiMap } from '@mdi/js'
+import { mdiChevronDown, mdiChevronUp, mdiCrosshairsGps, mdiDownload, mdiFilter, mdiFlaskEmptyOutline, mdiMap } from '@mdi/js'
+import BaseIcon from '@/components/BaseIcon.vue'
 
 import { usePlantasStore } from '@/stores/plantas'
 import {useLoginStore} from '@/stores/login'
@@ -16,7 +17,7 @@ import { LMap, LTileLayer, LMarker, LTooltip } from '@vue-leaflet/vue-leaflet'
 import { computed, ref, watch } from 'vue'
 import CardBoxModal from '@/components/CardBoxModal.vue'
 import FormAnalitica from '@/components/FormAnalitica.vue'
-import { getIconByInfraestructura, markerDivIcon } from '@/helpers/maps'
+import { getIconByInfraestructura, getInfraPinColors, markerDivIcon, filtrarPuntosMapa, tipoBucketDePunto } from '@/helpers/maps'
 import L from 'leaflet'
 import 'leaflet.markercluster'
 import { onMounted } from 'vue'
@@ -71,7 +72,7 @@ const buildClusterGroup = () => {
   const buttonLabel = useCreate ? 'Añadir analítica' : 'Ver analíticas'
   const action = useCreate ? 'crear' : 'ver'
 
-  puntosMuestreo.value.forEach((punto) => {
+  puntosMapa.value.forEach((punto) => {
     if (!punto.posicion) return
 
     const marker = L.marker([punto.posicion.lat, punto.posicion.lon], {
@@ -186,6 +187,89 @@ const puntosMuestreo = computed(() => {
   )
 })
 
+// ─── Filtro de tipos de punto en el mapa ─────────────────────────────────────
+// Preferencia por dispositivo (localStorage). null = mostrar todos los tipos;
+// array de buckets (ids de tipo de infraestructura o 'sin') = solo esos.
+const TIPOS_STORAGE_KEY = 'sinaq.mapa.tiposVisibles'
+
+const cargarTiposVisibles = () => {
+  try {
+    const raw = localStorage.getItem(TIPOS_STORAGE_KEY)
+    if (!raw) return null
+    const arr = JSON.parse(raw)
+    return Array.isArray(arr) ? arr : null
+  } catch {
+    return null
+  }
+}
+
+const tiposVisibles = ref(cargarTiposVisibles())
+const panelTiposAbierto = ref(typeof window !== 'undefined' && window.innerWidth >= 768)
+
+// Puntos que realmente se pintan: activos + zona + no ocultos + tipo visible
+const puntosMapa = computed(() =>
+  filtrarPuntosMapa(puntosMuestreo.value, tiposVisibles.value)
+)
+
+// Recuento por tipo (para los chips), sin contar los ocultos por el admin
+const conteoPorTipo = computed(() => {
+  const c = {}
+  puntosMuestreo.value.forEach((p) => {
+    if (p.oculto_mapa) return
+    const bucket = tipoBucketDePunto(p)
+    c[bucket] = (c[bucket] || 0) + 1
+  })
+  return c
+})
+
+const tiposConPuntos = computed(() => {
+  const chips = [...(plantasStore.getTipoInfraestructura || [])]
+    .sort((a, b) => Number(a.id) - Number(b.id))
+    .map((t) => ({
+      key: Number(t.id),
+      name: t.name,
+      count: conteoPorTipo.value[Number(t.id)] || 0
+    }))
+  if (conteoPorTipo.value['sin']) {
+    chips.push({ key: 'sin', name: 'Sin infraestructura', count: conteoPorTipo.value['sin'] })
+  }
+  return chips
+})
+
+const esTipoVisible = (key) =>
+  !tiposVisibles.value || tiposVisibles.value.map(String).includes(String(key))
+
+const colorDeTipo = (key) => {
+  if (key === 'sin') return '#78909c'
+  return getInfraPinColors(Number(key)).g1
+}
+
+const toggleTipo = (key) => {
+  const actuales = tiposVisibles.value
+    ? [...tiposVisibles.value]
+    : tiposConPuntos.value.map((c) => c.key)
+  const idx = actuales.map(String).indexOf(String(key))
+  if (idx >= 0) actuales.splice(idx, 1)
+  else actuales.push(key)
+  tiposVisibles.value = actuales
+  try {
+    localStorage.setItem(TIPOS_STORAGE_KEY, JSON.stringify(actuales))
+  } catch {
+    /* almacenamiento no disponible */
+  }
+}
+
+const mostrarTodosLosTipos = () => {
+  tiposVisibles.value = null
+  try {
+    localStorage.removeItem(TIPOS_STORAGE_KEY)
+  } catch {
+    /* almacenamiento no disponible */
+  }
+}
+
+const totalPuntosMapa = computed(() => puntosMuestreo.value.filter((p) => !p.oculto_mapa).length)
+
 const closeModal = () => {
   isModalActive.value = false
   selectedPunto.value = null
@@ -242,9 +326,9 @@ const centerOnUserLocation = () => {
   getUserLocation()
 }
 
-// Rebuild cluster when puntos or infraestructuras data changes (icons depend on both)
+// Rebuild cluster when puntos visibles or infraestructuras data changes (icons depend on both)
 watch(
-  [puntosMuestreo, () => plantasStore.getInfraestructuras.length],
+  [puntosMapa, () => plantasStore.getInfraestructuras.length],
   () => { if (mapLoaded.value) buildClusterGroup() }
 )
 
@@ -318,6 +402,64 @@ onMounted(async () => {
 
       <CardBox has-table class="overflow-hidden">
         <div class="relative w-full" style="height: calc(100dvh - 13rem); min-height: 400px;">
+
+          <!-- Filtro de tipos de punto (preferencia por dispositivo) -->
+          <div class="absolute top-3 left-3 z-10 flex flex-col gap-2">
+            <button
+              type="button"
+              class="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 bg-white/95 dark:bg-slate-800/95 text-gray-700 dark:text-gray-200 text-sm font-medium shadow-md border border-gray-200 dark:border-slate-600"
+              @click="panelTiposAbierto = !panelTiposAbierto"
+            >
+              <BaseIcon :path="mdiFilter" size="16" />
+              <span>Tipos de punto</span>
+              <span class="text-xs font-normal text-gray-500 dark:text-gray-400">{{ puntosMapa.length }}/{{ totalPuntosMapa }}</span>
+              <BaseIcon :path="panelTiposAbierto ? mdiChevronUp : mdiChevronDown" size="16" />
+            </button>
+
+            <div
+              v-if="panelTiposAbierto"
+              class="rounded-xl bg-white/95 dark:bg-slate-800/95 shadow-lg border border-gray-200 dark:border-slate-600 p-3 w-72 backdrop-blur"
+            >
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-xs font-semibold uppercase tracking-wide text-gray-400">Mostrar en el mapa</span>
+                <button
+                  v-if="tiposVisibles"
+                  type="button"
+                  class="text-xs font-medium text-blue-600 hover:underline dark:text-blue-400"
+                  @click="mostrarTodosLosTipos"
+                >
+                  Todos
+                </button>
+              </div>
+              <div class="flex flex-col gap-1.5">
+                <label
+                  v-for="chip in tiposConPuntos"
+                  :key="chip.key"
+                  class="flex items-center gap-2 cursor-pointer select-none"
+                >
+                  <input
+                    type="checkbox"
+                    class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    :checked="esTipoVisible(chip.key)"
+                    @change="toggleTipo(chip.key)"
+                  />
+                  <span
+                    class="inline-block w-3.5 h-3.5 rounded-full flex-shrink-0"
+                    :style="{ backgroundColor: colorDeTipo(chip.key) }"
+                    :class="{ 'opacity-30': !esTipoVisible(chip.key) }"
+                  />
+                  <span
+                    class="text-sm text-gray-700 dark:text-gray-200 flex-1 leading-tight"
+                    :class="{ 'opacity-50': !esTipoVisible(chip.key) }"
+                  >{{ chip.name }}</span>
+                  <span class="text-xs text-gray-400">{{ chip.count }}</span>
+                </label>
+              </div>
+              <p class="mt-2 text-[11px] leading-snug text-gray-400">
+                La selección se guarda en este dispositivo.
+              </p>
+            </div>
+          </div>
 
           <!-- Botón superpuesto sobre el mapa -->
           <div class="absolute top-3 right-12 z-10">

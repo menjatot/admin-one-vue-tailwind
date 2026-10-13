@@ -7,6 +7,8 @@ import {
   mdiAlertCircleOutline,
   mdiChevronDown,
   mdiChevronLeft,
+  mdiEye,
+  mdiEyeOff,
   mdiMapMarker,
   mdiPencil,
   mdiTrashCan,
@@ -28,7 +30,7 @@ import {
 } from '@/services/infraestructuras'
 import FormInfraestructura from './FormInfraestructura.vue'
 import FormPuntoMuestreo from './FormPuntoMuestreo.vue'
-import { anularPuntoMuestreo, createPuntoMuestreo, updatePuntoMuestreo } from '@/services/puntosMuestreo'
+import { anularPuntoMuestreo, createPuntoMuestreo, updatePuntoMuestreo, setPuntoOcultoMapa } from '@/services/puntosMuestreo'
 import { useNotifications } from '@/composables/useNotifications'
 
 defineProps({
@@ -53,6 +55,31 @@ const clearFilters = () => {
   filters.value.nombre = ''
   filters.value.zona = ''
   filters.value.infraestructura = ''
+}
+
+// Visibilidad de un punto en el mapa (ocultar sin anular)
+const toggleandoMapaId = ref(null)
+const columnaOcultoMapaDisponible = computed(() =>
+  plantaStore.getPuntosMuestreo.some((p) => p.oculto_mapa !== undefined)
+)
+
+const toggleOcultoMapa = async (punto) => {
+  if (!columnaOcultoMapaDisponible.value) return
+  toggleandoMapaId.value = punto.id
+  try {
+    await setPuntoOcultoMapa(punto.id, !punto.oculto_mapa)
+    punto.oculto_mapa = !punto.oculto_mapa
+    notifySuccess(
+      punto.oculto_mapa
+        ? 'Punto oculto en el mapa (sigue disponible para analíticas)'
+        : 'El punto vuelve a mostrarse en el mapa',
+      { title: 'Visibilidad en el mapa' }
+    )
+  } catch (e) {
+    notifyError('No se pudo cambiar la visibilidad: ' + (e?.message ?? e), { title: 'Error' })
+  } finally {
+    toggleandoMapaId.value = null
+  }
 }
 
 
@@ -331,6 +358,7 @@ defineExpose({
           <th>Nombre</th>
           <th>Infraestructura</th>
           <th>Zona</th>
+          <th class="text-center">Mapa</th>
 
           <th />
         </tr>
@@ -354,6 +382,25 @@ defineExpose({
             </td>
             <td data-label="Operador">
               {{ getZonaById(punto.zona_fk) }}
+            </td>
+
+            <td data-label="Mapa" class="text-center">
+              <button
+                type="button"
+                class="p-1.5 rounded-full transition-colors disabled:opacity-40"
+                :class="punto.oculto_mapa
+                  ? 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-200'
+                  : 'text-emerald-600 hover:text-emerald-700 dark:text-emerald-400'"
+                :title="!columnaOcultoMapaDisponible
+                  ? 'Pendiente de crear la columna oculto_mapa en Supabase'
+                  : (punto.oculto_mapa
+                    ? 'Oculto en el mapa — pulsa para mostrarlo'
+                    : 'Visible en el mapa — pulsa para ocultarlo')"
+                :disabled="toggleandoMapaId === punto.id || !columnaOcultoMapaDisponible"
+                @click="toggleOcultoMapa(punto)"
+              >
+                <BaseIcon :path="punto.oculto_mapa ? mdiEyeOff : mdiEye" size="18" />
+              </button>
             </td>
 
             <td>
