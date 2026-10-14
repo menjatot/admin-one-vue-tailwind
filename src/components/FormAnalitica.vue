@@ -142,7 +142,17 @@ const buscarPuntoSeleccionado = () => {
   )
 }
 
-const tipoInfraestructuraPunto = computed(() => {
+// Infraestructura efectiva del formulario: manda la elegida explícitamente
+// (cascada UO → zona → infraestructura); si no hay, la del punto seleccionado.
+// Al cambiar cualquiera de los dos, `form.punto_muestreo_fk` se limpia (watch de
+// abajo), por lo que el tipo de analítica se recalcula con la infraestructura nueva.
+const tipoInfraestructuraSeleccionada = computed(() => {
+  if (form.infraestructura) {
+    const infra = plantaStore.getInfraestructuras.find(
+      (i) => Number(i.id) === Number(form.infraestructura)
+    )
+    if (infra?.type != null) return infra.type
+  }
   const punto = buscarPuntoSeleccionado()
   if (!punto?.infraestructura_fk) return null
   const infra = plantaStore.getInfraestructuras.find((i) => i.id === punto.infraestructura_fk)
@@ -150,11 +160,11 @@ const tipoInfraestructuraPunto = computed(() => {
 })
 
 const opcionesTipoAnalitica = computed(() =>
-  tiposAnaliticaPermitidos(tipoInfraestructuraPunto.value)
+  tiposAnaliticaPermitidos(tipoInfraestructuraSeleccionada.value)
 )
 
 const restriccionTipoTexto = computed(() => {
-  const t = Number(tipoInfraestructuraPunto.value)
+  const t = Number(tipoInfraestructuraSeleccionada.value)
   if (t === 2 || t === 5) {
     return 'Depósito (cabecera o distribución): solo se permiten analíticas Operacional y Seguimiento.'
   }
@@ -164,7 +174,17 @@ const restriccionTipoTexto = computed(() => {
   return ''
 })
 
-// Si el punto cambia y el tipo elegido ya no aplica, se limpia la selección
+// Al cambiar de zona o infraestructura, el punto seleccionado ya no corresponde
+// a la cascada (el listado de puntos ha cambiado): se limpia para que el tipo de
+// analítica se recalcule y no se guarde la analítica en un punto equivocado.
+watch(
+  () => [form.zona, form.infraestructura],
+  () => {
+    form.punto_muestreo_fk = ''
+  }
+)
+
+// Si el punto/infraestructura cambia y el tipo elegido ya no aplica, se limpia
 watch([() => form.punto_muestreo_fk, opcionesTipoAnalitica], () => {
   if (form.type === '' || form.type === null || form.type === undefined) return
   if (!Object.keys(opcionesTipoAnalitica.value).includes(String(form.type))) {

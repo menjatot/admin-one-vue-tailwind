@@ -418,7 +418,7 @@ onMounted(async () => {
 
             <div
               v-if="panelTiposAbierto"
-              class="rounded-xl bg-white/95 dark:bg-slate-800/95 shadow-lg border border-gray-200 dark:border-slate-600 p-3 w-72 backdrop-blur"
+              class="rounded-xl bg-white/95 dark:bg-slate-800/95 shadow-lg border border-gray-200 dark:border-slate-600 p-3 w-72 max-w-[calc(100vw-1.5rem)] backdrop-blur"
             >
               <div class="flex items-center justify-between mb-2">
                 <span class="text-xs font-semibold uppercase tracking-wide text-gray-400">Mostrar en el mapa</span>
