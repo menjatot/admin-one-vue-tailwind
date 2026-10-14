@@ -17,7 +17,9 @@ import { usePermissions } from '@/composables/usePermissions';
 const tablaAnaliticas = ref();
 const { exportXMLData } = useExtractdata();
 const selectedZona= ref(null);
-const { isAdmin: isAdminRole, canExport: canExportAndPrint, isOperario, isVisualizador } = usePermissions();
+const { isAdmin: isAdminRole, isGestor, canExport: canExportAndPrint, isOperario, isVisualizador } = usePermissions();
+// El boletín XML pueden exportarlo administrador y gestor (rol 2)
+const canExportXML = computed(() => isAdminRole.value || isGestor.value)
 const { resumen, sinIncidencias, cargando, cargarIncidencias } = useDashboardIncidencias()
 const dashboardAbierto = ref(false)
 const loginStore = useLoginStore()
@@ -54,7 +56,7 @@ watch(() => tablaAnaliticas.value?.filters?.zona, (newZona) => {
 
 
 const downloadXML = () => {
-  if (!isAdminRole.value) return;
+  if (!canExportXML.value) return;
 
   const analiticasSeleccionadas = (tablaAnaliticas.value?.checkedRows || [])
     .filter(item => item.type === 28 || item.type === 29);
@@ -109,7 +111,7 @@ const loadAllAnalyticsForExport = async () => {
         <div class="flex flex-wrap gap-2">
           <!-- Download XML -->
           <button
-            v-if="isAdminRole && exportXMLData"
+            v-if="canExportXML && exportXMLData"
             class="inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-medium text-white bg-gradient-to-r from-sky-500 to-blue-600 shadow-md shadow-sky-300/50 dark:shadow-sky-900/40 transition-all duration-200 hover:from-sky-600 hover:to-blue-700 hover:-translate-y-0.5 hover:shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-md"
             :disabled="selectedAnaliticasFromTable.length === 0"
             @click="downloadXML"
