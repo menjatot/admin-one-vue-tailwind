@@ -12,6 +12,8 @@ import { usePlantasStore } from '@/stores/plantas'
 import useLoginStore from '@/stores/login'
 
 import AdvancedExportControls from '@/components/AdvancedExportControls.vue';
+import RevisionIncorrectasModal from '@/components/RevisionIncorrectasModal.vue';
+import { useRevisionIncorrectas } from '@/composables/useRevisionIncorrectas';
 import { usePermissions } from '@/composables/usePermissions';
 
 const tablaAnaliticas = ref();
@@ -20,6 +22,25 @@ const selectedZona= ref(null);
 const { isAdmin: isAdminRole, isGestor, canExport: canExportAndPrint, isOperario, isVisualizador } = usePermissions();
 // El boletín XML pueden exportarlo administrador y gestor (rol 2)
 const canExportXML = computed(() => isAdminRole.value || isGestor.value)
+
+// Revisión previa de analíticas incorrectas antes de exportar (XML/PDF/Excel)
+const { getIncorrectas } = useRevisionIncorrectas()
+const revisionAbierta = ref(false)
+const revisionIncorrectas = ref([])
+const revisionPendiente = ref(null)
+
+const confirmarRevisionXML = async () => {
+  const pend = revisionPendiente.value
+  revisionAbierta.value = false
+  revisionIncorrectas.value = []
+  revisionPendiente.value = null
+  if (pend) await pend.reanudar()
+}
+const cancelarRevisionXML = () => {
+  revisionAbierta.value = false
+  revisionIncorrectas.value = []
+  revisionPendiente.value = null
+}
 const { resumen, sinIncidencias, cargando, cargarIncidencias } = useDashboardIncidencias()
 const dashboardAbierto = ref(false)
 const loginStore = useLoginStore()
@@ -55,7 +76,7 @@ watch(() => tablaAnaliticas.value?.filters?.zona, (newZona) => {
 
 
 
-const downloadXML = () => {
+const downloadXML = async (saltarRevision = false) => {
   if (!canExportXML.value) return;
 
   const analiticasSeleccionadas = (tablaAnaliticas.value?.checkedRows || [])
@@ -64,6 +85,22 @@ const downloadXML = () => {
     alert('Por favor, seleccione al menos una analítica de tipo Operacional o Rutina para XML.');
     return;
   }
+
+  // Revisión previa: pantalla de incorrectas para poder corregirlas antes de exportar
+  if (saltarRevision !== true) {
+    try {
+      const incorrectas = await getIncorrectas(analiticasSeleccionadas)
+      if (incorrectas.length > 0) {
+        revisionPendiente.value = { reanudar: () => downloadXML(true) }
+        revisionIncorrectas.value = incorrectas
+        revisionAbierta.value = true
+        return
+      }
+    } catch (e) {
+      console.error('No se pudo comprobar las incorrectas antes de exportar:', e)
+    }
+  }
+
   const xmlContent = exportXMLData(analiticasSeleccionadas);
   const blob = new Blob([xmlContent], { type: 'application/xml' });
   const url = window.URL.createObjectURL(blob);
@@ -114,7 +151,7 @@ const loadAllAnalyticsForExport = async () => {
             v-if="canExportXML && exportXMLData"
             class="inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-medium text-white bg-gradient-to-r from-sky-500 to-blue-600 shadow-md shadow-sky-300/50 dark:shadow-sky-900/40 transition-all duration-200 hover:from-sky-600 hover:to-blue-700 hover:-translate-y-0.5 hover:shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-md"
             :disabled="selectedAnaliticasFromTable.length === 0"
-            @click="downloadXML"
+            @click="downloadXML()"
           >
             <BaseIcon :path="mdiDownload" size="16" />
             <span>XML</span>
@@ -231,6 +268,14 @@ const loadAllAnalyticsForExport = async () => {
           checkable 
         />
       </CardBox>
+
+      <RevisionIncorrectasModal
+        v-model="revisionAbierta"
+        :incorrectas="revisionIncorrectas"
+        export-label="la exportación a XML"
+        @confirm="confirmarRevisionXML"
+        @cancel="cancelarRevisionXML"
+      />
     </section>
   </LayoutAuthenticated>
 </template>

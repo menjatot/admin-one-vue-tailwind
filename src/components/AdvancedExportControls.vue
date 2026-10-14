@@ -5,6 +5,8 @@ import { mdiPrinter, mdiFileExcel, mdiLoading } from '@mdi/js';
 import { usePlantasStore } from '@/stores/plantas';
 import * as XLSX from 'xlsx';
 import { useNotifications } from '@/composables/useNotifications'
+import { useRevisionIncorrectas } from '@/composables/useRevisionIncorrectas'
+import RevisionIncorrectasModal from './RevisionIncorrectasModal.vue'
 import { CATALUNA_COMUNIDAD_ID } from '@/constants/comunidades'
 
 const props = defineProps({
@@ -45,6 +47,34 @@ const props = defineProps({
 const { selectedRows, allAnaliticasForDateRange, fileNameBase, logoUrl, companyName, selectedZona } = toRefs(props);
 const plantasStore = usePlantasStore();
 const exporting = ref(false)
+
+// Revisión previa de analíticas incorrectas antes de exportar (XML/PDF/Excel)
+const { getIncorrectas } = useRevisionIncorrectas()
+const revisionAbierta = ref(false)
+const revisionIncorrectas = ref([])
+const revisionPendiente = ref(null)
+
+const confirmarRevision = async () => {
+  const pend = revisionPendiente.value
+  revisionAbierta.value = false
+  revisionIncorrectas.value = []
+  revisionPendiente.value = null
+  if (!pend) return
+  if (pend.tipo === 'print' && pend.printWindow && !pend.printWindow.closed) {
+    pend.printWindow.close()
+  }
+  await pend.reanudar()
+}
+
+const cancelarRevision = () => {
+  const pend = revisionPendiente.value
+  revisionAbierta.value = false
+  revisionIncorrectas.value = []
+  revisionPendiente.value = null
+  if (pend?.tipo === 'print' && pend.printWindow && !pend.printWindow.closed) {
+    pend.printWindow.close()
+  }
+}
 
 const groupByZona = ref(false)
 
@@ -161,7 +191,7 @@ const getAnaliticasParaExportar = () => {
 
 // ...existing code...
 
-const handlePrintHTML = async () => {
+const handlePrintHTML = async (saltarRevision = false) => {
   // La ventana se abre DE FORMA SÍNCRONA dentro del click: si se hace después de
   // un await (la carga previa de datos tarda varios segundos), el navegador pierde
   // la "activación transitoria" del usuario, bloquea window.open como popup
@@ -182,12 +212,32 @@ const handlePrintHTML = async () => {
 
   exporting.value = true
   try {
+    const exportData = getAnaliticasParaExportar();
+    if (!exportData) {
+      if (printWindow && !printWindow.closed) printWindow.close();
+      return;
+    }
+
+    // Revisión previa: pantalla de incorrectas para poder corregirlas antes de exportar
+    if (saltarRevision !== true) {
+      const incorrectas = await getIncorrectas(exportData.analiticas)
+      if (incorrectas.length > 0) {
+        revisionPendiente.value = {
+          tipo: 'print',
+          printWindow,
+          reanudar: () => handlePrintHTML(true)
+        }
+        revisionIncorrectas.value = incorrectas
+        revisionAbierta.value = true
+        return
+      }
+    }
+
+    // Cargar el rango completo (volumen/consumo) solo tras confirmar la revisión
     if (props.onBeforeExport) {
       await props.onBeforeExport()
     }
 
-    const exportData = getAnaliticasParaExportar();
-    if (!exportData) return;
     let { analiticas, minDate, maxDate } = exportData;
 
   analiticas = [...analiticas].sort((a, b) => {
@@ -454,16 +504,31 @@ const handlePrintHTML = async () => {
   }
 };
 
-const handleExportExcel = async () => {
+const handleExportExcel = async (saltarRevision = false) => {
   exporting.value = true
   try {
+    const exportData = getAnaliticasParaExportar();
+    if (!exportData) return;
+
+    // Revisión previa: pantalla de incorrectas para poder corregirlas antes de exportar
+    if (saltarRevision !== true) {
+      const incorrectas = await getIncorrectas(exportData.analiticas)
+      if (incorrectas.length > 0) {
+        revisionPendiente.value = {
+          tipo: 'excel',
+          reanudar: () => handleExportExcel(true)
+        }
+        revisionIncorrectas.value = incorrectas
+        revisionAbierta.value = true
+        return
+      }
+    }
+
     // Llamar a la función de callback antes de exportar (si existe)
     if (props.onBeforeExport) {
     await props.onBeforeExport()
   }
 
-  const exportData = getAnaliticasParaExportar();
-  if (!exportData) return;
   let { analiticas, minDate, maxDate } = exportData;
 
   // Ordenar las analíticas de la misma manera que en el PDF
@@ -777,7 +842,7 @@ const handleExportExcel = async () => {
       v-if="props.enableHtmlPrint"
       class="inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-medium text-white bg-gradient-to-r from-slate-500 to-slate-700 shadow-md shadow-slate-300/50 dark:shadow-slate-900/40 transition-all duration-200 hover:from-slate-600 hover:to-slate-800 hover:-translate-y-0.5 hover:shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-md"
       :disabled="selectedRows.length === 0 || exporting"
-      @click="handlePrintHTML"
+      @click="handlePrintHTML()"
     >
       <BaseIcon :path="exporting ? mdiLoading : mdiPrinter" size="16" :class="{ 'animate-spin': exporting }" />
       <span>{{ exporting ? 'Exportando...' : 'Imprimir' }}</span>
@@ -786,10 +851,18 @@ const handleExportExcel = async () => {
     <button
       class="inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-medium text-white bg-gradient-to-r from-green-500 to-emerald-600 shadow-md shadow-green-300/50 dark:shadow-green-900/40 transition-all duration-200 hover:from-green-600 hover:to-emerald-700 hover:-translate-y-0.5 hover:shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-md"
       :disabled="selectedRows.length === 0 || exporting"
-      @click="handleExportExcel"
+      @click="handleExportExcel()"
     >
       <BaseIcon :path="exporting ? mdiLoading : mdiFileExcel" size="16" :class="{ 'animate-spin': exporting }" />
       <span>{{ exporting ? 'Exportando...' : 'Excel' }}</span>
     </button>
+
+    <RevisionIncorrectasModal
+      v-model="revisionAbierta"
+      :incorrectas="revisionIncorrectas"
+      export-label="la exportación"
+      @confirm="confirmarRevision"
+      @cancel="cancelarRevision"
+    />
   </div>
 </template>
