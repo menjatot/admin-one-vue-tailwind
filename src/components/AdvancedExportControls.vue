@@ -41,6 +41,10 @@ const props = defineProps({
   onBeforeExport: {
     type: Function,
     default: null
+  },
+  onEditAnalitica: {
+    type: Function,
+    default: null
   }
 });
 
@@ -74,6 +78,11 @@ const cancelarRevision = () => {
   if (pend?.tipo === 'print' && pend.printWindow && !pend.printWindow.closed) {
     pend.printWindow.close()
   }
+}
+
+// Edición directa desde la pantalla de revisión: delega en el contenedor
+const editarIncorrecta = (analitica) => {
+  if (props.onEditAnalitica) props.onEditAnalitica(analitica)
 }
 
 const groupByZona = ref(false)
@@ -861,6 +870,7 @@ const handleExportExcel = async (saltarRevision = false) => {
       v-model="revisionAbierta"
       :incorrectas="revisionIncorrectas"
       export-label="la exportación"
+      @edit="editarIncorrecta"
       @confirm="confirmarRevision"
       @cancel="cancelarRevision"
     />

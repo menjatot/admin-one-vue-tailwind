@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import CardBoxModal from './CardBoxModal.vue'
 import BaseButton from './BaseButton.vue'
 import BaseIcon from './BaseIcon.vue'
-import { mdiAlertCircleOutline } from '@mdi/js'
+import { mdiAlertCircleOutline, mdiPencil } from '@mdi/js'
 import { usePlantasStore } from '@/stores/plantas'
 
 const props = defineProps({
@@ -22,7 +22,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['update:modelValue', 'confirm', 'cancel'])
+const emit = defineEmits(['update:modelValue', 'confirm', 'cancel', 'edit'])
 
 const plantaStore = usePlantasStore()
 
@@ -58,8 +58,8 @@ const onConfirm = () => emit('confirm')
       <BaseIcon :path="mdiAlertCircleOutline" size="20" class="text-amber-500 flex-shrink-0 mt-0.5" />
       <p class="text-sm text-amber-800 dark:text-amber-200">
         Estas analíticas tienen valores fuera de rango u organolépticos no conformes.
-        Puedes <b>continuar</b> con {{ exportLabel }} o <b>cancelar</b> y corregirlas
-        antes con el lápiz del listado (las verás con el filtro «Solo valores incorrectos»).
+        Puedes <b>corregirlas con el lápiz</b> (sin salir de esta pantalla), <b>continuar</b> con
+        {{ exportLabel }} o <b>cancelar</b> y revisarlas en el listado.
       </p>
     </div>
 
@@ -72,6 +72,7 @@ const onConfirm = () => emit('confirm')
             <th class="text-left p-2">Operario</th>
             <th class="text-left p-2">Tipo</th>
             <th class="text-left p-2">Incidencias</th>
+            <th class="p-2"></th>
           </tr>
         </thead>
         <tbody>
@@ -92,6 +93,15 @@ const onConfirm = () => emit('confirm')
               >
                 {{ motivo }}
               </span>
+            </td>
+            <td class="p-2 text-right whitespace-nowrap">
+              <BaseButton
+                color="info"
+                :icon="mdiPencil"
+                small
+                title="Editar esta analítica"
+                @click="emit('edit', item.analitica)"
+              />
             </td>
           </tr>
         </tbody>

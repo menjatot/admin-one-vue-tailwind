@@ -41,6 +41,24 @@ const cancelarRevisionXML = () => {
   revisionIncorrectas.value = []
   revisionPendiente.value = null
 }
+
+// Edición directa desde la pantalla de revisión (lápiz)
+const editarDesdeRevision = (analitica) => {
+  tablaAnaliticas.value?.abrirEdicionAnalitica(analitica, onRevisionRowSaved)
+}
+
+// Tras guardar una corrección: recalcular los motivos de esa fila y actualizar la lista
+const onRevisionRowSaved = async (updated) => {
+  try {
+    const nuevas = await getIncorrectas([updated])
+    revisionIncorrectas.value = revisionIncorrectas.value
+      .filter((x) => x.analitica.id !== updated.id)
+      .concat(nuevas)
+  } catch (e) {
+    console.error('No se pudo recalcular la revisión tras guardar:', e)
+    revisionIncorrectas.value = revisionIncorrectas.value.filter((x) => x.analitica.id !== updated.id)
+  }
+}
 const { resumen, sinIncidencias, cargando, cargarIncidencias } = useDashboardIncidencias()
 const dashboardAbierto = ref(false)
 const loginStore = useLoginStore()
@@ -168,6 +186,7 @@ const loadAllAnalyticsForExport = async () => {
             :enable-html-print="true"
             :selected-zona="selectedZona"
             :on-before-export="loadAllAnalyticsForExport"
+            :on-edit-analitica="editarDesdeRevision"
           />
 
           <!-- Limpiar filtros -->
@@ -180,6 +199,15 @@ const loadAllAnalyticsForExport = async () => {
           </button>
         </div>
       </SectionTitleLineWithButton>
+
+      <RevisionIncorrectasModal
+        v-model="revisionAbierta"
+        :incorrectas="revisionIncorrectas"
+        export-label="la exportación a XML"
+        @edit="editarDesdeRevision"
+        @confirm="confirmarRevisionXML"
+        @cancel="cancelarRevisionXML"
+      />
 
       <!-- Dashboard de incidencias -->
       <CardBox v-if="resumen.total > 0 && !isOperario && !isVisualizador" class="mb-6 mx-10">
@@ -268,14 +296,6 @@ const loadAllAnalyticsForExport = async () => {
           checkable 
         />
       </CardBox>
-
-      <RevisionIncorrectasModal
-        v-model="revisionAbierta"
-        :incorrectas="revisionIncorrectas"
-        export-label="la exportación a XML"
-        @confirm="confirmarRevisionXML"
-        @cancel="cancelarRevisionXML"
-      />
     </section>
   </LayoutAuthenticated>
 </template>

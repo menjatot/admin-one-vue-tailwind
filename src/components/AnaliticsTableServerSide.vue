@@ -81,6 +81,15 @@ defineProps({
   checkable: Boolean
 })
 
+// Edición directa de una analítica desde fuera de la tabla (p. ej. desde la
+// pantalla de revisión previa a exportar). `onSaved` recibe la fila guardada.
+let editSavedCallback = null
+const abrirEdicionAnalitica = async (analitica, onSaved = null) => {
+  if (!analitica?.id) return
+  editSavedCallback = typeof onSaved === 'function' ? onSaved : null
+  await updateAnaliticaSeleccionada(analitica)
+}
+
 defineExpose({
   resetForm: () => {
     resetForm()
@@ -88,7 +97,8 @@ defineExpose({
   },
   checkedRows,
   filters: localFilters,
-  loadAllFilteredData
+  loadAllFilteredData,
+  abrirEdicionAnalitica
 })
 
 const showOnlyWrongValues = ref(false)
@@ -429,11 +439,26 @@ const handleConfirmUpdate = async () => {
     if (!analiticaToUpdate.value) {
       throw new Error('No hay analítica para actualizar')
     }
-    await updateAnaliticabyId(analiticaToUpdate.value.id, analiticaToUpdate.value)
+    const updatedRows = await updateAnaliticabyId(analiticaToUpdate.value.id, analiticaToUpdate.value)
+    const updated = Array.isArray(updatedRows) ? updatedRows[0] : updatedRows
+
+    // Mantener la selección (checkboxes) al día con los valores recién guardados,
+    // para que las exportaciones usen los datos corregidos.
+    if (updated?.id) {
+      const idx = checkedRows.value.findIndex((r) => r.id === updated.id)
+      if (idx >= 0) {
+        checkedRows.value[idx] = { ...checkedRows.value[idx], ...updated }
+      }
+    }
+
     await refresh() // Usar refresh del composable
+
+    const savedCb = editSavedCallback
+    editSavedCallback = null
     isModalActive.value = false
     analiticaToEdit.value = null
     analiticaToUpdate.value = null
+    if (savedCb && updated?.id) savedCb(updated)
   } catch (error) {
     console.error('Error al actualizar:', error)
     notifyError('No se ha podido actualizar la analitica seleccionada.', {
@@ -446,6 +471,7 @@ const closeModal = () => {
   isModalActive.value = false
   analiticaToEdit.value = null
   analiticaToUpdate.value = null
+  editSavedCallback = null
 }
 
 const deleteAnaliticaSeleccionada = async (analitica) => {
