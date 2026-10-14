@@ -13,6 +13,7 @@ import { mdiHistory, mdiAlertCircle, mdiCheckCircle } from '@mdi/js'
 import { CATALUNA_COMUNIDAD_ID } from '@/constants/comunidades'
 import { buildAnaliticaPayload } from '@/helpers/analiticaPayload'
 import { isAluminioWrong } from '@/composables/useRangeCheck'
+import { tiposAnaliticaPermitidos } from '@/constants/tiposAnalitica'
 import BaseIcon from './BaseIcon.vue'
 
 const plantaStore = usePlantasStore()
@@ -127,6 +128,50 @@ const {
   cargandoPuntos
 } = useFormSelectData()
 
+// ─── Reglas de tipo de analítica por infraestructura del punto ───────────────
+// Depósitos (distribución 2 / cabecera 5) → solo Operacional y Seguimiento.
+// Red de distribución (4) → solo Rutina y Seguimiento.
+const buscarPuntoSeleccionado = () => {
+  const raw = form.punto_muestreo_fk ?? props.initialPosition
+  if (raw === null || raw === undefined || raw === '') return null
+  const idNum = Number(raw)
+  return (
+    puntosCargados.value.find((p) => Number(p.id) === idNum) ||
+    plantaStore.getPuntosMuestreo.find((p) => Number(p.id) === idNum) ||
+    null
+  )
+}
+
+const tipoInfraestructuraPunto = computed(() => {
+  const punto = buscarPuntoSeleccionado()
+  if (!punto?.infraestructura_fk) return null
+  const infra = plantaStore.getInfraestructuras.find((i) => i.id === punto.infraestructura_fk)
+  return infra?.type ?? null
+})
+
+const opcionesTipoAnalitica = computed(() =>
+  tiposAnaliticaPermitidos(tipoInfraestructuraPunto.value)
+)
+
+const restriccionTipoTexto = computed(() => {
+  const t = Number(tipoInfraestructuraPunto.value)
+  if (t === 2 || t === 5) {
+    return 'Depósito (cabecera o distribución): solo se permiten analíticas Operacional y Seguimiento.'
+  }
+  if (t === 4) {
+    return 'Red de distribución: solo se permiten analíticas Rutina y Seguimiento.'
+  }
+  return ''
+})
+
+// Si el punto cambia y el tipo elegido ya no aplica, se limpia la selección
+watch([() => form.punto_muestreo_fk, opcionesTipoAnalitica], () => {
+  if (form.type === '' || form.type === null || form.type === undefined) return
+  if (!Object.keys(opcionesTipoAnalitica.value).includes(String(form.type))) {
+    form.type = ''
+  }
+})
+
 const resetForm = () => {
   form.punto_muestreo_fk = ''
   form.fecha = new Date().toISOString().split('T')[0]
@@ -235,6 +280,19 @@ const submitHandler = async () => {
     }
 
     assertAnaliticaWritePermission('crear')
+
+    // Guard de negocio: el tipo debe ser válido para la infraestructura del punto
+    // (depósitos → Operacional/Seguimiento; red → Rutina/Seguimiento)
+    if (
+      form.type !== '' && form.type !== null && form.type !== undefined &&
+      !Object.keys(opcionesTipoAnalitica.value).includes(String(form.type))
+    ) {
+      notifyError(
+        restriccionTipoTexto.value || 'El tipo de analítica seleccionado no está permitido para este punto.',
+        { title: 'Tipo de analítica no permitido' }
+      )
+      return
+    }
 
     const newAnalitica = buildAnaliticaPayload(form, {
       esCataluna: esCataluna.value,
@@ -615,9 +673,15 @@ watch(
           <FormKit
             v-model.number="form.type"
             type="radio"
-            :options="{ 29: 'Rutina', 28: 'Operacional', 99: 'Seguimiento' }"
+            :options="opcionesTipoAnalitica"
             label="Tipo de Analítica"
           />
+          <p
+            v-if="restriccionTipoTexto"
+            class="md:col-span-2 self-center text-xs text-amber-600 dark:text-amber-400"
+          >
+            {{ restriccionTipoTexto }}
+          </p>
         </div>
         <div v-if="form.type">
           <div v-if="form.type === 29">
