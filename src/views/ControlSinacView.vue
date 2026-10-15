@@ -258,7 +258,7 @@ const idCorto = (id) => (id ? String(id).slice(0, 8) : '—')
 
 <template>
   <LayoutAuthenticated>
-    <SectionMain>
+    <SectionMain fluid>
       <SectionTitleLineWithButton :icon="mdiClipboardCheckOutline" title="Control SINAC" main>
         <BaseButton
           :icon="mdiRefresh"
