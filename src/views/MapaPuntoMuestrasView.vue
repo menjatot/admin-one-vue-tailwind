@@ -403,8 +403,12 @@ onMounted(async () => {
       <CardBox has-table class="overflow-hidden">
         <div class="relative w-full" style="height: calc(100dvh - 13rem); min-height: 400px;">
 
-          <!-- Filtro de tipos de punto (preferencia por dispositivo) -->
-          <div class="absolute top-3 left-3 z-10 flex flex-col gap-2">
+          <!-- Filtro de tipos de punto (preferencia por dispositivo).
+               Móvil: abajo a la derecha y se despliega HACIA ARRIBA (deja libres
+               el zoom de Leaflet arriba-izquierda y el botón Centrar; queda por
+               encima de la atribución del mapa). md+: arriba a la izquierda,
+               separado del control de zoom de Leaflet. -->
+          <div class="absolute z-10 flex flex-col-reverse gap-2 bottom-8 right-3 md:flex-col md:top-3 md:left-14 md:bottom-auto md:right-auto">
             <button
               type="button"
               class="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 bg-white/95 dark:bg-slate-800/95 text-gray-700 dark:text-gray-200 text-sm font-medium shadow-md border border-gray-200 dark:border-slate-600"
