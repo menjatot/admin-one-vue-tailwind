@@ -116,3 +116,91 @@ export const transicionesEstadoXmlSinac = (estado) => {
       return []
   }
 }
+
+/**
+ * Tabla "Estado por zona de abastecimiento" del Control SINAC.
+ *
+ * @param {Array} xmls registros de xml_sinac con `xml_sinac_zonas` embebido,
+ *                    ordenados de más reciente a más antiguo (como los devuelve el servicio)
+ * @param {Array} catalogoZonas zonas de abastecimiento conocidas ([{id, name}])
+ * @returns {Array<{zona_fk:number|null, zona_nombre:string, cargado_hasta:string|null, ultimo:object|null}>}
+ *   - cargado_hasta: máxima fecha_hasta entre los desgloses de XML `correcto` (de cualquier técnico)
+ *   - ultimo: XML más reciente NO anulado que incluye la zona (para mostrar su estado)
+ */
+export const estadoZonasDesdeXmls = (xmls = [], catalogoZonas = []) => {
+  const porZona = new Map()
+
+  for (const xml of xmls) {
+    for (const z of xml?.xml_sinac_zonas ?? []) {
+      const key = z.zona_fk ?? `sin:${z.zona_nombre}`
+      if (!porZona.has(key)) {
+        porZona.set(key, {
+          zona_fk: z.zona_fk ?? null,
+          zona_nombre: z.zona_nombre,
+          cargado_hasta: null,
+          ultimo: null
+        })
+      }
+      const entrada = porZona.get(key)
+      if (xml.estado === 'correcto' && z.fecha_hasta) {
+        if (!entrada.cargado_hasta || z.fecha_hasta > entrada.cargado_hasta) {
+          entrada.cargado_hasta = z.fecha_hasta
+        }
+      }
+      // xmls vienen de más reciente a más antiguo: el primero no anulado es el último
+      if (xml.estado !== 'anulado' && !entrada.ultimo) entrada.ultimo = xml
+    }
+  }
+
+  const filas = catalogoZonas.map((z) => {
+    const datos = porZona.get(z.id)
+    return {
+      zona_fk: z.id,
+      zona_nombre: z.name,
+      cargado_hasta: datos?.cargado_hasta ?? null,
+      ultimo: datos?.ultimo ?? null
+    }
+  })
+
+  // Zonas presentes en XMLs pero fuera del catálogo (p. ej. "Sin zona")
+  for (const datos of porZona.values()) {
+    const existe = filas.some(
+      (f) => f.zona_fk === datos.zona_fk && f.zona_nombre === datos.zona_nombre
+    )
+    if (!existe) {
+      filas.push({
+        zona_fk: datos.zona_fk,
+        zona_nombre: datos.zona_nombre,
+        cargado_hasta: datos.cargado_hasta,
+        ultimo: datos.ultimo
+      })
+    }
+  }
+
+  return filas.sort((a, b) => a.zona_nombre.localeCompare(b.zona_nombre, 'es'))
+}
+
+/** Contadores por estado del histórico de XMLs. */
+export const contarEstadosXmlSinac = (xmls = []) => {
+  const c = { total: xmls.length, generado: 0, anulado: 0, correcto: 0, con_errores: 0 }
+  for (const x of xmls) c[x.estado] = (c[x.estado] ?? 0) + 1
+  return c
+}
+
+/**
+ * Filtro del histórico. `desde`/`hasta` comparan contra la fecha de generación
+ * (YYYY-MM-DD, inclusive). `tecnico` busca en email y nombre.
+ */
+export const filtrarHistoricoXmlSinac = (xmls = [], { estado, tecnico, desde, hasta } = {}) =>
+  xmls.filter((xml) => {
+    if (estado && xml.estado !== estado) return false
+    if (tecnico && String(tecnico).trim()) {
+      const q = String(tecnico).trim().toLowerCase()
+      const texto = `${xml.tecnico_email ?? ''} ${xml.tecnico_nombre ?? ''}`.toLowerCase()
+      if (!texto.includes(q)) return false
+    }
+    const gen = (xml.fecha_generacion ?? '').slice(0, 10)
+    if (desde && gen < desde) return false
+    if (hasta && gen > hasta) return false
+    return true
+  })

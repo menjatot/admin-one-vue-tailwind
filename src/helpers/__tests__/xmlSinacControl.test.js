@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
   ESTADOS_XML_SINAC,
+  contarEstadosXmlSinac,
+  estadoZonasDesdeXmls,
   etiquetaXmlSinac,
+  filtrarHistoricoXmlSinac,
   nombreFicheroSinac,
   resumenXmlSinac,
   soloFecha,
@@ -132,5 +135,89 @@ describe('transicionesEstadoXmlSinac', () => {
   it('estado desconocido no permite nada', () => {
     expect(transicionesEstadoXmlSinac(undefined)).toEqual([])
     expect(ESTADOS_XML_SINAC).toContain('generado')
+  })
+})
+
+const ZONAS_XML = (fk, nombre, desde, hasta, n) => ({
+  zona_fk: fk,
+  zona_nombre: nombre,
+  fecha_desde: desde,
+  fecha_hasta: hasta,
+  num_analiticas: n
+})
+// Orden real del servicio: más reciente primero
+const XMLS = [
+  { id: 'x3', estado: 'anulado', fecha_generacion: '2026-10-06T09:00:00Z', xml_sinac_zonas: [ZONAS_XML(1, 'Villalpardo', '2026-10-01', '2026-10-15', 2)] },
+  { id: 'x2', estado: 'generado', fecha_generacion: '2026-10-05T09:00:00Z', xml_sinac_zonas: [ZONAS_XML(3, 'Loriguilla', '2026-10-01', '2026-10-10', 1)] },
+  { id: 'x1', estado: 'correcto', fecha_generacion: '2026-10-01T09:00:00Z', xml_sinac_zonas: [ZONAS_XML(1, 'Villalpardo', '2026-09-01', '2026-09-30', 4)] },
+  { id: 'x0', estado: 'correcto', fecha_generacion: '2026-09-20T09:00:00Z', xml_sinac_zonas: [ZONAS_XML(1, 'Villalpardo', '2026-08-01', '2026-08-31', 3)] }
+]
+const CATALOGO = [
+  { id: 1, name: 'Villalpardo' },
+  { id: 2, name: 'Fortaleny' },
+  { id: 3, name: 'Loriguilla' }
+]
+
+describe('estadoZonasDesdeXmls', () => {
+  it('calcula "cargado hasta" solo con XML correctos (máx fecha_hasta) e ignora anulados', () => {
+    const filas = estadoZonasDesdeXmls(XMLS, CATALOGO)
+    const villalpardo = filas.find((f) => f.zona_fk === 1)
+    // el anulado llegaba hasta 15/10 pero no cuenta: manda el correcto (30/09)
+    expect(villalpardo.cargado_hasta).toBe('2026-09-30')
+    // último NO anulado = x1 (el anulado x3 se salta)
+    expect(villalpardo.ultimo.id).toBe('x1')
+    expect(villalpardo.ultimo.estado).toBe('correcto')
+  })
+
+  it('incluye las zonas del catálogo sin actividad y las ordena por nombre', () => {
+    const filas = estadoZonasDesdeXmls(XMLS, CATALOGO)
+    expect(filas.map((f) => f.zona_nombre)).toEqual(['Fortaleny', 'Loriguilla', 'Villalpardo'])
+    const fortaleny = filas.find((f) => f.zona_fk === 2)
+    expect(fortaleny.cargado_hasta).toBeNull()
+    expect(fortaleny.ultimo).toBeNull()
+    const loriguilla = filas.find((f) => f.zona_fk === 3)
+    expect(loriguilla.cargado_hasta).toBeNull() // generado, aún no correcto
+    expect(loriguilla.ultimo.id).toBe('x2')
+  })
+
+  it('añade zonas presentes en XMLs pero fuera del catálogo (p. ej. Sin zona)', () => {
+    const xmls = [
+      { id: 'y1', estado: 'generado', fecha_generacion: '2026-10-01T09:00:00Z', xml_sinac_zonas: [ZONAS_XML(null, 'Sin zona', '2026-09-01', '2026-09-30', 1)] }
+    ]
+    const filas = estadoZonasDesdeXmls(xmls, CATALOGO)
+    expect(filas.some((f) => f.zona_nombre === 'Sin zona')).toBe(true)
+  })
+
+  it('tolera listas vacías', () => {
+    expect(estadoZonasDesdeXmls()).toEqual([])
+    expect(estadoZonasDesdeXmls(XMLS, [])).toHaveLength(2) // solo las que aparecen en XMLs (Villalpardo y Loriguilla)
+  })
+})
+
+describe('contarEstadosXmlSinac', () => {
+  it('cuenta por estado y total', () => {
+    expect(contarEstadosXmlSinac(XMLS)).toEqual({ total: 4, generado: 1, anulado: 1, correcto: 2, con_errores: 0 })
+    expect(contarEstadosXmlSinac()).toEqual({ total: 0, generado: 0, anulado: 0, correcto: 0, con_errores: 0 })
+  })
+})
+
+describe('filtrarHistoricoXmlSinac', () => {
+  it('filtra por estado', () => {
+    expect(filtrarHistoricoXmlSinac(XMLS, { estado: 'correcto' }).map((x) => x.id)).toEqual(['x1', 'x0'])
+  })
+  it('filtra por técnico (email o nombre, case-insensitive)', () => {
+    const xmls = [
+      { id: 'a', estado: 'generado', tecnico_email: 'ana@aqlara.com', tecnico_nombre: 'Ana López', fecha_generacion: '2026-10-01T00:00:00Z' },
+      { id: 'b', estado: 'generado', tecnico_email: 'luis@aqlara.com', tecnico_nombre: 'Luis Pérez', fecha_generacion: '2026-10-02T00:00:00Z' }
+    ]
+    expect(filtrarHistoricoXmlSinac(xmls, { tecnico: 'ANA' }).map((x) => x.id)).toEqual(['a'])
+    expect(filtrarHistoricoXmlSinac(xmls, { tecnico: 'pérez' }).map((x) => x.id)).toEqual(['b'])
+  })
+  it('filtra por rango de fecha de generación (inclusive)', () => {
+    expect(filtrarHistoricoXmlSinac(XMLS, { desde: '2026-10-01', hasta: '2026-10-06' }).map((x) => x.id)).toEqual(['x3', 'x2', 'x1'])
+    expect(filtrarHistoricoXmlSinac(XMLS, { hasta: '2026-09-30' }).map((x) => x.id)).toEqual(['x0'])
+  })
+  it('sin filtros devuelve todo', () => {
+    expect(filtrarHistoricoXmlSinac(XMLS)).toHaveLength(4)
   })
 })

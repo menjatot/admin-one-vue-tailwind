@@ -13,7 +13,7 @@ import useLoginStore from '@/stores/login'
 import { usePermissions } from '@/composables/usePermissions'
 import { useNotifications } from '@/composables/useNotifications'
 import { formatDate } from '@/helpers'
-import { transicionesEstadoXmlSinac } from '@/helpers/xmlSinacControl'
+import { contarEstadosXmlSinac, estadoZonasDesdeXmls, filtrarHistoricoXmlSinac, transicionesEstadoXmlSinac } from '@/helpers/xmlSinacControl'
 import { cambiarEstadoXmlSinac, getXmlSinac, obtenerUrlXmlSinac } from '@/services/xmlSinac'
 
 const plantaStore = usePlantasStore()
@@ -100,55 +100,7 @@ const rangoTexto = (desde, hasta) =>
 
 // ---------- Estado por zona de abastecimiento ----------
 
-const estadoPorZona = computed(() => {
-  const porZona = new Map()
-  // xmls viene ordenado de más reciente a más antiguo
-  for (const xml of xmls.value) {
-    for (const z of xml.xml_sinac_zonas ?? []) {
-      const key = z.zona_fk ?? `sin:${z.zona_nombre}`
-      if (!porZona.has(key)) {
-        porZona.set(key, {
-          zona_fk: z.zona_fk ?? null,
-          zona_nombre: z.zona_nombre,
-          cargado_hasta: null,
-          ultimo: null
-        })
-      }
-      const entrada = porZona.get(key)
-      if (xml.estado === 'correcto' && z.fecha_hasta) {
-        if (!entrada.cargado_hasta || z.fecha_hasta > entrada.cargado_hasta) {
-          entrada.cargado_hasta = z.fecha_hasta
-        }
-      }
-      if (xml.estado !== 'anulado' && !entrada.ultimo) entrada.ultimo = xml
-    }
-  }
-
-  const filas = (plantaStore.getZonas ?? []).map((z) => {
-    const datos = porZona.get(z.id)
-    return {
-      zona_fk: z.id,
-      zona_nombre: z.name,
-      cargado_hasta: datos?.cargado_hasta ?? null,
-      ultimo: datos?.ultimo ?? null
-    }
-  })
-
-  // Zonas presentes en XMLs pero no en el catálogo (p. ej. "Sin zona")
-  for (const datos of porZona.values()) {
-    const existe = filas.some((f) => f.zona_fk === datos.zona_fk && f.zona_nombre === datos.zona_nombre)
-    if (!existe) {
-      filas.push({
-        zona_fk: datos.zona_fk,
-        zona_nombre: datos.zona_nombre,
-        cargado_hasta: datos.cargado_hasta,
-        ultimo: datos.ultimo
-      })
-    }
-  }
-
-  return filas.sort((a, b) => a.zona_nombre.localeCompare(b.zona_nombre, 'es'))
-})
+const estadoPorZona = computed(() => estadoZonasDesdeXmls(xmls.value, plantaStore.getZonas ?? []))
 
 const zonasFiltradas = computed(() => {
   const q = filtroZona.value.trim().toLowerCase()
@@ -162,25 +114,15 @@ const zonasFiltradas = computed(() => {
 // ---------- Histórico ----------
 
 const historicoFiltrado = computed(() =>
-  xmls.value.filter((xml) => {
-    if (filtroEstado.value && xml.estado !== filtroEstado.value) return false
-    if (filtroTecnico.value.trim()) {
-      const q = filtroTecnico.value.trim().toLowerCase()
-      const texto = `${xml.tecnico_email ?? ''} ${xml.tecnico_nombre ?? ''}`.toLowerCase()
-      if (!texto.includes(q)) return false
-    }
-    const gen = (xml.fecha_generacion ?? '').slice(0, 10)
-    if (filtroDesde.value && gen < filtroDesde.value) return false
-    if (filtroHasta.value && gen > filtroHasta.value) return false
-    return true
+  filtrarHistoricoXmlSinac(xmls.value, {
+    estado: filtroEstado.value,
+    tecnico: filtroTecnico.value,
+    desde: filtroDesde.value,
+    hasta: filtroHasta.value
   })
 )
 
-const contadores = computed(() => {
-  const c = { total: xmls.value.length, generado: 0, anulado: 0, correcto: 0, con_errores: 0 }
-  for (const x of xmls.value) c[x.estado] = (c[x.estado] ?? 0) + 1
-  return c
-})
+const contadores = computed(() => contarEstadosXmlSinac(xmls.value))
 
 // ---------- Acciones ----------
 
