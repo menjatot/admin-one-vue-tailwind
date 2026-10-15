@@ -154,6 +154,16 @@ const routes = [
   },
   {
     meta: {
+      title: 'Control SINAC',
+      requiresAuth: true,
+      blockedRoles: [1, '1', 10, '10']
+    },
+    path: '/controlSinac',
+    name: 'controlSinac',
+    component: () => import('@/views/ControlSinacView.vue')
+  },
+  {
+    meta: {
       title: 'Video',
       requiresAuth: true
     },

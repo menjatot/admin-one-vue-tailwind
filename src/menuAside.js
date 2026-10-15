@@ -26,6 +26,11 @@ export default [
         // icon: mdiSquareEditOutline
       },
       {
+        label: 'Control SINAC',
+        to: { name: "controlSinac" },
+        blockedFor: [1, '1', 10, '10']
+      },
+      {
         label: 'Mapa',
         to: {name: "mapa"},
       },

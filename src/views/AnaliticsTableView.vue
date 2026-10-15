@@ -15,6 +15,9 @@ import AdvancedExportControls from '@/components/AdvancedExportControls.vue';
 import RevisionIncorrectasModal from '@/components/RevisionIncorrectasModal.vue';
 import { useRevisionIncorrectas } from '@/composables/useRevisionIncorrectas';
 import { usePermissions } from '@/composables/usePermissions';
+import { useNotifications } from '@/composables/useNotifications';
+import { etiquetaXmlSinac, nombreFicheroSinac, resumenXmlSinac } from '@/helpers/xmlSinacControl';
+import { registrarXmlSinac } from '@/services/xmlSinac';
 
 const tablaAnaliticas = ref();
 const { exportXMLData } = useExtractdata();
@@ -25,6 +28,7 @@ const canExportXML = computed(() => isAdminRole.value || isGestor.value)
 
 // Revisión previa de analíticas incorrectas antes de exportar (XML/PDF/Excel)
 const { getIncorrectas } = useRevisionIncorrectas()
+const { success: notifySuccess, error: notifyError } = useNotifications()
 const revisionAbierta = ref(false)
 const revisionIncorrectas = ref([])
 const revisionPendiente = ref(null)
@@ -119,16 +123,50 @@ const downloadXML = async (saltarRevision = false) => {
     }
   }
 
+  // Resumen para el control SINAC: rango real + desglose por zona de abastecimiento
+  const resumen = resumenXmlSinac(analiticasSeleccionadas, {
+    resolverPunto: (id) => plantaStore.getPuntosMuestreo.find((p) => p.id === id) || null,
+    resolverZona: (id) => plantaStore.getZonas.find((z) => z.id === id) || null
+  })
+  const etiqueta = etiquetaXmlSinac(resumen, {
+    resolverCentro: (id) => plantaStore.getCentrosCoste?.find((cc) => cc.id === id)?.name ?? null
+  })
+  const nombreFichero = nombreFicheroSinac({
+    etiqueta,
+    fechaDesde: resumen.fecha_desde,
+    fechaHasta: resumen.fecha_hasta,
+    fechaGeneracion: new Date().toISOString()
+  })
+
   const xmlContent = exportXMLData(analiticasSeleccionadas);
-  const blob = new Blob([xmlContent], { type: 'application/xml' });
+  const blob = new Blob([xmlContent], { type: "application/xml" });
   const url = window.URL.createObjectURL(blob);
-  const link = document.createElement('a');
+  const link = document.createElement("a");
   link.href = url;
-  link.setAttribute('download', `analiticas_AQLARA_${new Date().toISOString().split('T')[0]}.xml`);
+  link.setAttribute("download", nombreFichero);
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
   window.URL.revokeObjectURL(url);
+
+  // Registrar el XML en el control SINAC (estado inicial: generado / pendiente
+  // de envío). Si el registro falla, el XML ya se ha descargado: se avisa sin
+  // bloquear la descarga.
+  try {
+    const operario = plantaStore.getOperarios?.find(
+      (op) => op.email?.toLowerCase() === loginStore.userEmail?.toLowerCase()
+    )
+    await registrarXmlSinac({
+      nombreFichero,
+      resumen,
+      xmlBlob: blob,
+      tecnico: { email: loginStore.userEmail, nombre: operario?.name ?? null }
+    })
+    notifySuccess(`XML registrado en el control SINAC (pendiente de envío).`, { title: 'Control SINAC' })
+  } catch (e) {
+    console.error('No se pudo registrar el XML en el control SINAC:', e)
+    notifyError('El XML se ha descargado, pero no se pudo registrar en el control SINAC.', { title: 'Control SINAC' })
+  }
 };
 
 const selectedAnaliticasFromTable = computed(() => tablaAnaliticas.value?.checkedRows || []);
