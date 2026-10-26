@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { mdiClipboardCheckOutline, mdiDownload, mdiRefresh } from '@mdi/js'
 import LayoutAuthenticated from '@/layouts/LayoutAuthenticated.vue'
 import SectionMain from '@/components/SectionMain.vue'
@@ -63,6 +63,25 @@ const xmlAAnular = ref(null)
 const modalAnularAbierto = ref(false)
 
 const usuarioActual = computed(() => (loginStore.userEmail ?? '').toLowerCase())
+
+// Pestañas: el histórico es la parte más usada, así que es la pestaña inicial;
+// se recuerda la última elegida en el dispositivo.
+const PESTANA_KEY = 'sinaq.controlSinac.pestana'
+const leerPestana = () => {
+  try {
+    return localStorage.getItem(PESTANA_KEY) === 'zonas' ? 'zonas' : 'historico'
+  } catch (e) {
+    return 'historico'
+  }
+}
+const pestanaActiva = ref(leerPestana())
+watch(pestanaActiva, (valor) => {
+  try {
+    localStorage.setItem(PESTANA_KEY, valor)
+  } catch (e) {
+    /* almacenamiento no disponible */
+  }
+})
 
 const cargar = async () => {
   cargando.value = true
@@ -217,8 +236,29 @@ const idCorto = (id) => (id ? String(id).slice(0, 8) : '—')
         Error cargando el control: {{ errorCarga }}
       </div>
 
+      <!-- Pestañas: Histórico (más usado, por defecto) / Estado por zonas -->
+      <div class="mb-4 inline-flex flex-wrap gap-1 rounded-xl bg-gray-100 p-1 dark:bg-slate-700">
+        <button
+          type="button"
+          class="rounded-lg px-4 py-1.5 text-sm font-medium transition-colors"
+          :class="pestanaActiva === 'historico' ? 'bg-white text-gray-800 shadow dark:bg-slate-800 dark:text-white' : 'text-gray-500 hover:text-gray-700 dark:text-slate-300 dark:hover:text-white'"
+          @click="pestanaActiva = 'historico'"
+        >
+          Histórico de XMLs
+          <span class="ml-1 rounded-full bg-blue-100 px-1.5 text-xs text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">{{ contadores.total }}</span>
+        </button>
+        <button
+          type="button"
+          class="rounded-lg px-4 py-1.5 text-sm font-medium transition-colors"
+          :class="pestanaActiva === 'zonas' ? 'bg-white text-gray-800 shadow dark:bg-slate-800 dark:text-white' : 'text-gray-500 hover:text-gray-700 dark:text-slate-300 dark:hover:text-white'"
+          @click="pestanaActiva = 'zonas'"
+        >
+          Estado por zonas de abastecimiento
+        </button>
+      </div>
+
       <!-- Estado por zona de abastecimiento -->
-      <CardBox class="mb-6">
+      <CardBox v-if="pestanaActiva === 'zonas'" class="mb-6">
         <div class="p-5 pb-3 flex flex-wrap items-end justify-between gap-3">
           <div>
             <h2 class="text-lg font-semibold">Estado por zona de abastecimiento</h2>
@@ -310,7 +350,7 @@ const idCorto = (id) => (id ? String(id).slice(0, 8) : '—')
       </CardBox>
 
       <!-- Histórico de XMLs -->
-      <CardBox>
+      <CardBox v-if="pestanaActiva === 'historico'">
         <div class="p-5 pb-3">
           <h2 class="text-lg font-semibold mb-1">Histórico de XMLs</h2>
           <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500 dark:text-slate-400 mb-3">
