@@ -165,6 +165,9 @@ const opcionesTipoAnalitica = computed(() =>
 
 const restriccionTipoTexto = computed(() => {
   const t = Number(tipoInfraestructuraSeleccionada.value)
+  if (t === 1) {
+    return 'Captación: solo se permite la analítica de Seguimiento.'
+  }
   if (t === 2 || t === 5) {
     return 'Depósito (cabecera o distribución): solo se permiten analíticas Operacional y Seguimiento.'
   }

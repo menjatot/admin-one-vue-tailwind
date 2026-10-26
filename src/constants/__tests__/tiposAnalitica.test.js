@@ -11,8 +11,12 @@ describe('tiposAnaliticaPermitidos', () => {
     expect(tiposAnaliticaPermitidos(4)).toEqual({ 29: 'Rutina', 99: 'Seguimiento' })
   })
 
-  it('captación (1) y tratamiento (3): sin restricción', () => {
-    expect(tiposAnaliticaPermitidos(1)).toEqual(TIPOS_ANALITICA)
+  it('captación (1): solo Seguimiento', () => {
+    expect(tiposAnaliticaPermitidos(1)).toEqual({ 99: 'Seguimiento' })
+    expect(tiposAnaliticaPermitidos('1')).toEqual({ 99: 'Seguimiento' })
+  })
+
+  it('tratamiento (3): sin restricción', () => {
     expect(tiposAnaliticaPermitidos(3)).toEqual(TIPOS_ANALITICA)
   })
 
