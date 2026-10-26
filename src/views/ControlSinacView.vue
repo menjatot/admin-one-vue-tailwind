@@ -282,7 +282,25 @@ const idCorto = (id) => (id ? String(id).slice(0, 8) : '—')
                   </span>
                 </td>
                 <td class="px-5 py-2 text-gray-500 dark:text-slate-400">
-                  <span v-if="fila.ultimo">{{ fechaHora(fila.ultimo.fecha_generacion) }}</span>
+                  <div v-if="fila.ultimo" class="flex items-center gap-2">
+                    <div class="flex flex-col leading-tight">
+                      <span>{{ fechaHora(fila.ultimo.fecha_generacion) }}</span>
+                      <span
+                        class="font-mono text-[11px] text-gray-400"
+                        :title="`ID: ${fila.ultimo.id}\nFichero: ${fila.ultimo.nombre_fichero}`"
+                      >{{ idCorto(fila.ultimo.id) }}</span>
+                    </div>
+                    <BaseButton
+                      v-if="fila.ultimo.fichero_path"
+                      :icon="mdiDownload"
+                      color="info"
+                      small
+                      outline
+                      title="Descargar este XML"
+                      :disabled="guardando"
+                      @click="redescargar(fila.ultimo)"
+                    />
+                  </div>
                   <span v-else>—</span>
                 </td>
               </tr>
