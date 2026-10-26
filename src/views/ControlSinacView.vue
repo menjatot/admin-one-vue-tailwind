@@ -60,6 +60,7 @@ const soloConActividad = ref(false)
 
 const expandidos = ref([])
 const xmlAAnular = ref(null)
+const modalAnularAbierto = ref(false)
 
 const usuarioActual = computed(() => (loginStore.userEmail ?? '').toLowerCase())
 
@@ -135,6 +136,7 @@ const accionesDisponibles = (xml) =>
 const marcar = (xml, nuevoEstado) => {
   if (nuevoEstado === 'anulado') {
     xmlAAnular.value = xml
+    modalAnularAbierto.value = true
     return
   }
   aplicarEstado(xml, nuevoEstado)
@@ -152,18 +154,16 @@ const aplicarEstado = async (xml, nuevoEstado) => {
   } finally {
     guardando.value = false
     xmlAAnular.value = null
+    modalAnularAbierto.value = false
   }
 }
 
-const modalAnularAbierto = computed({
-  get: () => !!xmlAAnular.value,
-  set: (v) => {
-    if (!v) xmlAAnular.value = null
-  }
-})
-
-const confirmarAnular = () => {
-  if (xmlAAnular.value) aplicarEstado(xmlAAnular.value, 'anulado')
+// OJO: CardBoxModal pone su v-model a false ANTES de emitir 'confirm', por eso
+// el XML a anular se guarda en un ref aparte del estado de apertura del modal.
+const confirmarAnular = async () => {
+  const xml = xmlAAnular.value
+  if (!xml) return
+  await aplicarEstado(xml, 'anulado')
 }
 
 const redescargar = async (xml) => {
