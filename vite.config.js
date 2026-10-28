@@ -24,14 +24,22 @@ import { VitePWA } from 'vite-plugin-pwa';
 export default defineConfig(({ mode }) => {
   // Cargar variables de entorno (Doppler las inyectará automáticamente)
   const env = loadEnv(mode, process.cwd(), '');
-  
+
+  // Sello de versión visible en la app (soporte puede comprobarlo de un vistazo).
+  // Se calcula al construir, así que identifica el bundle concreto que se sirve.
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  const buildId = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+
   return {
     base: env.VITE_BASE_URL || "/sinaq/",
     plugins: [
       vue(),
       VitePWA({
         registerType: 'autoUpdate',
-        injectRegister: 'auto',
+        // El registro se hace a mano en src/main.js (con comprobación de versión
+        // y recarga única): `injectRegister: false` evita un segundo registro.
+        injectRegister: false,
         devOptions: {
           enabled: true
         },
@@ -56,6 +64,11 @@ export default defineConfig(({ mode }) => {
         },
         workbox: {
           maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
+          // El service worker nuevo toma el control de las pestañas abiertas
+          // (controllerchange → recarga única en src/main.js). Sin esto, un
+          // dispositivo con la app abierta sigue con el bundle antiguo.
+          skipWaiting: true,
+          clientsClaim: true,
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
           runtimeCaching: [
             {
@@ -121,6 +134,7 @@ export default defineConfig(({ mode }) => {
     },
     define: {
       '__VUE_PROD_HYDRATION_MISMATCH_DETAILS__': false,
+      '__BUILD_ID__': JSON.stringify(buildId),
     },
     resolve: {
       alias: {

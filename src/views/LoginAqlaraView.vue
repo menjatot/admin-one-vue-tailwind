@@ -15,6 +15,9 @@ import { supabase } from '@/services/supabase'
 const router = useRouter()
 const loginStore = useLoginStore()
 
+// Sello de versión del bundle (lo inyecta vite.config.js en el build).
+const buildId = typeof __BUILD_ID__ !== 'undefined' ? __BUILD_ID__ : 'dev'
+
 const isAuthenticating = ref(false)
 const errorMessage = ref('')
 const accessToken = ref('')
@@ -128,6 +131,10 @@ onMounted(() => {
           <div v-if="errorMessage" class="text-red-500 text-sm text-center">
             {{ errorMessage }}
           </div>
+
+          <p class="mt-4 text-xs text-center text-gray-400 dark:text-gray-500">
+            versión {{ buildId }}
+          </p>
         </template>
       </CardBox>
     </SectionFullScreen>

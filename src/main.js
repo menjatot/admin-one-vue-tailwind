@@ -3,6 +3,7 @@ import { createPinia } from 'pinia'
 import { plugin, defaultConfig } from '@formkit/vue'
 import { initOfflineSync } from '@/services/offlineSync'
 import PrimeVue from 'primevue/config'
+import { registerSW } from 'virtual:pwa-register'
 
 import config from '../formkit.config'
 import '@formkit/themes/genesis'
@@ -89,3 +90,41 @@ router.onError((error) => {
     reloadOnceForNewVersion()
   }
 })
+
+// --- Actualización de la PWA ---
+// La app es una PWA con el index.html y los chunks precacheados: sin esto, un
+// dispositivo que ya la tenía abierta sigue ejecutando el bundle antiguo durante
+// días (el service worker nuevo se activa, pero la página abierta no se recarga)
+// y aparecen incidencias ya corregidas. Ahora:
+//   · se comprueba si hay versión nueva al volver la app a primer plano y cada hora,
+//   · al tomar el control el service worker nuevo se recarga una sola vez.
+const SW_RELOAD_KEY = 'sinaq-sw-reload-ts'
+const habiaServiceWorker = 'serviceWorker' in navigator && !!navigator.serviceWorker.controller
+
+const recargarPorNuevaVersion = () => {
+  const last = Number(sessionStorage.getItem(SW_RELOAD_KEY) || 0)
+  if (Date.now() - last < 10000) return
+  sessionStorage.setItem(SW_RELOAD_KEY, String(Date.now()))
+  window.location.reload()
+}
+
+if ('serviceWorker' in navigator) {
+  registerSW({
+    immediate: true,
+    onRegisteredSW(_swUrl, registration) {
+      if (!registration) return
+      const comprobarVersion = () => registration.update().catch(() => {})
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') comprobarVersion()
+      })
+      setInterval(comprobarVersion, 60 * 60 * 1000)
+      comprobarVersion()
+    }
+  })
+
+  // Solo si ya había un service worker controlando la página: en la primera
+  // instalación también se dispara y no hay nada que actualizar.
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (habiaServiceWorker) recargarPorNuevaVersion()
+  })
+}

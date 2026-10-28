@@ -14,6 +14,7 @@ import { CATALUNA_COMUNIDAD_ID } from '@/constants/comunidades'
 import { buildAnaliticaPayload } from '@/helpers/analiticaPayload'
 import { isAluminioWrong } from '@/composables/useRangeCheck'
 import { tiposAnaliticaPermitidos } from '@/constants/tiposAnalitica'
+import { idNumerico, infraIdDePunto, puntoEncajaEnCascada } from '@/helpers/infraestructuraForm'
 import BaseIcon from './BaseIcon.vue'
 
 const plantaStore = usePlantasStore()
@@ -142,20 +143,15 @@ const buscarPuntoSeleccionado = () => {
   )
 }
 
-// Infraestructura efectiva del formulario: manda la elegida explícitamente
-// (cascada UO → zona → infraestructura); si no hay, la del punto seleccionado.
-// Al cambiar cualquiera de los dos, `form.punto_muestreo_fk` se limpia (watch de
-// abajo), por lo que el tipo de analítica se recalcula con la infraestructura nueva.
+// Infraestructura efectiva: manda SIEMPRE la del punto de muestreo (es donde se
+// guarda la analítica). Solo si aún no hay punto se usa la elegida en la cascada
+// UO → zona → infraestructura. Así ninguna selección anterior puede dejar el
+// selector de tipo con las opciones de otra infraestructura.
 const tipoInfraestructuraSeleccionada = computed(() => {
-  if (form.infraestructura) {
-    const infra = plantaStore.getInfraestructuras.find(
-      (i) => Number(i.id) === Number(form.infraestructura)
-    )
-    if (infra?.type != null) return infra.type
-  }
   const punto = buscarPuntoSeleccionado()
-  if (!punto?.infraestructura_fk) return null
-  const infra = plantaStore.getInfraestructuras.find((i) => i.id === punto.infraestructura_fk)
+  const infraId = infraIdDePunto(punto) ?? idNumerico(form.infraestructura)
+  if (infraId === null) return null
+  const infra = plantaStore.getInfraestructuras.find((i) => Number(i.id) === infraId)
   return infra?.type ?? null
 })
 
@@ -177,13 +173,35 @@ const restriccionTipoTexto = computed(() => {
   return ''
 })
 
-// Al cambiar de zona o infraestructura, el punto seleccionado ya no corresponde
-// a la cascada (el listado de puntos ha cambiado): se limpia para que el tipo de
-// analítica se recalcule y no se guarde la analítica en un punto equivocado.
+// Al elegir punto, la infraestructura del formulario se sincroniza con la suya:
+// el tipo de analítica se calcula siempre con la infraestructura real del punto.
+watch(
+  () => form.punto_muestreo_fk,
+  (nuevoPunto) => {
+    if (!nuevoPunto) return
+    cargarHistorial(nuevoPunto)
+    const infraPunto = infraIdDePunto(buscarPuntoSeleccionado())
+    if (infraPunto !== null && idNumerico(form.infraestructura) !== infraPunto) {
+      form.infraestructura = infraPunto
+    }
+  }
+)
+
+// Al cambiar de zona o infraestructura, el punto seleccionado deja de encajar en
+// la cascada y se limpia (el listado de puntos ha cambiado). El cambio que viene
+// de sincronizar la infraestructura con el punto sí encaja y se conserva.
 watch(
   () => [form.zona, form.infraestructura],
   () => {
-    form.punto_muestreo_fk = ''
+    const punto = buscarPuntoSeleccionado()
+    if (
+      !puntoEncajaEnCascada(punto, {
+        zona: form.zona,
+        infraestructura: form.infraestructura
+      })
+    ) {
+      form.punto_muestreo_fk = ''
+    }
   }
 )
 
@@ -452,13 +470,6 @@ watch(
     form.zona = null
     form.infraestructura = null
     form.punto_muestreo_fk = null
-  }
-)
-
-watch(
-  () => form.punto_muestreo_fk,
-  (nuevoPunto) => {
-    if (nuevoPunto) cargarHistorial(nuevoPunto)
   }
 )
 </script>
