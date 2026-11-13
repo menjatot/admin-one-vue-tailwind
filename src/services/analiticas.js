@@ -148,7 +148,9 @@ export const getAnaliticasPaginated = async (options = {}) => {
   let query = supabase.from('analiticas').select(buildSelect(hasScope), { count: 'exact' })
   query = applyPuntoScope(query, scope)
   query = applyDirectFilters(query)
-  query = query.order(sortBy, { ascending: orderDirection })
+  // `id` como desempate: sin él, las filas con la misma fecha se ordenan de forma no
+  // determinista y al paginar unas se repiten y otras no aparecen.
+  query = query.order(sortBy, { ascending: orderDirection }).order('id', { ascending: orderDirection })
 
   const from = (page - 1) * pageSize
   query = query.range(from, from + pageSize - 1)
@@ -197,7 +199,9 @@ export const getAnaliticasFiltered = async (options = {}) => {
   let query = supabase.from('analiticas').select(buildSelect(hasScope))
   query = applyPuntoScope(query, scope)
   query = applyDirectFilters(query)
-  query = query.order(sortBy, { ascending: orderDirection })
+  // `id` como desempate: sin él, las filas con la misma fecha se ordenan de forma no
+  // determinista y al paginar unas se repiten y otras no aparecen.
+  query = query.order(sortBy, { ascending: orderDirection }).order('id', { ascending: orderDirection })
 
   return fetchAll(query)
 }
