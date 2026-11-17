@@ -17,6 +17,7 @@ import { useRevisionIncorrectas } from '@/composables/useRevisionIncorrectas';
 import { usePermissions } from '@/composables/usePermissions';
 import { useNotifications } from '@/composables/useNotifications';
 import { etiquetaXmlSinac, nombreFicheroSinac, resumenXmlSinac } from '@/helpers/xmlSinacControl';
+import { filtrarExcluidas } from '@/helpers/revisionExport';
 import { registrarXmlSinac } from '@/services/xmlSinac';
 
 const tablaAnaliticas = ref();
@@ -33,12 +34,12 @@ const revisionAbierta = ref(false)
 const revisionIncorrectas = ref([])
 const revisionPendiente = ref(null)
 
-const confirmarRevisionXML = async () => {
+const confirmarRevisionXML = async (payload = {}) => {
   const pend = revisionPendiente.value
   revisionAbierta.value = false
   revisionIncorrectas.value = []
   revisionPendiente.value = null
-  if (pend) await pend.reanudar()
+  if (pend) await pend.reanudar(payload?.excluidas ?? [])
 }
 const cancelarRevisionXML = () => {
   revisionAbierta.value = false
@@ -98,11 +99,13 @@ watch(() => tablaAnaliticas.value?.filters?.zona, (newZona) => {
 
 
 
-const downloadXML = async (saltarRevision = false) => {
+const downloadXML = async (saltarRevision = false, excluidas = []) => {
   if (!canExportXML.value) return;
 
-  const analiticasSeleccionadas = (tablaAnaliticas.value?.checkedRows || [])
-    .filter(item => item.type === 28 || item.type === 29);
+  const analiticasSeleccionadas = filtrarExcluidas(
+    (tablaAnaliticas.value?.checkedRows || []).filter(item => item.type === 28 || item.type === 29),
+    excluidas
+  );
   if (analiticasSeleccionadas.length === 0) {
     alert('Por favor, seleccione al menos una analítica de tipo Operacional o Rutina para XML.');
     return;
@@ -113,7 +116,7 @@ const downloadXML = async (saltarRevision = false) => {
     try {
       const incorrectas = await getIncorrectas(analiticasSeleccionadas)
       if (incorrectas.length > 0) {
-        revisionPendiente.value = { reanudar: () => downloadXML(true) }
+        revisionPendiente.value = { reanudar: (idsExcluidos) => downloadXML(true, idsExcluidos) }
         revisionIncorrectas.value = incorrectas
         revisionAbierta.value = true
         return

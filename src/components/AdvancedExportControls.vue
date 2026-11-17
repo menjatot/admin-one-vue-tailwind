@@ -7,6 +7,7 @@ import * as XLSX from 'xlsx';
 import { useNotifications } from '@/composables/useNotifications'
 import { useRevisionIncorrectas } from '@/composables/useRevisionIncorrectas'
 import RevisionIncorrectasModal from './RevisionIncorrectasModal.vue'
+import { filtrarExcluidas } from '@/helpers/revisionExport'
 import { CATALUNA_COMUNIDAD_ID } from '@/constants/comunidades'
 
 const props = defineProps({
@@ -58,7 +59,7 @@ const revisionAbierta = ref(false)
 const revisionIncorrectas = ref([])
 const revisionPendiente = ref(null)
 
-const confirmarRevision = async () => {
+const confirmarRevision = async (payload = {}) => {
   const pend = revisionPendiente.value
   revisionAbierta.value = false
   revisionIncorrectas.value = []
@@ -67,7 +68,7 @@ const confirmarRevision = async () => {
   if (pend.tipo === 'print' && pend.printWindow && !pend.printWindow.closed) {
     pend.printWindow.close()
   }
-  await pend.reanudar()
+  await pend.reanudar(payload?.excluidas ?? [])
 }
 
 const cancelarRevision = () => {
@@ -179,8 +180,11 @@ const getM3PerDia = (analitica) => {
 
 const { warning: notifyWarning, error: notifyError } = useNotifications()
 
-const getAnaliticasParaExportar = () => {
-  if (selectedRows.value.length === 0) {
+const getAnaliticasParaExportar = (excluidas = []) => {
+  // Exclusiones marcadas en la revisión previa: no entran en el fichero exportado
+  const seleccion = filtrarExcluidas(selectedRows.value, excluidas)
+
+  if (seleccion.length === 0) {
     notifyWarning('Selecciona al menos una analitica para exportar.', {
       title: 'Seleccion requerida'
     })
@@ -188,19 +192,19 @@ const getAnaliticasParaExportar = () => {
   }
 
   // Exportar solo las analíticas seleccionadas (marcadas con checkbox), no todas las filtradas
-  let minDate = selectedRows.value[0].fecha;
-  let maxDate = selectedRows.value[0].fecha;
-  selectedRows.value.forEach(row => {
+  let minDate = seleccion[0].fecha;
+  let maxDate = seleccion[0].fecha;
+  seleccion.forEach(row => {
     if (row.fecha < minDate) minDate = row.fecha;
     if (row.fecha > maxDate) maxDate = row.fecha;
   });
 
-  return { analiticas: [...selectedRows.value], minDate, maxDate };
+  return { analiticas: [...seleccion], minDate, maxDate };
 };
 
 // ...existing code...
 
-const handlePrintHTML = async (saltarRevision = false) => {
+const handlePrintHTML = async (saltarRevision = false, excluidas = []) => {
   // La ventana se abre DE FORMA SÍNCRONA dentro del click: si se hace después de
   // un await (la carga previa de datos tarda varios segundos), el navegador pierde
   // la "activación transitoria" del usuario, bloquea window.open como popup
@@ -221,7 +225,7 @@ const handlePrintHTML = async (saltarRevision = false) => {
 
   exporting.value = true
   try {
-    const exportData = getAnaliticasParaExportar();
+    const exportData = getAnaliticasParaExportar(excluidas);
     if (!exportData) {
       if (printWindow && !printWindow.closed) printWindow.close();
       return;
@@ -234,7 +238,7 @@ const handlePrintHTML = async (saltarRevision = false) => {
         revisionPendiente.value = {
           tipo: 'print',
           printWindow,
-          reanudar: () => handlePrintHTML(true)
+          reanudar: (idsExcluidos) => handlePrintHTML(true, idsExcluidos)
         }
         revisionIncorrectas.value = incorrectas
         revisionAbierta.value = true
@@ -513,10 +517,10 @@ const handlePrintHTML = async (saltarRevision = false) => {
   }
 };
 
-const handleExportExcel = async (saltarRevision = false) => {
+const handleExportExcel = async (saltarRevision = false, excluidas = []) => {
   exporting.value = true
   try {
-    const exportData = getAnaliticasParaExportar();
+    const exportData = getAnaliticasParaExportar(excluidas);
     if (!exportData) return;
 
     // Revisión previa: pantalla de incorrectas para poder corregirlas antes de exportar
@@ -525,7 +529,7 @@ const handleExportExcel = async (saltarRevision = false) => {
       if (incorrectas.length > 0) {
         revisionPendiente.value = {
           tipo: 'excel',
-          reanudar: () => handleExportExcel(true)
+          reanudar: (idsExcluidos) => handleExportExcel(true, idsExcluidos)
         }
         revisionIncorrectas.value = incorrectas
         revisionAbierta.value = true
