@@ -46,6 +46,7 @@ export default defineConfig(({ mode }) => {
         manifest: {
           name: 'SinAQ - AQLARA',
           short_name: 'SinAQ',
+          lang: 'es',
           description: 'AQLARA SINAC Manager',
           theme_color: '#1e3a8a',
           icons: [

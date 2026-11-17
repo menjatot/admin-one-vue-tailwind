@@ -704,7 +704,11 @@ watch(
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <!-- key: al cambiar las opciones se monta de nuevo el radio, para que
+               ninguna capa que reescriba el DOM (p. ej. el traductor del
+               navegador) deje etiquetas viejas sobre valores nuevos -->
           <FormKit
+            :key="Object.keys(opcionesTipoAnalitica).join('-')"
             v-model.number="form.type"
             type="radio"
             :options="opcionesTipoAnalitica"
