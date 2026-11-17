@@ -102,12 +102,15 @@ watch(() => tablaAnaliticas.value?.filters?.zona, (newZona) => {
 const downloadXML = async (saltarRevision = false, excluidas = []) => {
   if (!canExportXML.value) return;
 
-  const analiticasSeleccionadas = filtrarExcluidas(
-    (tablaAnaliticas.value?.checkedRows || []).filter(item => item.type === 28 || item.type === 29),
-    excluidas
-  );
+  const seleccionBase = (tablaAnaliticas.value?.checkedRows || [])
+    .filter(item => item.type === 28 || item.type === 29);
+  const analiticasSeleccionadas = filtrarExcluidas(seleccionBase, excluidas);
   if (analiticasSeleccionadas.length === 0) {
-    alert('Por favor, seleccione al menos una analítica de tipo Operacional o Rutina para XML.');
+    alert(
+      (excluidas || []).length > 0 && seleccionBase.length > 0
+        ? 'Has excluido todas las analíticas de la selección: no queda ninguna para exportar al XML.'
+        : 'Por favor, seleccione al menos una analítica de tipo Operacional o Rutina para XML.'
+    );
     return;
   }
 

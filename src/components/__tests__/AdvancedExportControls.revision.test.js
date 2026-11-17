@@ -5,6 +5,7 @@ import AdvancedExportControls from '../AdvancedExportControls.vue'
 
 const getIncorrectas = vi.hoisted(() => vi.fn())
 const writeFileMock = vi.hoisted(() => vi.fn())
+const notifyWarning = vi.hoisted(() => vi.fn())
 
 vi.mock('xlsx', async (importOriginal) => {
   const actual = await importOriginal()
@@ -16,7 +17,7 @@ vi.mock('@/composables/useRevisionIncorrectas', () => ({
 }))
 
 vi.mock('@/composables/useNotifications', () => ({
-  useNotifications: () => ({ warning: vi.fn(), error: vi.fn(), success: vi.fn() })
+  useNotifications: () => ({ warning: notifyWarning, error: vi.fn(), success: vi.fn() })
 }))
 
 vi.mock('@/stores/plantas', () => ({
@@ -141,5 +142,48 @@ describe('AdvancedExportControls — exclusión de incorrectas en la exportació
     const html = ventanas[1].document.write.mock.calls.at(-1)[0]
     expect(html).toContain('Informe de Analíticas')
     open.mockRestore()
+  })
+
+  it('con una sola incorrecta, al desmarcarla se exporta el resto de la selección', async () => {
+    writeFileMock.mockClear()
+    getIncorrectas.mockResolvedValue([{ analitica: ROWS[1], motivos: ['Cloro: 0 mg/l [0.2 - 1]'] }])
+
+    const w = mountControls()
+    await flushPromises()
+    await boton(w, 'Excel').trigger('click')
+    await flushPromises()
+
+    const checks = w.findAll('tbody input[type="checkbox"]')
+    expect(checks).toHaveLength(1)
+    await checks[0].setValue(false)
+
+    await w.findAll('button').find((b) => b.text().includes('Continuar con')).trigger('click')
+    await flushPromises()
+
+    expect(writeFileMock).toHaveBeenCalledTimes(1)
+    const datos = filasDatosExcel(writeFileMock.mock.calls[0][0])
+    expect(datos).toHaveLength(2)
+    expect(datos.flat()).not.toContain(102)
+  })
+
+  it('si se excluyen todas las analíticas no se exporta nada y se avisa', async () => {
+    writeFileMock.mockClear()
+    notifyWarning.mockClear()
+    getIncorrectas.mockResolvedValue(ROWS.map((r) => ({ analitica: r, motivos: ['x'] })))
+
+    const w = mountControls()
+    await flushPromises()
+    await boton(w, 'Excel').trigger('click')
+    await flushPromises()
+
+    await w.find('thead input[type="checkbox"]').setValue(false)
+    await w.findAll('button').find((b) => b.text().includes('Continuar con')).trigger('click')
+    await flushPromises()
+
+    expect(writeFileMock).not.toHaveBeenCalled()
+    expect(notifyWarning).toHaveBeenCalledWith(
+      expect.stringContaining('Has excluido todas las analíticas'),
+      expect.anything()
+    )
   })
 })

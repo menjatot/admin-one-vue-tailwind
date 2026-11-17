@@ -154,4 +154,28 @@ describe('AnaliticsTableView — XML sin las filas desmarcadas en la revisión',
 
     expect(exportXMLData.mock.calls[0][0].map((r) => r.id)).toEqual([1, 2])
   })
+
+  it('con una sola incorrecta, al desmarcarla se exporta el resto de la selección', async () => {
+    globalThis.URL.createObjectURL = vi.fn(() => 'blob:x')
+    globalThis.URL.revokeObjectURL = vi.fn()
+    exportXMLData.mockClear()
+    registrarXmlSinac.mockClear()
+    getIncorrectas.mockResolvedValue([{ analitica: R1, motivos: ['Cloro: 0 mg/l [0.2 - 1]'] }])
+
+    const w = mountView()
+    await flushPromises()
+    await botonXml(w).trigger('click')
+    await flushPromises()
+
+    const checks = w.findAll('tbody input[type="checkbox"]')
+    expect(checks).toHaveLength(1)
+    await checks[0].setValue(false)
+
+    await w.findAll('button').find((b) => b.text().includes('a XML')).trigger('click')
+    await flushPromises()
+
+    expect(exportXMLData).toHaveBeenCalledTimes(1)
+    expect(exportXMLData.mock.calls[0][0].map((r) => r.id)).toEqual([2])
+    expect(registrarXmlSinac.mock.calls[0][0].resumen.num_analiticas).toBe(1)
+  })
 })

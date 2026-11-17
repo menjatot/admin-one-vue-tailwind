@@ -52,22 +52,47 @@ describe('RevisionIncorrectasModal — exclusión de filas', () => {
     expect(w.emitted('confirm')[0][0]).toEqual({ excluidas: [2] })
   })
 
-  it('la casilla de cabecera excluye todas y deshabilita el botón de continuar', async () => {
+  it('la casilla de cabecera excluye todas y aun así se puede continuar', async () => {
     const w = mountModal()
     await maestra(w).setValue(false)
 
     filas(w).forEach((c) => expect(c.element.checked).toBe(false))
-    expect(botonConfirmar(w).attributes('disabled')).toBeDefined()
+    expect(w.text()).toContain('Ninguna de las 3 se incluirá en el fichero')
+    expect(botonConfirmar(w).attributes('disabled')).toBeUndefined()
 
-    await filas(w)[2].setValue(true)
+    await botonConfirmar(w).trigger('click')
+    expect(w.emitted('confirm')[0][0]).toEqual({ excluidas: [1, 2, 3] })
+  })
+
+  it('marca intermedia: desmarcar una deja la maestra en estado parcial y se puede volver a marcar todas', async () => {
+    const w = mountModal()
+    await filas(w)[2].setValue(false)
+
     expect(maestra(w).element.checked).toBe(false)
     expect(maestra(w).element.indeterminate).toBe(true)
-    expect(botonConfirmar(w).attributes('disabled')).toBeUndefined()
-    expect(w.text()).toContain('excluir 2')
+    expect(w.text()).toContain('excluir 1')
 
     await maestra(w).setValue(true)
     filas(w).forEach((c) => expect(c.element.checked).toBe(true))
     expect(w.text()).toContain('Se incluirán las 3 analíticas.')
+  })
+
+  it('con una sola incorrecta, desmarcarla deja continuar excluyéndola', async () => {
+    const w = mount(
+      RevisionIncorrectasModal,
+      {
+        props: {
+          modelValue: true,
+          incorrectas: [item(7)],
+          exportLabel: 'la exportación a XML'
+        }
+      }
+    )
+    await filas(w)[0].setValue(false)
+    expect(botonConfirmar(w).attributes('disabled')).toBeUndefined()
+
+    await botonConfirmar(w).trigger('click')
+    expect(w.emitted('confirm')[0][0]).toEqual({ excluidas: [7] })
   })
 
   it('al cerrar y reabrir vuelve a incluir todo', async () => {

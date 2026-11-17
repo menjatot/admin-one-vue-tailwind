@@ -188,9 +188,13 @@ const onConfirm = () =>
 
     <div class="flex flex-wrap items-center justify-between gap-2 mt-4">
       <p class="text-xs text-gray-500 dark:text-gray-400">
-        <template v-if="totalExcluidas > 0">
+        <template v-if="totalExcluidas > 0 && totalIncluidas > 0">
           {{ totalIncluidas }} de {{ incorrectas.length }} se incluirán en el fichero;
           {{ totalExcluidas === 1 ? '1 analítica queda fuera' : `${totalExcluidas} analíticas quedan fuera` }}.
+        </template>
+        <template v-else-if="totalExcluidas > 0">
+          Ninguna de las {{ incorrectas.length }} se incluirá en el fichero; el resto de la
+          selección se exporta igualmente.
         </template>
         <template v-else>
           Se incluirán las {{ incorrectas.length }} analíticas.
@@ -206,8 +210,6 @@ const onConfirm = () =>
         />
         <BaseButton
           :label="etiquetaConfirmar"
-          :disabled="totalIncluidas === 0"
-          :title="totalIncluidas === 0 ? 'Deja marcada al menos una analítica para poder exportar' : ''"
           color="info"
           rounded
           @click="onConfirm"

@@ -181,9 +181,13 @@ const getAnaliticasParaExportar = (excluidas = []) => {
   const seleccion = filtrarExcluidas(selectedRows.value, excluidas)
 
   if (seleccion.length === 0) {
-    notifyWarning('Selecciona al menos una analitica para exportar.', {
-      title: 'Seleccion requerida'
-    })
+    const hayExclusiones = (excluidas || []).length > 0
+    notifyWarning(
+      hayExclusiones
+        ? 'Has excluido todas las analíticas de la selección: no queda ninguna para exportar.'
+        : 'Selecciona al menos una analitica para exportar.',
+      { title: hayExclusiones ? 'Nada que exportar' : 'Seleccion requerida' }
+    )
     return null;
   }
 
@@ -201,6 +205,12 @@ const getAnaliticasParaExportar = (excluidas = []) => {
 // ...existing code...
 
 const handlePrintHTML = async (saltarRevision = false, excluidas = []) => {
+  // La selección se resuelve ANTES de abrir la ventana —es síncrono, no se pierde
+  // la activación del click— para no abrir una pestaña en balde si no queda nada
+  // que exportar (p. ej. se excluyeron todas las filas en la revisión).
+  const exportData = getAnaliticasParaExportar(excluidas)
+  if (!exportData) return
+
   // La ventana se abre DE FORMA SÍNCRONA dentro del click: si se hace después de
   // un await (la carga previa de datos tarda varios segundos), el navegador pierde
   // la "activación transitoria" del usuario, bloquea window.open como popup
@@ -221,12 +231,6 @@ const handlePrintHTML = async (saltarRevision = false, excluidas = []) => {
 
   exporting.value = true
   try {
-    const exportData = getAnaliticasParaExportar(excluidas);
-    if (!exportData) {
-      if (printWindow && !printWindow.closed) printWindow.close();
-      return;
-    }
-
     // Revisión previa: pantalla de incorrectas para poder corregirlas antes de exportar
     if (saltarRevision !== true) {
       const incorrectas = await getIncorrectas(exportData.analiticas)
