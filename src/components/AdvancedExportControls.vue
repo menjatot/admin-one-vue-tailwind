@@ -65,20 +65,16 @@ const confirmarRevision = async (payload = {}) => {
   revisionIncorrectas.value = []
   revisionPendiente.value = null
   if (!pend) return
-  if (pend.tipo === 'print' && pend.printWindow && !pend.printWindow.closed) {
-    pend.printWindow.close()
-  }
+  // La ventana de impresión se abre dentro de reanudar(), de forma síncrona con
+  // el click de este botón (la pestaña "Generando informe..." ya se cerró al
+  // abrir la revisión).
   await pend.reanudar(payload?.excluidas ?? [])
 }
 
 const cancelarRevision = () => {
-  const pend = revisionPendiente.value
   revisionAbierta.value = false
   revisionIncorrectas.value = []
   revisionPendiente.value = null
-  if (pend?.tipo === 'print' && pend.printWindow && !pend.printWindow.closed) {
-    pend.printWindow.close()
-  }
 }
 
 // Edición directa desde la pantalla de revisión: delega en el contenedor
@@ -235,9 +231,15 @@ const handlePrintHTML = async (saltarRevision = false, excluidas = []) => {
     if (saltarRevision !== true) {
       const incorrectas = await getIncorrectas(exportData.analiticas)
       if (incorrectas.length > 0) {
+        // La ventana se abrió para no perder la activación del click, pero el
+        // modal vive en ESTA pestaña: si se deja abierta, el usuario se queda
+        // mirando la pestaña "Generando informe..." y el proceso parece parado.
+        // Se cierra y, al confirmar, se abrirá otra de forma síncrona con el
+        // click del botón del modal.
+        if (printWindow && !printWindow.closed) printWindow.close()
+        window.focus()
         revisionPendiente.value = {
           tipo: 'print',
-          printWindow,
           reanudar: (idsExcluidos) => handlePrintHTML(true, idsExcluidos)
         }
         revisionIncorrectas.value = incorrectas

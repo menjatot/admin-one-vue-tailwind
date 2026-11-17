@@ -101,4 +101,45 @@ describe('AdvancedExportControls — exclusión de incorrectas en la exportació
     const libro = writeFileMock.mock.calls[0][0]
     expect(filasDatosExcel(libro)).toHaveLength(3)
   })
+
+  it('Imprimir: cierra la pestaña "Generando informe..." al abrir la revisión y la reabre al confirmar', async () => {
+    const ventanas = []
+    const nuevaVentana = () => {
+      const win = {
+        closed: false,
+        document: { open: vi.fn(), write: vi.fn(), close: vi.fn() }
+      }
+      win.close = vi.fn(() => {
+        win.closed = true
+      })
+      ventanas.push(win)
+      return win
+    }
+    const open = vi.spyOn(window, 'open').mockImplementation(() => nuevaVentana())
+    getIncorrectas.mockResolvedValue([
+      { analitica: ROWS[1], motivos: ['Cloro: 0 mg/l [0.2 - 1]'] },
+      { analitica: ROWS[2], motivos: ['pH: 9 [6.5 - 8.5]'] }
+    ])
+
+    const w = mountControls()
+    await flushPromises()
+    await boton(w, 'Imprimir').trigger('click')
+    await flushPromises()
+
+    // La ventana se abre para no perder la activación del click…
+    expect(open).toHaveBeenCalledTimes(1)
+    // …pero se cierra: el modal está en la pestaña de la app, no en la nueva
+    expect(ventanas[0].close).toHaveBeenCalledTimes(1)
+    expect(ventanas[0].closed).toBe(true)
+
+    // Al confirmar la revisión se abre otra ventana (síncrona con el click) con el informe
+    await w.findAll('button').find((b) => b.text().includes('Continuar con')).trigger('click')
+    await flushPromises()
+
+    expect(open).toHaveBeenCalledTimes(2)
+    expect(ventanas[1].closed).toBe(false)
+    const html = ventanas[1].document.write.mock.calls.at(-1)[0]
+    expect(html).toContain('Informe de Analíticas')
+    open.mockRestore()
+  })
 })
